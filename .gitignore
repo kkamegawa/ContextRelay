@@ -1,0 +1,35 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+out/
+dist/
+*.vsix
+
+# TypeScript cache
+*.tsbuildinfo
+
+# VS Code extension host
+.vscode-test/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Generated handoff documents and authentication token cache
+.contextrelay/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Editor directories
+.idea/
+*.swp
+*.swo
