@@ -8,20 +8,24 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 
 - **Keyword-first search** – Search across all connected Microsoft 365 sources with a single query.
 - **Source targeting via slash commands** – Narrow results to a specific source instantly.
-  | Command | Source |
-  |---------|--------|
-  | `/mail <query>` | Exchange Online mail |
-  | `/teams <query>` | Microsoft Teams messages |
-  | `/sharepoint <query>` | SharePoint sites & pages |
-  | `/onedrive <query>` | OneDrive files |
+
+| Command | Source |
+|---------|--------|
+| `/mail <query>` | Exchange Online mail |
+| `/teams <query>` | Microsoft Teams messages |
+| `/sharepoint <query>` | SharePoint sites & pages |
+| `/onedrive <query>` | OneDrive files |
+
 - **Snippet pinning** – Save any search result as a named snippet, visible across sessions.
-- **Timestamped handoff docs** – Generate Markdown documents that capture current context:
-  | Document | Purpose |
-  |----------|---------|
-  | `PLAN` | High-level goals and decisions |
-  | `TASKS` | Actionable to-do items |
-  | `TEST` | Test cases and acceptance criteria |
-  | `HANDOFF` | Full context summary for the next engineer or Copilot session |
+- **Timestamped handoff docs** – Generate Markdown documents that capture current context.
+
+| Document | Purpose |
+|----------|---------|
+| `PLAN` | High-level goals and decisions |
+| `TASKS` | Actionable to-do items |
+| `TEST` | Test cases and acceptance criteria |
+| `HANDOFF` | Full context summary for the next engineer or Copilot session |
+
 - **GitHub Copilot ready** – Generated docs follow a structured format that Copilot can parse for continuity.
 
 ---
@@ -48,14 +52,11 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 
 ### From Source
 
-```bash
-git clone https://github.com/kkamegawa/ContextRelay.git
-cd ContextRelay
-npm install
-npm run compile
-```
+Building the extension from source is not currently supported from this repository, which only contains documentation and supporting files.
 
-Press `F5` in VS Code to open a new Extension Development Host window with the extension loaded.
+To use ContextRelay, install it from the VS Code Marketplace as described above.
+
+If/when the extension source is published in this repository, this section will be updated with correct build instructions.
 
 ---
 
@@ -136,7 +137,7 @@ Choose one or more document types (**PLAN**, **TASKS**, **TEST**, **HANDOFF**). 
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+Contributions are welcome! Please review the guidelines below before submitting a pull request.
 
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feature/my-feature`.
