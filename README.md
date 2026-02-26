@@ -1,13 +1,13 @@
 # ContextRelay
 
-ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. It provides keyword-first search across Exchange mail, Teams messages, SharePoint sites, and OneDrive—with optional source targeting via slash commands. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST / HANDOFF) so GitHub Copilot can pick up the work fast.
+ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. It provides keyword-first search across Exchange mail, Teams messages, SharePoint sites, and OneDrive — with optional source targeting via slash commands. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
 
 ---
 
 ## Features
 
-- **Keyword-first search** – Search across all connected Microsoft 365 sources with a single query.
-- **Source targeting via slash commands** – Narrow results to a specific source instantly.
+- **Keyword-first search** -- Search across all connected Microsoft 365 sources with a single query.
+- **Source targeting via slash commands** -- Narrow results to a specific source instantly.
 
 | Command | Source |
 |---------|--------|
@@ -15,30 +15,45 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/teams <query>` | Microsoft Teams messages |
 | `/sharepoint <query>` | SharePoint sites & pages |
 | `/onedrive <query>` | OneDrive files |
+| `/all <query>` | All enabled sources (same as no prefix) |
 
-- **Snippet pinning** – Save any search result as a named snippet, visible across sessions.
-- **Timestamped handoff docs** – Generate Markdown documents that capture current context.
+- **Snippet pinning** -- Save any search result as a named snippet, visible across sessions.
+- **Timestamped handoff docs** -- Generate Markdown documents that capture current context.
 
 | Document | Purpose |
 |----------|---------|
-| `PLAN` | High-level goals and decisions |
-| `TASKS` | Actionable to-do items |
-| `TEST` | Test cases and acceptance criteria |
-| `HANDOFF` | Full context summary for the next engineer or Copilot session |
+| `PLAN.md` | High-level goals and decisions |
+| `TASKS.md` | Actionable to-do items |
+| `TEST_PLAN.md` | Test cases and acceptance criteria |
+| `HANDOFF.md` (optional) | Full context summary for the next engineer or Copilot session |
 
-- **GitHub Copilot ready** – Generated docs follow a structured format that Copilot can parse for continuity.
+- **GitHub Copilot ready** -- Generated docs follow a structured format that Copilot can parse for continuity.
 
 ---
 
 ## Requirements
 
 - [Visual Studio Code](https://code.visualstudio.com/) 1.85 or later
-- A Microsoft 365 account (Exchange, Teams, SharePoint, and/or OneDrive access)
-- An Azure AD app registration with the following Microsoft Graph API permissions:
-  - `Mail.Read`
-  - `ChannelMessage.Read.All`
-  - `Sites.Read.All`
-  - `Files.Read.All`
+- A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
+- **For SharePoint/OneDrive search and Chat features**: Microsoft 365 Copilot license assigned to the user
+- **For Exchange Mail and Teams search**: Standard Microsoft 365 license (no Copilot license needed)
+
+### Required permissions
+
+ContextRelay uses the VS Code built-in Microsoft authentication provider. No Azure AD app registration is needed. The following delegated permissions are requested via `vscode.authentication.getSession`:
+
+| Permission | Used by |
+|---|---|
+| `Files.Read.All` | SharePoint / OneDrive search |
+| `Sites.Read.All` | SharePoint / OneDrive search, Chat |
+| `Mail.Read` | Exchange Mail search, Chat |
+| `Chat.Read` | Teams search, Chat |
+| `ChannelMessage.Read.All` | Teams search, Chat |
+| `People.Read.All` | Chat |
+| `OnlineMeetingTranscript.Read.All` | Chat |
+| `ExternalItem.Read.All` | Connectors search, Chat (optional) |
+
+> **Note**: Some permissions (e.g., `ChannelMessage.Read.All`) may require tenant admin consent.
 
 ---
 
@@ -62,25 +77,36 @@ If/when the extension source is published in this repository, this section will 
 
 ## Configuration
 
-Add the following settings to your `settings.json`:
+Add the following settings to your `settings.json` (all optional):
 
 ```jsonc
 {
-  // Azure AD application (client) ID
-  "contextRelay.clientId": "<your-client-id>",
-
-  // Azure AD tenant ID (use "common" for multi-tenant)
-  "contextRelay.tenantId": "<your-tenant-id>",
-
   // Number of search results returned per source (default: 10)
   "contextRelay.maxResults": 10,
 
   // Directory where handoff documents are saved (default: ".contextrelay")
-  "contextRelay.outputDir": ".contextrelay"
+  "contextRelay.outputDir": ".contextrelay",
+
+  // Cache TTL in seconds (default: 300)
+  "contextRelay.cache.ttlSeconds": 300,
+
+  // Maximum number of cached entries, LRU eviction (default: 200)
+  "contextRelay.cache.maxEntries": 200,
+
+  // Persist cache in workspace state (default: true)
+  "contextRelay.cache.persistWorkspaceState": true,
+
+  // Enable the Chat tab — Copilot Chat API is in beta (default: true)
+  "contextRelay.enableChatPreview": true,
+
+  // Per-adapter enable/disable toggles (all default to true except connectors)
+  "contextRelay.adapters.mail": true,
+  "contextRelay.adapters.teams": true,
+  "contextRelay.adapters.sharepoint": true,
+  "contextRelay.adapters.onedrive": true,
+  "contextRelay.adapters.connectors": false
 }
 ```
-
-On first use, ContextRelay will open a browser window for Microsoft authentication (OAuth 2.0 device-code flow).
 
 ---
 
@@ -96,9 +122,11 @@ ContextRelay: Open Panel
 
 from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
 
+On first use, VS Code will prompt you to sign in with your Microsoft work/school account.
+
 ### Searching
 
-Type a keyword in the search box and press **Enter** to search all sources simultaneously.
+Type a keyword in the search box and press **Enter** to search all enabled sources simultaneously. Results are grouped by source section (Mail / Teams / SharePoint / OneDrive).
 
 To target a specific source, prefix your query with a slash command:
 
@@ -112,8 +140,8 @@ To target a specific source, prefix your query with a slash command:
 ### Pinning Snippets
 
 1. Hover over any search result.
-2. Click the **pin** icon (📌) to save it as a snippet.
-3. View all pinned snippets in the **Snippets** section of the panel.
+2. Click the **pin** icon to save it as a snippet.
+3. View all pinned snippets in the **Snippets** tab of the panel.
 
 ### Generating Handoff Documents
 
@@ -123,15 +151,24 @@ Run the command from the Command Palette:
 ContextRelay: Generate Handoff Docs
 ```
 
-Choose one or more document types (**PLAN**, **TASKS**, **TEST**, **HANDOFF**). Documents are saved as Markdown files with a UTC timestamp in the configured output directory:
+Choose one or more document types (**PLAN**, **TASKS**, **TEST_PLAN**, **HANDOFF**). Each run appends a new timestamped section (UTC) to the corresponding file in the configured output directory:
 
 ```
 .contextrelay/
-  PLAN-2025-06-01T12-00-00Z.md
-  TASKS-2025-06-01T12-00-00Z.md
-  TEST-2025-06-01T12-00-00Z.md
-  HANDOFF-2025-06-01T12-00-00Z.md
+  PLAN.md
+  TASKS.md
+  TEST_PLAN.md
+  HANDOFF.md
 ```
+
+### Copilot Handoff
+
+Use the built-in commands to hand off context to GitHub Copilot:
+
+- **ContextRelay: Open Copilot Chat with Handoff Prompt** -- Opens Copilot Chat with a pre-filled prompt referencing `HANDOFF.md`.
+- **ContextRelay: Copy Handoff Prompt to Clipboard** -- Copies a ready-to-paste Copilot prompt.
+
+Attach `HANDOFF.md` in Copilot Chat using VS Code's context mechanisms (#-mentions / Add Context).
 
 ---
 
@@ -150,4 +187,3 @@ Contributions are welcome! Please review the guidelines below before submitting 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
-
