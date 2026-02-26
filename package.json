@@ -1,15 +1,14 @@
 {
   "name": "context-relay",
-  "displayName": "ContextRelay",
+  "displayName": "ContextRelay for Microsoft 365",
   "description": "Surface Microsoft 365 context (SharePoint, OneDrive, Teams, Mail) in a VS Code side panel",
   "version": "0.1.0",
-  "publisher": "contextrelay",
+  "publisher": "Kazushi Kamegawa",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
-  "activationEvents": [
-    "onView:contextRelay.panel"
+  "categories": [
+    "Other"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -125,7 +124,8 @@
     "package": "webpack --mode production --devtool hidden-source-map",
     "compile-tests": "tsc -p ./tsconfig.test.json",
     "pretest": "npm run compile-tests",
-    "test": "node ./out-test/test/runTests.js",
+    "test": "node ./out-test/src/test/runTests.js",
+    "test:security": "npm audit --audit-level=high",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
@@ -133,11 +133,11 @@
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
     "@vscode/test-electron": "^2.3.8",
     "chai": "^4.4.1",
-    "eslint": "^8.56.0",
+    "eslint": "^9.39.0",
     "mocha": "^10.2.0",
     "ts-loader": "^9.5.1",
     "typescript": "^5.3.3",
