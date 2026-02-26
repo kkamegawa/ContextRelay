@@ -1,0 +1,147 @@
+{
+  "name": "context-relay",
+  "displayName": "ContextRelay",
+  "description": "Surface Microsoft 365 context (SharePoint, OneDrive, Teams, Mail) in a VS Code side panel",
+  "version": "0.1.0",
+  "publisher": "contextrelay",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onView:contextRelay.panel"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "contextRelay",
+          "title": "ContextRelay",
+          "icon": "$(search-view-icon)"
+        }
+      ]
+    },
+    "views": {
+      "contextRelay": [
+        {
+          "type": "webview",
+          "id": "contextRelay.panel",
+          "name": "ContextRelay"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "contextRelay.search",
+        "title": "ContextRelay: Search"
+      },
+      {
+        "command": "contextRelay.clearCache",
+        "title": "ContextRelay: Clear Cache"
+      },
+      {
+        "command": "contextRelay.clearSnippets",
+        "title": "ContextRelay: Clear All Snippets"
+      },
+      {
+        "command": "contextRelay.generateHandoffDocs",
+        "title": "ContextRelay: Generate Handoff Docs"
+      },
+      {
+        "command": "contextRelay.openCopilotChat",
+        "title": "ContextRelay: Open Copilot Chat with Handoff Prompt"
+      },
+      {
+        "command": "contextRelay.copyHandoffPrompt",
+        "title": "ContextRelay: Copy Handoff Prompt to Clipboard"
+      }
+    ],
+    "configuration": {
+      "title": "ContextRelay",
+      "properties": {
+        "contextRelay.maxResults": {
+          "type": "number",
+          "default": 10,
+          "description": "Number of search results returned per source"
+        },
+        "contextRelay.outputDir": {
+          "type": "string",
+          "default": ".contextrelay",
+          "description": "Directory where handoff documents are saved"
+        },
+        "contextRelay.cache.ttlSeconds": {
+          "type": "number",
+          "default": 300,
+          "description": "Cache TTL in seconds"
+        },
+        "contextRelay.cache.maxEntries": {
+          "type": "number",
+          "default": 200,
+          "description": "Maximum number of cached entries (LRU eviction)"
+        },
+        "contextRelay.cache.persistWorkspaceState": {
+          "type": "boolean",
+          "default": true,
+          "description": "Persist cache snapshot in workspace state"
+        },
+        "contextRelay.enableChatPreview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Chat tab (Copilot Chat API is in beta)"
+        },
+        "contextRelay.adapters.mail": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Exchange Mail adapter"
+        },
+        "contextRelay.adapters.teams": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Teams adapter"
+        },
+        "contextRelay.adapters.sharepoint": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable SharePoint adapter"
+        },
+        "contextRelay.adapters.onedrive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable OneDrive adapter"
+        },
+        "contextRelay.adapters.connectors": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Copilot connectors adapter"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p ./tsconfig.test.json",
+    "pretest": "npm run compile-tests",
+    "test": "node ./out-test/test/runTests.js",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vscode/test-electron": "^2.3.8",
+    "chai": "^4.4.1",
+    "eslint": "^8.56.0",
+    "mocha": "^10.2.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.4"
+  }
+}

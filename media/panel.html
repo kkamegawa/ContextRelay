@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline' {{cssUri}}; script-src 'nonce-{{cspNonce}}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{cssUri}}">
+  <title>ContextRelay</title>
+</head>
+<body>
+  <div id="app">
+    <header id="header">
+      <span id="account-label" class="account-label" aria-live="polite"></span>
+      <button id="sign-in-btn" class="btn-primary" aria-label="Sign in to Microsoft 365" style="display:none">Sign in</button>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="ContextRelay tabs">
+      <button class="tab active" data-tab="search" role="tab" aria-selected="true" aria-controls="panel-search" id="tab-search">Search</button>
+      <button class="tab" data-tab="chat" role="tab" aria-selected="false" aria-controls="panel-chat" id="tab-chat">Chat</button>
+      <button class="tab" data-tab="snippets" role="tab" aria-selected="false" aria-controls="panel-snippets" id="tab-snippets">Snippets</button>
+      <button class="tab" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings" id="tab-settings">Settings</button>
+    </nav>
+
+    <!-- Search Tab -->
+    <div id="panel-search" class="tab-panel active" role="tabpanel" aria-labelledby="tab-search">
+      <div class="search-bar">
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
+          placeholder="Search or /mail, /teams, /sharepoint, /onedrive, /all"
+          aria-label="Search query"
+          autocomplete="off"
+        />
+        <button id="search-btn" class="btn-icon" aria-label="Run search" title="Search">&#8629;</button>
+      </div>
+      <div id="search-status" class="status-bar" aria-live="polite" role="status"></div>
+      <div id="search-results" class="results-container" aria-live="polite"></div>
+    </div>
+
+    <!-- Chat Tab -->
+    <div id="panel-chat" class="tab-panel" role="tabpanel" aria-labelledby="tab-chat" style="display:none">
+      <div class="beta-banner" role="alert">
+        ⚠️ Preview / Beta API — The Copilot Chat API may change without notice.
+      </div>
+      <div class="chat-toolbar">
+        <button id="new-conversation-btn" class="btn-secondary" aria-label="New conversation">New Conversation</button>
+      </div>
+      <div id="chat-messages" class="chat-messages" aria-live="polite" aria-label="Chat messages"></div>
+      <div class="chat-input-row">
+        <input
+          type="text"
+          id="chat-input"
+          class="search-input"
+          placeholder="Ask a question grounded in Microsoft 365..."
+          aria-label="Chat message"
+          autocomplete="off"
+        />
+        <button id="chat-send-btn" class="btn-icon" aria-label="Send message" title="Send">&#8629;</button>
+      </div>
+      <div id="chat-status" class="status-bar" aria-live="polite" role="status"></div>
+    </div>
+
+    <!-- Snippets Tab -->
+    <div id="panel-snippets" class="tab-panel" role="tabpanel" aria-labelledby="tab-snippets" style="display:none">
+      <div class="snippets-toolbar">
+        <button id="clear-snippets-btn" class="btn-secondary" aria-label="Clear all snippets">Clear All</button>
+      </div>
+      <div id="snippets-list" class="results-container" aria-live="polite" aria-label="Saved snippets"></div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="panel-settings" class="tab-panel" role="tabpanel" aria-labelledby="tab-settings" style="display:none">
+      <div class="settings-content">
+        <h3>ContextRelay Settings</h3>
+        <p class="settings-hint">Configure settings via <code>File &gt; Preferences &gt; Settings</code> (search "contextRelay").</p>
+        <ul class="settings-list">
+          <li><strong>contextRelay.maxResults</strong> — Results per source (default: 10)</li>
+          <li><strong>contextRelay.cache.ttlSeconds</strong> — Cache TTL in seconds (default: 300)</li>
+          <li><strong>contextRelay.enableChatPreview</strong> — Enable Chat tab (default: true)</li>
+          <li><strong>contextRelay.adapters.mail</strong> — Enable Mail adapter</li>
+          <li><strong>contextRelay.adapters.teams</strong> — Enable Teams adapter</li>
+          <li><strong>contextRelay.adapters.sharepoint</strong> — Enable SharePoint adapter</li>
+          <li><strong>contextRelay.adapters.onedrive</strong> — Enable OneDrive adapter</li>
+        </ul>
+        <div class="settings-actions">
+          <button id="clear-cache-btn" class="btn-secondary" aria-label="Clear cache">Clear Cache</button>
+          <button id="generate-docs-btn" class="btn-secondary" aria-label="Generate handoff docs">Generate Handoff Docs</button>
+          <button id="copy-prompt-btn" class="btn-secondary" aria-label="Copy handoff prompt">Copy Handoff Prompt</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script nonce="{{cspNonce}}" src="{{jsUri}}"></script>
+</body>
+</html>

@@ -6,6 +6,7 @@ yarn-error.log*
 
 # Build output
 out/
+out-test/
 dist/
 *.vsix
 
