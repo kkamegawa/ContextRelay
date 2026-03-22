@@ -12,7 +12,7 @@ async function main(): Promise<void> {
       launchArgs: ['--disable-extensions']
     });
   } catch (err) {
-    console.error('Failed to run tests:', err);
+    process.stderr.write(`Failed to run tests: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
     process.exit(1);
   }
 }

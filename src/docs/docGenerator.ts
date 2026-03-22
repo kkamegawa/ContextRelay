@@ -18,9 +18,9 @@ function ensureDir(dir: string): void {
   }
 }
 
-function appendSection(filePath: string, heading: string, content: string): void {
-  const section = `\n## ${heading}\n\n${content}\n`;
-  fs.appendFileSync(filePath, section, 'utf8');
+function appendUpdate(filePath: string, content: string): void {
+  const prefix = fs.existsSync(filePath) && fs.statSync(filePath).size > 0 ? '\n\n' : '';
+  fs.appendFileSync(filePath, `${prefix}${content.trimEnd()}\n`, 'utf8');
 }
 
 export class DocGenerator {
@@ -124,10 +124,10 @@ export class DocGenerator {
     const testPlanPath = path.join(outputDir, 'TEST_PLAN.md');
     const handoffPath = path.join(outputDir, 'HANDOFF.md');
 
-    appendSection(planPath, '', this.generatePlan(context).replace(/^## /, ''));
-    appendSection(tasksPath, '', this.generateTasks().replace(/^## /, ''));
-    appendSection(testPlanPath, '', this.generateTestPlan().replace(/^## /, ''));
-    appendSection(handoffPath, '', this.generateHandoff(context).replace(/^## /, ''));
+    appendUpdate(planPath, this.generatePlan(context));
+    appendUpdate(tasksPath, this.generateTasks());
+    appendUpdate(testPlanPath, this.generateTestPlan());
+    appendUpdate(handoffPath, this.generateHandoff(context));
   }
 
   async generateAll(context: HandoffContext): Promise<string[]> {
@@ -144,7 +144,7 @@ export class DocGenerator {
     const written: string[] = [];
     for (const file of files) {
       const filePath = path.join(outputDir, file.name);
-      fs.appendFileSync(filePath, '\n' + file.content, 'utf8');
+      appendUpdate(filePath, file.content);
       written.push(filePath);
     }
     return written;

@@ -67,11 +67,37 @@ ContextRelay uses the VS Code built-in Microsoft authentication provider. No Azu
 
 ### From Source
 
-Building the extension from source is not currently supported from this repository, which only contains documentation and supporting files.
+1. Clone this repository.
+2. Install dependencies:
 
-To use ContextRelay, install it from the VS Code Marketplace as described above.
+  ```bash
+  npm install
+  ```
 
-If/when the extension source is published in this repository, this section will be updated with correct build instructions.
+3. Build the extension:
+
+  ```bash
+  npm run compile
+  ```
+
+4. Press `F5` in VS Code to launch the Extension Development Host.
+
+Before submitting changes, run:
+
+```bash
+npm run compile
+npm run lint
+npm test
+npm run security:check
+```
+
+Additional project docs:
+
+- [Design plan](docs/plan.md)
+- [Implementation tasks](docs/tasks.md)
+- [Test plan](docs/test_plan.md)
+- [E2E manual checklist](docs/e2e_checklist.md)
+- [E2E review summary](docs/e2e_report.md)
 
 ---
 
@@ -151,7 +177,7 @@ Run the command from the Command Palette:
 ContextRelay: Generate Handoff Docs
 ```
 
-Choose one or more document types (**PLAN**, **TASKS**, **TEST_PLAN**, **HANDOFF**). Each run appends a new timestamped section (UTC) to the corresponding file in the configured output directory:
+Each run appends a new timestamped section (UTC) to the corresponding file in the configured output directory:
 
 ```
 .contextrelay/

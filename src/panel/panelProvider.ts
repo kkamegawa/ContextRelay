@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
 import { AuthProvider } from '../auth/authProvider';
 import { CacheStore } from '../cache/cacheStore';
+import { HandoffContext } from '../docs/docGenerator';
 import { SnippetStore } from '../snippets/snippetStore';
 import { DocGenerator } from '../docs/docGenerator';
 import { parseCommand, getHelpText } from '../router/commandRouter';
@@ -11,6 +11,7 @@ import { searchTeams } from '../adapters/teamsAdapter';
 import { searchRetrieval } from '../adapters/retrievalAdapter';
 import { createConversation, sendMessage } from '../adapters/chatAdapter';
 import { ContextItem } from '../models/contextItem';
+import { buildSearchSummary } from './searchSummary';
 
 interface SearchResult {
   source: string;
@@ -32,13 +33,15 @@ export class PanelProvider implements vscode.WebviewViewProvider {
   private snippetStore: SnippetStore;
   private docGenerator: DocGenerator;
   private currentConversationId?: string;
+  private webviewReady = false;
+  private pendingMessages: unknown[] = [];
+  private latestSearchSummary?: string;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly authProvider: AuthProvider,
     private readonly extensionUri: vscode.Uri
   ) {
-    const config = vscode.workspace.getConfiguration('contextRelay');
     this.cache = new CacheStore<ContextItem[]>(
       context,
       () => vscode.workspace.getConfiguration('contextRelay').get<number>('cache.ttlSeconds', 300),
@@ -55,6 +58,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ): void {
     this.view = webviewView;
+    this.webviewReady = false;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -68,9 +72,6 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       undefined,
       this.context.subscriptions
     );
-
-    // Send initial state
-    this.sendAuthState();
   }
 
   private async handleMessage(message: PanelMessage): Promise<void> {
@@ -98,9 +99,38 @@ export class PanelProvider implements vscode.WebviewViewProvider {
         await this.handleSignIn();
         break;
       case 'ready':
+        this.webviewReady = true;
         await this.sendAuthState();
+        await this.sendUiState();
+        this.flushPendingMessages();
+        break;
+      case 'clearCache':
+        await vscode.commands.executeCommand('contextRelay.clearCache');
+        break;
+      case 'clearSnippets':
+        await vscode.commands.executeCommand('contextRelay.clearSnippets');
+        break;
+      case 'generateDocs':
+        await vscode.commands.executeCommand('contextRelay.generateHandoffDocs');
+        break;
+      case 'copyPrompt':
+        await vscode.commands.executeCommand('contextRelay.copyHandoffPrompt');
+        break;
+      case 'openUrl':
+        await this.handleOpenUrl(message.url as string);
+        break;
+      case 'copyText':
+        await this.handleCopyText(message.text as string);
         break;
     }
+  }
+
+  public async refreshAuthState(): Promise<void> {
+    await this.sendAuthState();
+  }
+
+  public async refreshUiState(): Promise<void> {
+    await this.sendUiState();
   }
 
   private async handleSignIn(): Promise<void> {
@@ -121,6 +151,14 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       type: 'authState',
       signedIn: !!label,
       accountLabel: label ?? null
+    });
+  }
+
+  private async sendUiState(): Promise<void> {
+    const config = vscode.workspace.getConfiguration('contextRelay');
+    this.postMessage({
+      type: 'uiState',
+      chatEnabled: config.get<boolean>('enableChatPreview', true)
     });
   }
 
@@ -231,7 +269,33 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    this.latestSearchSummary = buildSearchSummary(query, results);
+
     this.postMessage({ type: 'searchResults', results });
+  }
+
+  private async handleOpenUrl(url: string): Promise<void> {
+    if (!url?.trim()) {
+      return;
+    }
+
+    try {
+      await vscode.env.openExternal(vscode.Uri.parse(url));
+    } catch (err) {
+      this.postMessage({
+        type: 'error',
+        message: `Failed to open link: ${err instanceof Error ? err.message : String(err)}`
+      });
+    }
+  }
+
+  private async handleCopyText(text: string): Promise<void> {
+    if (!text?.trim()) {
+      return;
+    }
+
+    await vscode.env.clipboard.writeText(text);
+    vscode.window.showInformationMessage('ContextRelay: Text copied to clipboard.');
   }
 
   private async handleChat(message: string): Promise<void> {
@@ -285,7 +349,24 @@ export class PanelProvider implements vscode.WebviewViewProvider {
   }
 
   postMessage(message: unknown): void {
-    this.view?.webview.postMessage(message);
+    if (this.view && this.webviewReady) {
+      this.view.webview.postMessage(message);
+      return;
+    }
+
+    this.pendingMessages.push(message);
+  }
+
+  private flushPendingMessages(): void {
+    if (!this.view || !this.webviewReady || this.pendingMessages.length === 0) {
+      return;
+    }
+
+    const queued = [...this.pendingMessages];
+    this.pendingMessages = [];
+    queued.forEach(message => {
+      this.view?.webview.postMessage(message);
+    });
   }
 
   clearCache(): void {
@@ -304,6 +385,13 @@ export class PanelProvider implements vscode.WebviewViewProvider {
 
   getDocGenerator(): DocGenerator {
     return this.docGenerator;
+  }
+
+  getHandoffContext(): HandoffContext {
+    return {
+      snippets: this.snippetStore.getAll(),
+      searchSummary: this.latestSearchSummary
+    };
   }
 
   private getHtmlContent(webview: vscode.Webview): string {

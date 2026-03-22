@@ -27,21 +27,27 @@
   const signInBtn = document.getElementById('sign-in-btn');
   const accountLabel = document.getElementById('account-label');
 
+  function activateTab(target) {
+    tabs.forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === target);
+      t.setAttribute('aria-selected', t.dataset.tab === target ? 'true' : 'false');
+    });
+    panels.forEach(p => {
+      const isActive = p.id === `panel-${target}`;
+      p.classList.toggle('active', isActive);
+      p.style.display = isActive ? '' : 'none';
+    });
+    if (target === 'snippets') {
+      vscode.postMessage({ type: 'getSnippets' });
+    }
+  }
+
   // Tab switching
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const target = tab.dataset.tab;
-      tabs.forEach(t => {
-        t.classList.toggle('active', t.dataset.tab === target);
-        t.setAttribute('aria-selected', t.dataset.tab === target ? 'true' : 'false');
-      });
-      panels.forEach(p => {
-        const isActive = p.id === `panel-${target}`;
-        p.classList.toggle('active', isActive);
-        p.style.display = isActive ? '' : 'none';
-      });
-      if (target === 'snippets') {
-        vscode.postMessage({ type: 'getSnippets' });
+      if (target) {
+        activateTab(target);
       }
     });
   });
@@ -112,6 +118,9 @@
     switch (message.type) {
       case 'authState':
         updateAuthState(message.signedIn, message.accountLabel);
+        break;
+      case 'uiState':
+        updateUiState(message);
         break;
       case 'authRequired':
         showAuthRequired(message.message);
@@ -192,13 +201,50 @@
    */
   function showAuthRequired(message) {
     if (searchResults) {
-      searchResults.innerHTML = `
-        <div class="auth-required">
-          <p>${escapeHtml(message)}</p>
-          <button class="btn-primary" onclick="document.getElementById('sign-in-btn').click()">Sign in</button>
-        </div>`;
+      searchResults.innerHTML = '';
+      const container = document.createElement('div');
+      container.className = 'auth-required';
+
+      const text = document.createElement('p');
+      text.textContent = message;
+      container.appendChild(text);
+
+      const button = document.createElement('button');
+      button.className = 'btn-primary';
+      button.textContent = 'Sign in';
+      button.addEventListener('click', () => {
+        vscode.postMessage({ type: 'signIn' });
+      });
+      container.appendChild(button);
+
+      searchResults.appendChild(container);
     }
     if (searchStatus) { searchStatus.textContent = ''; }
+  }
+
+  /**
+   * @param {{ chatEnabled?: boolean }} state
+   */
+  function updateUiState(state) {
+    const chatTab = document.getElementById('tab-chat');
+    const chatPanel = document.getElementById('panel-chat');
+    const chatEnabled = state.chatEnabled !== false;
+
+    if (chatTab) {
+      chatTab.style.display = chatEnabled ? '' : 'none';
+      chatTab.setAttribute('aria-hidden', chatEnabled ? 'false' : 'true');
+    }
+
+    if (chatPanel) {
+      chatPanel.style.display = chatEnabled && chatPanel.classList.contains('active') ? '' : 'none';
+    }
+
+    if (!chatEnabled) {
+      const isChatActive = chatPanel && chatPanel.classList.contains('active');
+      if (isChatActive) {
+        activateTab('search');
+      }
+    }
   }
 
   /**

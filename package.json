@@ -17,7 +17,7 @@
         {
           "id": "contextRelay",
           "title": "ContextRelay",
-          "icon": "$(search-view-icon)"
+          "icon": "media/contextRelay-icon.svg"
         }
       ]
     },
@@ -31,6 +31,10 @@
       ]
     },
     "commands": [
+      {
+        "command": "contextRelay.openPanel",
+        "title": "ContextRelay: Open Panel"
+      },
       {
         "command": "contextRelay.search",
         "title": "ContextRelay: Search"
@@ -117,11 +121,16 @@
       }
     }
   },
+  "overrides": {
+    "flatted": "3.4.2",
+    "serialize-javascript": "7.0.4"
+  },
   "scripts": {
     "vscode:prepublish": "npm run package",
     "security:check": "npm audit --audit-level=moderate",
     "precompile": "npm run security:check",
-    "compile": "tsc -p ./",
+    "compile:types": "tsc -p ./",
+    "compile": "npm run compile:types && webpack --mode development --devtool hidden-source-map",
     "watch": "tsc -watch -p ./",
     "prepackage": "npm run security:check",
     "package": "webpack --mode production --devtool hidden-source-map",
@@ -144,7 +153,7 @@
     "mocha": "^10.2.0",
     "ts-loader": "^9.5.1",
     "typescript": "^5.3.3",
-    "webpack": "^5.90.0",
+    "webpack": "^5.105.4",
     "webpack-cli": "^5.1.4"
   }
 }

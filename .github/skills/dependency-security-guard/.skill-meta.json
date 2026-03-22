@@ -1,0 +1,7 @@
+{
+  "name": "dependency-security-guard",
+  "source": "unknown",
+  "description": "Use when updating npm dependencies, adding packages, fixing npm audit vulnerabilities, or preparing build/PR for dependency changes.",
+  "categories": [],
+  "installedAt": "2026-03-02T21:31:34.854Z"
+}

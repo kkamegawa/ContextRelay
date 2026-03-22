@@ -5,6 +5,7 @@ import * as path from 'path';
 interface PackageJson {
   devDependencies?: Record<string, string>;
   scripts?: Record<string, string>;
+  overrides?: Record<string, string>;
 }
 
 function getMajor(versionRange: string | undefined): number | undefined {
@@ -54,6 +55,23 @@ suite('Dependency security baselines', () => {
     assert.ok(
       (getMajor(parserVersion) ?? 0) >= 8,
       `@typescript-eslint/parser must be v8+ to avoid known high vulnerabilities (found: ${parserVersion})`
+    );
+  });
+
+  test('pins safe override versions for vulnerable transitive dependencies', () => {
+    const packageJsonPath = path.resolve(__dirname, '../../../../package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as PackageJson;
+
+    assert.equal(
+      packageJson.overrides?.flatted,
+      '3.4.2',
+      'flatted override must pin the first non-vulnerable release'
+    );
+
+    assert.equal(
+      packageJson.overrides?.['serialize-javascript'],
+      '7.0.4',
+      'serialize-javascript override must pin a non-vulnerable release'
     );
   });
 });

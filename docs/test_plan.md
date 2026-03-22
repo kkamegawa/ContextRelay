@@ -1,6 +1,6 @@
 # ContextRelay — Test Plan
 
-> Cross-reference: [plan.md](plan.md) for design rationale, [tasks.md](tasks.md) for implementation tasks.
+> Cross-reference: [plan.md](plan.md) for design rationale, [tasks.md](tasks.md) for implementation tasks, and [e2e_checklist.md](e2e_checklist.md) for a step-by-step manual verification runbook.
 
 ---
 

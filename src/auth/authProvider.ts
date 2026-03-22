@@ -53,7 +53,7 @@ export class AuthProvider {
         silent
       });
       return this.session;
-    } catch (err) {
+    } catch {
       this.session = undefined;
       return undefined;
     }
