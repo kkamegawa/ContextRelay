@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { buildProviderScopes, getBuiltInAuthConfigurationMessage } from './authScopes';
 
 const MAIL_SCOPES = ['Mail.Read'];
 const TEAMS_SCOPES = ['Chat.Read', 'ChannelMessage.Read.All'];
@@ -17,35 +18,48 @@ const CHAT_SCOPES = [
 export class AuthProvider {
   private session: vscode.AuthenticationSession | undefined;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(_context: vscode.ExtensionContext) {}
 
   getRequiredScopes(): string[] {
     const config = vscode.workspace.getConfiguration('contextRelay');
-    const scopes = new Set<string>();
+    const featureScopes = new Set<string>();
 
     if (config.get<boolean>('adapters.mail', true)) {
-      MAIL_SCOPES.forEach(s => scopes.add(s));
+      MAIL_SCOPES.forEach(s => featureScopes.add(s));
     }
     if (config.get<boolean>('adapters.teams', true)) {
-      TEAMS_SCOPES.forEach(s => scopes.add(s));
+      TEAMS_SCOPES.forEach(s => featureScopes.add(s));
     }
     if (
       config.get<boolean>('adapters.sharepoint', true) ||
       config.get<boolean>('adapters.onedrive', true)
     ) {
-      RETRIEVAL_SCOPES.forEach(s => scopes.add(s));
+      RETRIEVAL_SCOPES.forEach(s => featureScopes.add(s));
     }
     if (config.get<boolean>('adapters.connectors', false)) {
-      CONNECTORS_SCOPES.forEach(s => scopes.add(s));
+      CONNECTORS_SCOPES.forEach(s => featureScopes.add(s));
     }
     if (config.get<boolean>('enableChatPreview', true)) {
-      CHAT_SCOPES.forEach(s => scopes.add(s));
+      CHAT_SCOPES.forEach(s => featureScopes.add(s));
     }
 
-    return Array.from(scopes);
+    return buildProviderScopes(Array.from(featureScopes), {
+      clientId: config.get<string>('auth.clientId')?.trim(),
+      tenantId: config.get<string>('auth.tenantId', 'organizations')?.trim()
+    });
   }
 
   async getSession(silent = false): Promise<vscode.AuthenticationSession | undefined> {
+    const config = vscode.workspace.getConfiguration('contextRelay');
+    const clientId = config.get<string>('auth.clientId')?.trim();
+    if (!clientId) {
+      if (silent) {
+        return undefined;
+      }
+
+      throw new Error(getBuiltInAuthConfigurationMessage());
+    }
+
     const scopes = this.getRequiredScopes();
     try {
       this.session = await vscode.authentication.getSession('microsoft', scopes, {
@@ -53,8 +67,18 @@ export class AuthProvider {
         silent
       });
       return this.session;
-    } catch {
+    } catch (err) {
       this.session = undefined;
+
+      if (!silent) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('AADSTS65002')) {
+          throw new Error(
+            `${getBuiltInAuthConfigurationMessage()} Current sign-in is still using VS Code's default client and was rejected by Microsoft Graph preauthorization.`
+          );
+        }
+      }
+
       return undefined;
     }
   }

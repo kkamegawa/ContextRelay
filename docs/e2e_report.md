@@ -28,6 +28,9 @@ The following user-flow issues were identified and fixed:
 4. **Generated handoff docs did not include the latest search context**
    - Fixed by building and persisting a search summary from the latest search results and feeding it into doc generation.
 
+5. **Built-in VS Code Microsoft authentication failed with `AADSTS65002` when using VS Code's default first-party client id**
+   - Fixed by continuing to use the built-in provider, but injecting a custom client/tenant via `VSCODE_CLIENT_ID` and `VSCODE_TENANT` override scopes.
+
 ---
 
 ## 3. Automated validation status

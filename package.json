@@ -73,6 +73,16 @@
           "default": ".contextrelay",
           "description": "Directory where handoff documents are saved"
         },
+        "contextRelay.auth.clientId": {
+          "type": "string",
+          "default": "",
+          "description": "Microsoft Entra application (client) ID injected into the built-in VS Code Microsoft auth provider via VSCODE_CLIENT_ID"
+        },
+        "contextRelay.auth.tenantId": {
+          "type": "string",
+          "default": "organizations",
+          "description": "Tenant ID or domain injected into the built-in VS Code Microsoft auth provider via VSCODE_TENANT"
+        },
         "contextRelay.cache.ttlSeconds": {
           "type": "number",
           "default": 300,

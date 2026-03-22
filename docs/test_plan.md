@@ -20,8 +20,8 @@ Authentication, slash routing, Retrieval API, Chat API (preview), Exchange Mail 
 ## 3. Authentication
 
 **T-AUTH-01 Sign in**
-- Steps: Open ContextRelay panel → Click "Sign in" or trigger first query
-- Expected: `vscode.authentication.getSession` returns a session; signed-in account name is displayed in the panel header.
+- Steps: Configure `contextRelay.auth.clientId` → Open ContextRelay panel → Click "Sign in" or trigger first query
+- Expected: VS Code built-in Microsoft authentication starts, and the signed-in account name is displayed in the panel header.
 
 **T-AUTH-02 Session change / sign out**
 - Steps: Sign out via VS Code Accounts menu
@@ -30,6 +30,14 @@ Authentication, slash routing, Retrieval API, Chat API (preview), Exchange Mail 
 **T-AUTH-03 Consent not granted**
 - Steps: Attempt a query with an account that has not consented to required permissions
 - Expected: Actionable error message listing the missing permissions, with instructions to contact tenant admin if admin consent is needed.
+
+**T-AUTH-04 Missing client ID configuration**
+- Steps: Remove `contextRelay.auth.clientId` and click "Sign in"
+- Expected: Actionable error explains that the built-in VS Code Microsoft auth provider needs `contextRelay.auth.clientId` so it can override the default first-party client registration.
+
+**T-AUTH-05 Default client preauthorization error is avoided**
+- Steps: Configure `contextRelay.auth.clientId` and retry sign-in for Graph scopes that previously failed with `AADSTS65002`
+- Expected: Sign-in no longer attempts to use VS Code's default client id `aebc6443-996d-45c2-90f0-388ff96faa56` for those scopes.
 
 ---
 

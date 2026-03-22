@@ -108,9 +108,11 @@ Recommended pre-run settings:
 ### E2E-11 Sign in from panel
 - Status: [ ]
 - Steps:
+  1. Set `contextRelay.auth.clientId`.
   1. Click **Sign in**.
   2. Complete VS Code Microsoft authentication.
 - Expected:
+  - Built-in VS Code Microsoft authentication flow starts.
   - Header shows `Signed in: <account>`.
   - Sign-in button disappears.
 
@@ -133,6 +135,22 @@ Recommended pre-run settings:
 - Expected:
   - Header reflects the signed-out state.
   - Search/chat actions require re-authentication.
+
+### E2E-14 Missing app-registration configuration
+- Status: [ ]
+- Steps:
+  1. Clear `contextRelay.auth.clientId`.
+  2. Click **Sign in**.
+- Expected:
+  - The panel shows an actionable error explaining that the built-in VS Code auth provider needs a custom client id override for these Graph scopes.
+
+### E2E-15 AADSTS65002 regression check
+- Status: [ ]
+- Steps:
+  1. Configure `contextRelay.auth.clientId` and the required redirect URIs.
+  2. Trigger sign-in again.
+- Expected:
+  - The previous `AADSTS65002` preauthorization error does not occur.
 
 ---
 

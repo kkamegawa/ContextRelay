@@ -20,7 +20,7 @@
 
 ## B. Authentication
 
-- [ ] Implement sign-in using `vscode.authentication.getSession('microsoft', scopes, { createIfNone: true })`
+- [ ] Implement sign-in using `vscode.authentication.getSession('microsoft', ...)` with custom client/tenant override scopes
 - [ ] Build scope set dynamically based on enabled adapters (see permission matrix in plan.md Section 6)
 - [ ] Listen for `onDidChangeSessions` to react to sign-out / account changes
 - [ ] Show signed-in account name in the panel header
