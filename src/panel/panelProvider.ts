@@ -11,7 +11,11 @@ import { searchTeams } from '../adapters/teamsAdapter';
 import { searchRetrieval } from '../adapters/retrievalAdapter';
 import { createConversation, sendMessage } from '../adapters/chatAdapter';
 import { ContextItem } from '../models/contextItem';
+import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
 import { buildSearchSummary } from './searchSummary';
+import { createFallbackPreview, createMailPreview, getMailMessageId } from './itemPreview';
+import { buildHandoffSnippetDraft } from './handoffSelection';
+import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from '../adapters/graphClient';
 
 interface SearchResult {
   source: string;
@@ -87,7 +91,14 @@ export class PanelProvider implements vscode.WebviewViewProvider {
         this.postMessage({ type: 'conversationReset' });
         break;
       case 'pinSnippet':
-        this.handlePinSnippet(message.item as ContextItem);
+        await this.handlePinSnippet(message.item as ContextItem, message.name as string | undefined);
+        break;
+      case 'savePreviewSnippet':
+        this.handleSavePreviewSnippet(
+          message.item as ContextItem,
+          message.selectedText as string | undefined,
+          message.previewBody as string | undefined
+        );
         break;
       case 'removeSnippet':
         this.handleRemoveSnippet(message.id as string);
@@ -102,6 +113,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
         this.webviewReady = true;
         await this.sendAuthState();
         await this.sendUiState();
+        this.sendSnippets();
         this.flushPendingMessages();
         break;
       case 'clearCache':
@@ -113,6 +125,12 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       case 'generateDocs':
         await vscode.commands.executeCommand('contextRelay.generateHandoffDocs');
         break;
+      case 'openHandoffDoc':
+        await vscode.commands.executeCommand('contextRelay.openHandoffDoc');
+        break;
+      case 'openCopilotChat':
+        await vscode.commands.executeCommand('contextRelay.openCopilotChat');
+        break;
       case 'copyPrompt':
         await vscode.commands.executeCommand('contextRelay.copyHandoffPrompt');
         break;
@@ -121,6 +139,9 @@ export class PanelProvider implements vscode.WebviewViewProvider {
         break;
       case 'copyText':
         await this.handleCopyText(message.text as string);
+        break;
+      case 'previewItem':
+        await this.handlePreviewItem(message.item as ContextItem);
         break;
     }
   }
@@ -298,6 +319,46 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     vscode.window.showInformationMessage('ContextRelay: Text copied to clipboard.');
   }
 
+  private async handlePreviewItem(item: ContextItem): Promise<void> {
+    if (!item) {
+      return;
+    }
+
+    this.postMessage({ type: 'previewStart', item });
+
+    try {
+      let preview = createFallbackPreview(item);
+
+      if (item.source === 'mail') {
+        let token: string;
+        try {
+          token = await this.authProvider.getAccessToken();
+        } catch (err) {
+          this.postMessage({
+            type: 'previewError',
+            message: err instanceof Error ? err.message : 'Authentication required for preview.'
+          });
+          return;
+        }
+
+        const messageId = getMailMessageId(item);
+        if (messageId) {
+          const url = `${GRAPH_BASE}/v1.0/me/messages/${encodeURIComponent(messageId)}?$select=body`;
+          const response = await graphFetchWithRetry(url, token, { method: 'GET' });
+          const data = await handleGraphResponse(response) as { body?: { contentType?: string; content?: string } };
+          preview = createMailPreview(item, data);
+        }
+      }
+
+      this.postMessage({ type: 'previewContent', preview });
+    } catch (err) {
+      this.postMessage({
+        type: 'previewError',
+        message: err instanceof Error ? err.message : String(err)
+      });
+    }
+  }
+
   private async handleChat(message: string): Promise<void> {
     if (!message?.trim()) {
       return;
@@ -332,9 +393,40 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private handlePinSnippet(item: ContextItem): void {
-    const snippet = this.snippetStore.save(item);
+  private async handlePinSnippet(item: ContextItem, name?: string): Promise<void> {
+    let handoffItem = item;
+
+    if (item.source === 'mail' || item.source === 'sharepoint' || item.source === 'onedrive') {
+      try {
+        const token = await this.authProvider.getAccessToken();
+        handoffItem = await hydrateItemForHandoff(token, item);
+      } catch (err) {
+        vscode.window.showWarningMessage(
+          `ContextRelay: Could not fetch full content for "${item.title}". Saved available excerpt instead. ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+
+    const snippet = this.snippetStore.save(handoffItem, name);
     this.postMessage({ type: 'snippetSaved', snippet });
+    this.sendSnippets();
+    vscode.window.showInformationMessage(`Snippet "${snippet.name}" saved.`);
+  }
+
+  private handleSavePreviewSnippet(
+    item: ContextItem,
+    selectedText?: string,
+    previewBody?: string
+  ): void {
+    const draft = buildHandoffSnippetDraft(item, { selectedText, previewBody });
+    if (!draft) {
+      this.postMessage({ type: 'error', message: 'No preview text selected. Select text or save the full preview.' });
+      return;
+    }
+
+    const snippet = this.snippetStore.save(draft.item, draft.name);
+    this.postMessage({ type: 'snippetSaved', snippet });
+    this.sendSnippets();
     vscode.window.showInformationMessage(`Snippet "${snippet.name}" saved.`);
   }
 

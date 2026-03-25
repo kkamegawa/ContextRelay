@@ -3,10 +3,12 @@ import { ContextItem } from '../models/contextItem';
 import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from './graphClient';
 
 interface MailMessage {
+  id?: string;
   subject?: string;
   bodyPreview?: string;
   receivedDateTime?: string;
   webLink?: string;
+  from?: { emailAddress?: { name?: string; address?: string } };
 }
 
 interface MailResponse {
@@ -30,6 +32,12 @@ export async function searchMail(token: string, query: string): Promise<ContextI
     snippet: msg.bodyPreview ?? '',
     url: msg.webLink,
     timestamp: msg.receivedDateTime,
-    cache: { hit: false }
+    cache: { hit: false },
+    raw: {
+      messageId: msg.id,
+      senderName: msg.from?.emailAddress?.name,
+      senderAddress: msg.from?.emailAddress?.address,
+      bodyPreview: msg.bodyPreview ?? ''
+    }
   }));
 }

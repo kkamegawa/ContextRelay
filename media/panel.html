@@ -11,32 +11,106 @@
 <body>
   <div id="app">
     <header id="header">
-      <span id="account-label" class="account-label" aria-live="polite"></span>
+      <div class="brand-block">
+        <div class="app-title">ContextRelay</div>
+        <div class="app-subtitle">Microsoft 365 context, right inside VS Code</div>
+        <span id="account-label" class="account-label" aria-live="polite"></span>
+      </div>
       <button id="sign-in-btn" class="btn-primary" aria-label="Sign in to Microsoft 365" style="display:none">Sign in</button>
     </header>
 
     <nav class="tabs" role="tablist" aria-label="ContextRelay tabs">
       <button class="tab active" data-tab="search" role="tab" aria-selected="true" aria-controls="panel-search" id="tab-search">Search</button>
       <button class="tab" data-tab="chat" role="tab" aria-selected="false" aria-controls="panel-chat" id="tab-chat">Chat</button>
-      <button class="tab" data-tab="snippets" role="tab" aria-selected="false" aria-controls="panel-snippets" id="tab-snippets">Snippets</button>
+      <button class="tab" data-tab="snippets" role="tab" aria-selected="false" aria-controls="panel-snippets" id="tab-snippets">Handoff</button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings" id="tab-settings">Settings</button>
     </nav>
 
     <!-- Search Tab -->
     <div id="panel-search" class="tab-panel active" role="tabpanel" aria-labelledby="tab-search">
-      <div class="search-bar">
-        <input
-          type="text"
-          id="search-input"
-          class="search-input"
-          placeholder="Search or /mail, /teams, /sharepoint, /onedrive, /all"
-          aria-label="Search query"
-          autocomplete="off"
-        />
-        <button id="search-btn" class="btn-icon" aria-label="Run search" title="Search">&#8629;</button>
+      <div class="search-shell">
+        <div class="search-workspace">
+          <div class="search-stage-header">
+            <div class="search-stage-copy">
+              <span class="search-kicker">Context search</span>
+              <div class="search-stage-title">上段に検索結果、下段にフリー入力ペイン。</div>
+              <div class="search-stage-subtitle">Copilot Chat のように自然文で入力しつつ、Mail / Teams / SharePoint / OneDrive の結果を上で追えるワークスペースです。</div>
+            </div>
+            <div id="search-active-query" class="search-active-query" hidden aria-live="polite">
+              <span class="search-active-query-label">Last query</span>
+              <code id="search-query-text"></code>
+            </div>
+          </div>
+          <div id="search-status" class="status-bar" aria-live="polite" role="status"></div>
+          <div class="search-feed">
+            <div id="search-results-view" class="search-view search-results-view" aria-live="polite">
+              <div class="pane-header">
+                <div class="pane-heading-row">
+                  <span class="pane-title">Search results</span>
+                  <span id="search-results-count" class="pane-badge">Ready</span>
+                </div>
+                <span class="pane-caption">上の結果を選ぶと、下のプレビューに詳細を表示します。</span>
+              </div>
+              <div id="search-results" class="results-container"></div>
+            </div>
+            <div id="search-preview-view" class="search-view search-preview-view">
+              <div class="preview-toolbar">
+                <div class="preview-toolbar-main">
+                  <span class="pane-title">Selected result</span>
+                  <span id="preview-source-badge" class="preview-source-badge"></span>
+                </div>
+                <div class="preview-toolbar-actions">
+                  <button id="preview-save-selection-btn" class="btn-secondary" aria-label="Add selected text to handoff">Add selection</button>
+                  <button id="preview-save-preview-btn" class="btn-secondary" aria-label="Add full preview to handoff">Add preview</button>
+                  <button id="preview-review-handoff-btn" class="btn-secondary" aria-label="Review handoff excerpts">Handoff</button>
+                  <button id="preview-back-btn" class="btn-secondary" aria-label="Clear preview">Clear</button>
+                </div>
+              </div>
+              <div class="preview-handoff-bar">
+                <span id="preview-handoff-hint" class="preview-handoff-hint">本文をドラッグ選択して <strong>Add selection</strong>、または <strong>Add preview</strong> で全文を handoff に追加します。</span>
+                <span id="preview-selection-status" class="preview-selection-status" aria-live="polite"></span>
+              </div>
+              <div id="preview-content" class="preview-content" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+      <div class="composer-shell search-composer-shell">
+        <div class="composer-card search-composer-card">
+          <div class="composer-context-row">
+            <span class="composer-mode-pill">Search</span>
+            <span class="composer-context-text">フリー入力 / slash command 対応</span>
+          </div>
+          <div class="composer-input-row">
+            <textarea
+            id="search-input"
+            class="composer-input"
+            placeholder="検索したい内容を自由に入力…"
+            aria-label="Search query"
+            rows="1"
+            ></textarea>
+          </div>
+          <div class="composer-toolbar">
+            <div class="composer-toolbar-left">
+              <button class="composer-toolbar-btn" title="Tip: /mail, /teams, /sharepoint" aria-label="Search tips">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zM8 5a.75.75 0 1 1 0 1.5A.75.75 0 0 1 8 5zm-.75 3a.75.75 0 0 1 1.5 0v2.5a.75.75 0 0 1-1.5 0V8z"/></svg>
+              </button>
+            </div>
+            <div class="composer-toolbar-right">
+              <button id="search-btn" class="composer-send" aria-label="Run search" title="Search">
+                <svg viewBox="0 0 16 16"><path d="M3.5 2a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .8.4L8 10.5l4.2 3.4a.5.5 0 0 0 .8-.4v-11a.5.5 0 0 0-.5-.5h-9zM8 9L4 12V3h8v9L8 9z" fill="none"/><path d="M2.5 1L13 1a.5.5 0 0 1 .5.5v0L8 8 2 1.5A.5.5 0 0 1 2.5 1z" fill="none"/><polygon points="3,14 3,2 13,8" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="composer-hint">Enter で検索 · Shift+Enter で改行 · 例: <code>/mail private preview</code> / <code>/teams release notes</code></div>
+        <div class="composer-suggestion-row" aria-label="Suggested searches">
+          <button class="suggestion-chip" data-query="/mail project kickoff notes">Mail updates</button>
+          <button class="suggestion-chip" data-query="/teams release notes">Teams notes</button>
+          <button class="suggestion-chip" data-query="/sharepoint architecture decision record">Architecture docs</button>
+          <button class="suggestion-chip" data-query="/onedrive q3 report draft">OneDrive files</button>
+        </div>
       </div>
-      <div id="search-status" class="status-bar" aria-live="polite" role="status"></div>
-      <div id="search-results" class="results-container" aria-live="polite"></div>
+      </div>
     </div>
 
     <!-- Chat Tab -->
@@ -48,23 +122,53 @@
         <button id="new-conversation-btn" class="btn-secondary" aria-label="New conversation">New Conversation</button>
       </div>
       <div id="chat-messages" class="chat-messages" aria-live="polite" aria-label="Chat messages"></div>
-      <div class="chat-input-row">
-        <input
-          type="text"
-          id="chat-input"
-          class="search-input"
-          placeholder="Ask a question grounded in Microsoft 365..."
-          aria-label="Chat message"
-          autocomplete="off"
-        />
-        <button id="chat-send-btn" class="btn-icon" aria-label="Send message" title="Send">&#8629;</button>
+      <div class="composer-shell chat-composer-shell">
+        <div class="composer-card">
+          <div class="composer-input-row">
+            <textarea
+            id="chat-input"
+            class="composer-input"
+            placeholder="Ask a question grounded in your Microsoft 365 context…"
+            aria-label="Chat message"
+            rows="1"
+            ></textarea>
+          </div>
+          <div class="composer-toolbar">
+            <div class="composer-toolbar-left"></div>
+            <div class="composer-toolbar-right">
+              <button id="chat-send-btn" class="composer-send" aria-label="Send message" title="Send">
+                <svg viewBox="0 0 16 16"><polygon points="3,14 3,2 13,8" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="composer-hint">Enter to send · Shift+Enter for a new line</div>
       </div>
       <div id="chat-status" class="status-bar" aria-live="polite" role="status"></div>
     </div>
 
-    <!-- Snippets Tab -->
+    <!-- Handoff Tab -->
     <div id="panel-snippets" class="tab-panel" role="tabpanel" aria-labelledby="tab-snippets" style="display:none">
-      <div class="snippets-toolbar">
+      <div class="handoff-hero">
+        <div class="handoff-hero-copy">
+          <div class="handoff-hero-title">Search → Select text → Generate handoff</div>
+          <div class="handoff-hero-subtitle">検索結果の本文から必要な箇所だけを handoff に積み、`HANDOFF.md` / `PLAN.md` / `TASKS.md` / `TEST_PLAN.md` をまとめて生成します。</div>
+        </div>
+        <div class="handoff-count-card">
+          <span class="handoff-count-label">Saved excerpts</span>
+          <strong id="handoff-count" class="handoff-count-value">0</strong>
+        </div>
+      </div>
+      <div class="handoff-steps">
+        <div class="handoff-step"><span class="handoff-step-number">1</span><span>検索結果を開く</span></div>
+        <div class="handoff-step"><span class="handoff-step-number">2</span><span>本文を選択して handoff に追加</span></div>
+        <div class="handoff-step"><span class="handoff-step-number">3</span><span>保存内容を確認して生成</span></div>
+      </div>
+      <div class="snippets-toolbar handoff-toolbar">
+        <button id="generate-docs-from-handoff-btn" class="btn-secondary" aria-label="Generate handoff docs">Generate Docs</button>
+        <button id="open-handoff-btn" class="btn-secondary" aria-label="Open HANDOFF document">Open HANDOFF</button>
+        <button id="open-copilot-btn" class="btn-secondary" aria-label="Open Copilot Chat">Open Copilot</button>
+        <button id="copy-prompt-secondary-btn" class="btn-secondary" aria-label="Copy handoff prompt">Copy Prompt</button>
         <button id="clear-snippets-btn" class="btn-secondary" aria-label="Clear all snippets">Clear All</button>
       </div>
       <div id="snippets-list" class="results-container" aria-live="polite" aria-label="Saved snippets"></div>

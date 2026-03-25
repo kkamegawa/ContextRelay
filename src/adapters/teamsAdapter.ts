@@ -60,7 +60,12 @@ export async function searchTeams(token: string, query: string): Promise<Context
           snippet: hit.summary ?? '',
           url: resource.webUrl,
           timestamp: resource.createdDateTime ?? resource.lastModifiedDateTime,
-          cache: { hit: false }
+          cache: { hit: false },
+          raw: {
+            summary: hit.summary ?? '',
+            senderName,
+            channelName
+          }
         });
       }
     }

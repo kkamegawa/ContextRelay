@@ -4,28 +4,48 @@
 
   const vscode = acquireVsCodeApi();
 
-  // State
   let isSignedIn = false;
 
-  // Elements
   const tabs = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('.tab'));
   const panels = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.tab-panel'));
-  const searchInput = /** @type {HTMLInputElement} */ (document.getElementById('search-input'));
+  const searchInput = /** @type {HTMLTextAreaElement} */ (document.getElementById('search-input'));
   const searchBtn = document.getElementById('search-btn');
   const searchStatus = document.getElementById('search-status');
   const searchResults = document.getElementById('search-results');
-  const chatInput = /** @type {HTMLInputElement} */ (document.getElementById('chat-input'));
+  const searchResultsView = document.getElementById('search-results-view');
+  const searchPreviewView = document.getElementById('search-preview-view');
+  const searchActiveQuery = document.getElementById('search-active-query');
+  const searchQueryText = document.getElementById('search-query-text');
+  const searchResultsCount = document.getElementById('search-results-count');
+  const previewContent = document.getElementById('preview-content');
+  const previewBackBtn = document.getElementById('preview-back-btn');
+  const previewSourceBadge = document.getElementById('preview-source-badge');
+  const previewSaveSelectionBtn = document.getElementById('preview-save-selection-btn');
+  const previewSavePreviewBtn = document.getElementById('preview-save-preview-btn');
+  const previewReviewHandoffBtn = document.getElementById('preview-review-handoff-btn');
+  const previewSelectionStatus = document.getElementById('preview-selection-status');
+  const chatInput = /** @type {HTMLTextAreaElement} */ (document.getElementById('chat-input'));
   const chatSendBtn = document.getElementById('chat-send-btn');
   const chatMessages = document.getElementById('chat-messages');
   const chatStatus = document.getElementById('chat-status');
   const newConversationBtn = document.getElementById('new-conversation-btn');
   const snippetsList = document.getElementById('snippets-list');
+  const handoffCount = document.getElementById('handoff-count');
   const clearSnippetsBtn = document.getElementById('clear-snippets-btn');
+  const generateDocsFromHandoffBtn = document.getElementById('generate-docs-from-handoff-btn');
+  const openHandoffBtn = document.getElementById('open-handoff-btn');
+  const openCopilotBtn = document.getElementById('open-copilot-btn');
+  const copyPromptSecondaryBtn = document.getElementById('copy-prompt-secondary-btn');
   const clearCacheBtn = document.getElementById('clear-cache-btn');
   const generateDocsBtn = document.getElementById('generate-docs-btn');
   const copyPromptBtn = document.getElementById('copy-prompt-btn');
   const signInBtn = document.getElementById('sign-in-btn');
   const accountLabel = document.getElementById('account-label');
+  const suggestionChips = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('.suggestion-chip'));
+  let selectedItemKey = null;
+  let latestSearchQuery = '';
+  let currentPreviewItem = null;
+  let currentPreview = null;
 
   function activateTab(target) {
     tabs.forEach(t => {
@@ -42,7 +62,6 @@
     }
   }
 
-  // Tab switching
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const target = tab.dataset.tab;
@@ -52,31 +71,43 @@
     });
   });
 
-  // Search
   function runSearch() {
     const query = searchInput.value.trim();
     if (!query) { return; }
+    activateTab('search');
     vscode.postMessage({ type: 'search', query });
   }
 
   searchBtn && searchBtn.addEventListener('click', runSearch);
+  searchInput && searchInput.addEventListener('input', () => {
+    autosizeTextarea(searchInput);
+  });
   searchInput && searchInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { runSearch(); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      runSearch();
+    }
   });
 
-  // Chat
   function sendChat() {
     const msg = chatInput.value.trim();
     if (!msg) { return; }
     addChatBubble('user', msg);
     chatInput.value = '';
+    autosizeTextarea(chatInput);
     if (chatStatus) { chatStatus.textContent = ''; }
     vscode.postMessage({ type: 'chat', message: msg });
   }
 
   chatSendBtn && chatSendBtn.addEventListener('click', sendChat);
+  chatInput && chatInput.addEventListener('input', () => {
+    autosizeTextarea(chatInput);
+  });
   chatInput && chatInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { sendChat(); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
   });
 
   newConversationBtn && newConversationBtn.addEventListener('click', () => {
@@ -84,7 +115,6 @@
     vscode.postMessage({ type: 'newConversation' });
   });
 
-  // Snippets / Settings
   clearSnippetsBtn && clearSnippetsBtn.addEventListener('click', () => {
     vscode.postMessage({ type: 'clearSnippets' });
   });
@@ -97,18 +127,67 @@
     vscode.postMessage({ type: 'generateDocs' });
   });
 
+  generateDocsFromHandoffBtn && generateDocsFromHandoffBtn.addEventListener('click', () => {
+    vscode.postMessage({ type: 'generateDocs' });
+  });
+
   copyPromptBtn && copyPromptBtn.addEventListener('click', () => {
     vscode.postMessage({ type: 'copyPrompt' });
+  });
+
+  copyPromptSecondaryBtn && copyPromptSecondaryBtn.addEventListener('click', () => {
+    vscode.postMessage({ type: 'copyPrompt' });
+  });
+
+  openHandoffBtn && openHandoffBtn.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openHandoffDoc' });
+  });
+
+  openCopilotBtn && openCopilotBtn.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openCopilotChat' });
   });
 
   signInBtn && signInBtn.addEventListener('click', () => {
     vscode.postMessage({ type: 'signIn' });
   });
 
-  // Message handling from extension
+  previewBackBtn && previewBackBtn.addEventListener('click', () => {
+    clearPreviewSelection(true);
+  });
+
+  previewSaveSelectionBtn && previewSaveSelectionBtn.addEventListener('click', () => {
+    savePreviewToHandoff(true);
+  });
+
+  previewSavePreviewBtn && previewSavePreviewBtn.addEventListener('click', () => {
+    savePreviewToHandoff(false);
+  });
+
+  previewReviewHandoffBtn && previewReviewHandoffBtn.addEventListener('click', () => {
+    activateTab('snippets');
+  });
+
+  suggestionChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const query = chip.dataset.query;
+      if (!query || !searchInput) {
+        return;
+      }
+
+      searchInput.value = query;
+      autosizeTextarea(searchInput);
+      searchInput.focus();
+      runSearch();
+    });
+  });
+
   window.addEventListener('message', event => {
     const message = event.data;
     handleMessage(message);
+  });
+
+  document.addEventListener('selectionchange', () => {
+    updatePreviewSelectionStatus();
   });
 
   /**
@@ -126,10 +205,13 @@
         showAuthRequired(message.message);
         break;
       case 'searchStart':
+        setSearchQuery(message.query);
+        setSearchResultsCountLabel('Searching…');
         if (searchStatus) {
           searchStatus.innerHTML = '<span class="loading"></span>Searching...';
         }
-        if (searchResults) { searchResults.innerHTML = ''; }
+        renderSearchLoadingState();
+        clearPreviewSelection(true);
         break;
       case 'searchResults':
         renderSearchResults(message.results);
@@ -137,11 +219,22 @@
       case 'searchUpdate':
         updateSourceSection(message.source, message.items, message.badge);
         break;
+      case 'previewStart':
+        renderPreviewLoading(message.item);
+        break;
+      case 'previewContent':
+        renderPreview(message.preview);
+        break;
+      case 'previewError':
+        renderPreviewError(message.message);
+        break;
       case 'help':
         if (searchResults) {
           searchResults.innerHTML = `<div class="help-text">${escapeHtml(message.text)}</div>`;
         }
         if (searchStatus) { searchStatus.textContent = ''; }
+        setSearchResultsCountLabel('Tips');
+        clearPreviewSelection(true);
         break;
       case 'chatStart':
         if (chatStatus) { chatStatus.innerHTML = '<span class="loading"></span>Thinking...'; }
@@ -160,10 +253,11 @@
         renderSnippets(message.snippets);
         break;
       case 'snippetSaved':
-        // Could show a toast, for now just update snippets if on tab
+        setPreviewSelectionStatus('Handoff に追加しました。');
         break;
       case 'snippetsCleared':
-        if (snippetsList) { snippetsList.innerHTML = '<div class="empty-state">No saved snippets.</div>'; }
+        updateHandoffCount(0);
+        if (snippetsList) { snippetsList.innerHTML = '<div class="empty-state">まだ handoff 用の抜粋はありません。検索結果を開いて本文を選択してください。</div>'; }
         break;
       case 'cacheCleared':
         if (searchStatus) { searchStatus.textContent = 'Cache cleared.'; }
@@ -172,10 +266,14 @@
         if (searchResults) {
           searchResults.innerHTML = `<div class="error-banner">${escapeHtml(message.message)}</div>`;
         }
+        setSearchResultsCountLabel('Error');
+        clearPreviewSelection(true);
         break;
       case 'setQuery':
+        activateTab('search');
         if (searchInput) {
           searchInput.value = message.query;
+          autosizeTextarea(searchInput);
           runSearch();
         }
         break;
@@ -220,6 +318,8 @@
       searchResults.appendChild(container);
     }
     if (searchStatus) { searchStatus.textContent = ''; }
+    setSearchResultsCountLabel('Sign in');
+    clearPreviewSelection(true);
   }
 
   /**
@@ -256,9 +356,12 @@
 
     if (!results || results.length === 0) {
       searchResults.innerHTML = '<div class="empty-state">No results found.</div>';
+      setSearchResultsCountLabel(formatResultCount(0));
+      clearPreviewSelection(true);
       return;
     }
 
+    const allItems = [];
     searchResults.innerHTML = '';
     for (const result of results) {
       if (result.error && result.items.length === 0) {
@@ -271,6 +374,10 @@
 
       if (result.items.length === 0) { continue; }
 
+      for (const item of result.items) {
+        allItems.push(item);
+      }
+
       const section = buildSourceSection(result.source, result.items, result.cached ? 'Cached' : undefined);
       section.dataset.source = result.source;
       searchResults.appendChild(section);
@@ -278,6 +385,23 @@
 
     if (!searchResults.hasChildNodes()) {
       searchResults.innerHTML = '<div class="empty-state">No results found.</div>';
+      setSearchResultsCountLabel(formatResultCount(0));
+      clearPreviewSelection(true);
+      return;
+    }
+
+    setSearchResultsCountLabel(formatResultCount(allItems.length));
+
+    const firstItem = allItems[0];
+    if (firstItem) {
+      const nextKey = findMatchingItemKey(allItems);
+      if (nextKey) {
+        setSelectedItemKey(nextKey);
+        const nextItem = allItems.find(item => getItemKey(item) === nextKey);
+        if (nextItem) {
+          vscode.postMessage({ type: 'previewItem', item: nextItem });
+        }
+      }
     }
   }
 
@@ -292,7 +416,11 @@
 
     const header = document.createElement('div');
     header.className = 'source-header';
-    header.textContent = capitalizeSource(source);
+
+    const title = document.createElement('span');
+    title.className = 'source-title';
+    title.textContent = capitalizeSource(source);
+    header.appendChild(title);
 
     if (badge) {
       const badgeEl = document.createElement('span');
@@ -325,6 +453,8 @@
     } else {
       searchResults.appendChild(newSection);
     }
+    setSearchResultsCountLabel(formatResultCount(getRenderedResultCount()));
+    updateSelectedResultHighlight();
   }
 
   /**
@@ -333,6 +463,29 @@
   function buildResultItem(item) {
     const el = document.createElement('div');
     el.className = 'result-item';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `Preview ${item.title || 'item'}`);
+    const itemKey = getItemKey(item);
+    el.dataset.itemKey = itemKey;
+    if (selectedItemKey === itemKey) {
+      el.classList.add('active');
+    }
+
+    const requestPreview = () => {
+      setSelectedItemKey(itemKey);
+      vscode.postMessage({ type: 'previewItem', item });
+    };
+
+    el.addEventListener('click', () => {
+      requestPreview();
+    });
+    el.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        requestPreview();
+      }
+    });
 
     const title = document.createElement('div');
     title.className = 'result-title';
@@ -360,16 +513,18 @@
       const openBtn = document.createElement('button');
       openBtn.textContent = 'Open';
       openBtn.title = 'Open in browser';
-      openBtn.addEventListener('click', () => {
+      openBtn.addEventListener('click', event => {
+        event.stopPropagation();
         vscode.postMessage({ type: 'openUrl', url: item.url });
       });
       actions.appendChild(openBtn);
     }
 
     const pinBtn = document.createElement('button');
-    pinBtn.textContent = 'Pin';
-    pinBtn.title = 'Save as snippet';
-    pinBtn.addEventListener('click', () => {
+    pinBtn.textContent = 'Pin full';
+    pinBtn.title = 'Fetch full content for handoff';
+    pinBtn.addEventListener('click', event => {
+      event.stopPropagation();
       vscode.postMessage({ type: 'pinSnippet', item });
     });
     actions.appendChild(pinBtn);
@@ -377,7 +532,8 @@
     const copyBtn = document.createElement('button');
     copyBtn.textContent = 'Copy';
     copyBtn.title = 'Copy as Markdown citation';
-    copyBtn.addEventListener('click', () => {
+    copyBtn.addEventListener('click', event => {
+      event.stopPropagation();
       const md = buildMarkdownCitation(item);
       vscode.postMessage({ type: 'copyText', text: md });
     });
@@ -385,6 +541,208 @@
 
     el.appendChild(actions);
     return el;
+  }
+
+  /**
+   * @param {any} item
+   */
+  function renderPreviewLoading(item) {
+    currentPreviewItem = item || null;
+    currentPreview = null;
+    showPreviewView(item && item.source ? capitalizeSource(item.source) : 'Preview');
+    if (!previewContent) { return; }
+    previewContent.innerHTML = '<div class="preview-empty"><span class="loading"></span>Loading preview...</div>';
+    searchPreviewView && searchPreviewView.classList.add('has-preview');
+    setPreviewSelectionStatus('');
+    updatePreviewActionState();
+  }
+
+  /**
+   * @param {any} preview
+   */
+  function renderPreview(preview) {
+    currentPreview = preview || null;
+    showPreviewView(preview && preview.source ? capitalizeSource(preview.source) : 'Preview');
+    if (!previewContent) { return; }
+    searchPreviewView && searchPreviewView.classList.add('has-preview');
+
+    previewContent.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'preview-header';
+
+    const title = document.createElement('div');
+    title.className = 'preview-title';
+    title.textContent = preview.title || 'Untitled';
+    header.appendChild(title);
+
+    if (preview.subtitle) {
+      const subtitle = document.createElement('div');
+      subtitle.className = 'preview-subtitle';
+      subtitle.textContent = preview.subtitle;
+      header.appendChild(subtitle);
+    }
+
+    const metaParts = [];
+    if (preview.timestamp) {
+      metaParts.push(new Date(preview.timestamp).toLocaleString());
+    }
+    if (typeof preview.relevance === 'number') {
+      metaParts.push(`Relevance: ${preview.relevance.toFixed(2)}`);
+    }
+    if (metaParts.length > 0) {
+      const meta = document.createElement('div');
+      meta.className = 'preview-meta';
+      meta.textContent = metaParts.join(' · ');
+      header.appendChild(meta);
+    }
+
+    previewContent.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'preview-body';
+    body.textContent = preview.body || 'No preview text is available for this item yet.';
+    previewContent.appendChild(body);
+
+    if (preview.url) {
+      const actions = document.createElement('div');
+      actions.className = 'result-actions';
+
+      const openBtn = document.createElement('button');
+      openBtn.textContent = 'Open in browser';
+      openBtn.addEventListener('click', () => {
+        vscode.postMessage({ type: 'openUrl', url: preview.url });
+      });
+      actions.appendChild(openBtn);
+
+      previewContent.appendChild(actions);
+    }
+
+    setPreviewSelectionStatus('本文を選択して Add selection、または Add preview で全文保存できます。');
+    updatePreviewActionState();
+  }
+
+  /**
+   * @param {string} message
+   */
+  function renderPreviewError(message) {
+    currentPreview = null;
+    showPreviewView('Preview');
+    if (!previewContent) { return; }
+    previewContent.innerHTML = `<div class="error-banner">${escapeHtml(message)}</div>`;
+    searchPreviewView && searchPreviewView.classList.add('has-preview');
+    setPreviewSelectionStatus('');
+    updatePreviewActionState();
+  }
+
+  /**
+   * @param {string} [label]
+   */
+  function showPreviewView(label) {
+    if (previewSourceBadge) {
+      previewSourceBadge.textContent = label || 'Preview';
+    }
+  }
+
+  function clearPreviewSelection(showPlaceholder = false) {
+    selectedItemKey = null;
+    currentPreviewItem = null;
+    currentPreview = null;
+    updateSelectedResultHighlight();
+    if (showPlaceholder) {
+      renderPreviewPlaceholder();
+    }
+  }
+
+  function renderPreviewPlaceholder() {
+    showPreviewView('Preview');
+    if (!previewContent) { return; }
+    previewContent.innerHTML = '<div class="preview-empty">検索結果を選ぶと、ここに本文・メタデータ・リンクを表示します。</div>';
+    searchPreviewView && searchPreviewView.classList.remove('has-preview');
+    setPreviewSelectionStatus('');
+    updatePreviewActionState();
+  }
+
+  function renderSearchLoadingState() {
+    if (!searchResults) { return; }
+    searchResults.innerHTML = '<div class="empty-state"><span class="loading"></span>Searching your Microsoft 365 context...</div>';
+  }
+
+  function renderSearchWelcome() {
+    if (!searchResults) { return; }
+    searchResults.innerHTML = [
+      '<div class="search-hero">',
+      '<div class="search-hero-title">Search your Microsoft 365 context</div>',
+      '<div class="search-hero-copy">下の入力欄から自然文で検索すると、ここにソース別の結果が並びます。結果をクリックすると、その詳細を下段のプレビューで確認できます。</div>',
+      '</div>'
+    ].join('');
+  }
+
+  /**
+   * @param {HTMLTextAreaElement | null} textarea
+   */
+  function autosizeTextarea(textarea) {
+    if (!textarea) { return; }
+    textarea.style.height = '0px';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+  }
+
+  function setSelectedItemKey(itemKey) {
+    selectedItemKey = itemKey;
+    updateSelectedResultHighlight();
+  }
+
+  function updateSelectedResultHighlight() {
+    if (!searchResults) { return; }
+    const items = searchResults.querySelectorAll('.result-item');
+    items.forEach(itemEl => {
+      itemEl.classList.toggle('active', itemEl.dataset.itemKey === selectedItemKey);
+    });
+  }
+
+  function findMatchingItemKey(items) {
+    if (selectedItemKey && items.some(item => getItemKey(item) === selectedItemKey)) {
+      return selectedItemKey;
+    }
+
+    const firstItem = items[0];
+    return firstItem ? getItemKey(firstItem) : null;
+  }
+
+  function getItemKey(item) {
+    const raw = item && typeof item.raw === 'object' && item.raw ? item.raw : undefined;
+    const messageId = raw && raw.messageId ? raw.messageId : '';
+    return [item.source, messageId, item.url || '', item.timestamp || '', item.title || ''].join('::');
+  }
+
+  function setSearchQuery(query) {
+    latestSearchQuery = typeof query === 'string' ? query.trim() : latestSearchQuery;
+    if (searchQueryText) {
+      searchQueryText.textContent = latestSearchQuery;
+    }
+    if (searchActiveQuery) {
+      const hasQuery = latestSearchQuery.length > 0;
+      searchActiveQuery.hidden = !hasQuery;
+      searchActiveQuery.setAttribute('aria-hidden', hasQuery ? 'false' : 'true');
+    }
+  }
+
+  function setSearchResultsCountLabel(label) {
+    if (searchResultsCount) {
+      searchResultsCount.textContent = label;
+    }
+  }
+
+  function getRenderedResultCount() {
+    if (!searchResults) {
+      return 0;
+    }
+
+    return searchResults.querySelectorAll('.result-item').length;
+  }
+
+  function formatResultCount(count) {
+    return `${count} ${count === 1 ? 'item' : 'items'}`;
   }
 
   /**
@@ -416,8 +774,9 @@
    */
   function renderSnippets(snippets) {
     if (!snippetsList) { return; }
+    updateHandoffCount(Array.isArray(snippets) ? snippets.length : 0);
     if (!snippets || snippets.length === 0) {
-      snippetsList.innerHTML = '<div class="empty-state">No saved snippets.</div>';
+      snippetsList.innerHTML = '<div class="empty-state">まだ handoff 用の抜粋はありません。検索結果を開いて本文を選択してください。</div>';
       return;
     }
 
@@ -495,6 +854,83 @@
       .replace(/'/g, '&#039;');
   }
 
-  // Initialize
+  function savePreviewToHandoff(selectionOnly) {
+    if (!currentPreviewItem || !currentPreview || !currentPreview.body) {
+      setPreviewSelectionStatus('保存できる preview がありません。先に検索結果を選択してください。');
+      return;
+    }
+
+    const selectedText = selectionOnly ? getSelectedPreviewText() : '';
+    if (selectionOnly && !selectedText) {
+      setPreviewSelectionStatus('preview 本文をドラッグ選択してから Add selection を押してください。');
+      return;
+    }
+
+    vscode.postMessage({
+      type: 'savePreviewSnippet',
+      item: currentPreviewItem,
+      selectedText,
+      previewBody: currentPreview.body
+    });
+  }
+
+  function getSelectedPreviewText() {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || !previewContent) {
+      return '';
+    }
+
+    const range = selection.getRangeAt(0);
+    const ancestor = range.commonAncestorContainer;
+    const container = ancestor.nodeType === Node.TEXT_NODE ? ancestor.parentElement : ancestor;
+    if (!(container instanceof Element) || !previewContent.contains(container)) {
+      return '';
+    }
+
+    return selection.toString().trim();
+  }
+
+  function updatePreviewActionState() {
+    const hasPreview = !!(currentPreviewItem && currentPreview && currentPreview.body);
+    if (previewSaveSelectionBtn) {
+      previewSaveSelectionBtn.disabled = !hasPreview;
+    }
+    if (previewSavePreviewBtn) {
+      previewSavePreviewBtn.disabled = !hasPreview;
+    }
+    if (previewReviewHandoffBtn) {
+      previewReviewHandoffBtn.disabled = false;
+    }
+  }
+
+  function updatePreviewSelectionStatus() {
+    if (!currentPreview || !currentPreview.body) {
+      return;
+    }
+
+    const selectedText = getSelectedPreviewText();
+    if (selectedText) {
+      setPreviewSelectionStatus(`選択中: ${selectedText.length} 文字`);
+    }
+  }
+
+  function setPreviewSelectionStatus(text) {
+    if (previewSelectionStatus) {
+      previewSelectionStatus.textContent = text;
+    }
+  }
+
+  function updateHandoffCount(count) {
+    if (handoffCount) {
+      handoffCount.textContent = String(count);
+    }
+  }
+
+  autosizeTextarea(searchInput);
+  autosizeTextarea(chatInput);
+  setSearchResultsCountLabel('Ready');
+  updateHandoffCount(0);
+  renderSearchWelcome();
+  renderPreviewPlaceholder();
   vscode.postMessage({ type: 'ready' });
 }());

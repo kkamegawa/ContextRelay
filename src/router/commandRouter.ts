@@ -14,25 +14,28 @@ const SLASH_COMMANDS: Record<string, RouteTarget> = {
   all: 'all'
 };
 
+function normalizeQuery(input: string): string {
+  return input.replace(/\s+/g, ' ').trim();
+}
+
 export function parseCommand(input: string): ParsedCommand {
   const trimmed = input.trim();
+  const normalized = normalizeQuery(trimmed);
 
   if (trimmed.startsWith('/')) {
-    const spaceIdx = trimmed.indexOf(' ');
-    const command = spaceIdx === -1
-      ? trimmed.slice(1).toLowerCase()
-      : trimmed.slice(1, spaceIdx).toLowerCase();
-    const query = spaceIdx === -1 ? '' : trimmed.slice(spaceIdx + 1).trim();
+    const commandMatch = trimmed.match(/^\/(\S+)(?:\s+([\s\S]*))?$/);
+    const command = commandMatch?.[1]?.toLowerCase() ?? trimmed.slice(1).toLowerCase();
+    const query = normalizeQuery(commandMatch?.[2] ?? '');
     const target = SLASH_COMMANDS[command];
 
     if (target) {
       return { target, query, isEmpty: query.length === 0 };
     }
     // Unknown slash command — treat as /all with the original input
-    return { target: 'all', query: trimmed, isEmpty: trimmed.length === 0 };
+    return { target: 'all', query: normalized, isEmpty: normalized.length === 0 };
   }
 
-  return { target: 'all', query: trimmed, isEmpty: trimmed.length === 0 };
+  return { target: 'all', query: normalized, isEmpty: normalized.length === 0 };
 }
 
 export function getHelpText(command: string): string {

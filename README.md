@@ -35,8 +35,8 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 
 - [Visual Studio Code](https://code.visualstudio.com/) 1.85 or later
 - A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
-- **For SharePoint/OneDrive search and Chat features**: Microsoft 365 Copilot license assigned to the user
-- **For Exchange Mail and Teams search**: Standard Microsoft 365 license (no Copilot license needed)
+- **For Exchange Mail, Teams, SharePoint, and OneDrive search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
+- **For Chat preview / Copilot-grounded features**: Microsoft 365 Copilot license might still be required depending on tenant rollout and API availability
 
 ### Required permissions
 
@@ -282,7 +282,7 @@ If you want the smallest possible setup, use one of these patterns.
   - `/teams ...`
   - bare query across Mail + Teams
 
-**Pattern 3 — SharePoint / OneDrive retrieval**
+**Pattern 3 — SharePoint / OneDrive search**
 
 - Delegated permissions:
   - `User.Read`
@@ -290,8 +290,6 @@ If you want the smallest possible setup, use one of these patterns.
   - `Sites.Read.All`
 - Admin consent:
   - often required depending on tenant policy
-- Additional requirement:
-  - Microsoft 365 Copilot license for the signed-in user
 - Suitable for:
   - `/sharepoint ...`
   - `/onedrive ...`
@@ -310,7 +308,7 @@ If you want the smallest possible setup, use one of these patterns.
 - Admin consent:
   - usually required for several of the above
 - Additional requirement:
-  - Microsoft 365 Copilot license for retrieval/chat scenarios
+  - Chat preview / Copilot-grounded features can still require Microsoft 365 Copilot licensing depending on tenant rollout
 
 **Pattern 5 — Full extension including connectors**
 
@@ -404,7 +402,7 @@ Check:
 
 - The signed-in account belongs to the tenant that granted consent.
 - `contextRelay.auth.tenantId` is correct.
-- The account has the necessary Microsoft 365 / Copilot license.
+- The account has the necessary Microsoft 365 license and Graph permissions for the enabled adapters.
 
 #### Teams / Chat permissions fail after sign-in
 
@@ -450,7 +448,7 @@ What to do:
 
 #### License missing
 
-If mail and Teams search work but SharePoint / OneDrive retrieval or Chat-related experiences fail, the signed-in user may be missing a required Microsoft 365 Copilot license.
+If mail and Teams search work but SharePoint / OneDrive search still fails, first verify `Files.Read.All` and `Sites.Read.All` consent for the signed-in user. If Chat-related experiences fail, Microsoft 365 Copilot licensing may still be required.
 
 Common symptoms:
 
@@ -461,7 +459,8 @@ Common symptoms:
 What to check:
 
 1. Confirm the user has the expected Microsoft 365 license.
-2. Confirm the user also has the required Microsoft 365 Copilot license for retrieval/chat scenarios.
+2. For SharePoint / OneDrive search, confirm `Files.Read.All` and `Sites.Read.All` were granted and consented.
+3. For Chat preview scenarios, confirm the user also has the required Microsoft 365 Copilot license if your tenant requires it.
 3. If licenses were assigned recently, wait for propagation and retry.
 4. If the pilot does not need retrieval features yet, temporarily keep `contextRelay.adapters.sharepoint`, `contextRelay.adapters.onedrive`, and `contextRelay.enableChatPreview` disabled.
 
@@ -494,11 +493,15 @@ To target a specific source, prefix your query with a slash command:
 /onedrive architecture diagram
 ```
 
-### Pinning Snippets
+### Building a Handoff from Search Results
 
-1. Hover over any search result.
-2. Click the **pin** icon to save it as a snippet.
-3. View all pinned snippets in the **Snippets** tab of the panel.
+1. Run a search and open a result in the preview pane.
+2. Select the important text in the preview body.
+3. Click **Add selection** to save just that excerpt, or **Add preview** to save the full preview body.
+4. Review saved excerpts in the **Handoff** tab.
+5. Click **Generate Docs** to write `HANDOFF.md`, `PLAN.md`, `TASKS.md`, and `TEST_PLAN.md`.
+
+You can still pin a result card directly. When the item is a supported document or message, ContextRelay now attempts to fetch the **full content** before saving it into the Handoff workflow. The recommended path is still **preview text selection → Handoff tab → document generation** when you only want the relevant excerpt.
 
 ### Generating Handoff Documents
 

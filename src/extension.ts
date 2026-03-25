@@ -66,6 +66,18 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   };
 
+  const openHandoffDoc = async (): Promise<void> => {
+    try {
+      const handoffPath = await ensureHandoffDocExists();
+      const doc = await vscode.workspace.openTextDocument(handoffPath);
+      await vscode.window.showTextDocument(doc, { preview: false });
+    } catch (err) {
+      vscode.window.showErrorMessage(
+        `ContextRelay: Failed to open handoff doc: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  };
+
   // Register the WebviewView provider
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(PanelProvider.viewType, panelProvider, {
@@ -128,6 +140,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.openCopilotChat', openCopilotChat)
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.openHandoffDoc', openHandoffDoc)
   );
 
   context.subscriptions.push(

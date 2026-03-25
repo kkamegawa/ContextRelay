@@ -34,6 +34,20 @@ suite('CommandRouter', () => {
     assert.equal(result.query, 'architecture diagram');
   });
 
+  test('slash command accepts newline-separated query', () => {
+    const result = parseCommand('/onedrive\nLendHub_Requirements_Document_Fictional.docx');
+    assert.equal(result.target, 'onedrive');
+    assert.equal(result.query, 'LendHub_Requirements_Document_Fictional.docx');
+    assert.equal(result.isEmpty, false);
+  });
+
+  test('bare multiline query is normalized', () => {
+    const result = parseCommand('LendHub_Requirements\nDocument\tFictional.docx');
+    assert.equal(result.target, 'all');
+    assert.equal(result.query, 'LendHub_Requirements Document Fictional.docx');
+    assert.equal(result.isEmpty, false);
+  });
+
   test('/all command routes to all', () => {
     const result = parseCommand('/all architecture decisions');
     assert.equal(result.target, 'all');
@@ -54,8 +68,9 @@ suite('CommandRouter', () => {
   });
 
   test('unknown slash command treated as /all', () => {
-    const result = parseCommand('/unknown some query');
+    const result = parseCommand('/unknown some\nquery');
     assert.equal(result.target, 'all');
+    assert.equal(result.query, '/unknown some query');
   });
 
   test('empty input is isEmpty', () => {

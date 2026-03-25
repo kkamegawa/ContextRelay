@@ -15,6 +15,16 @@ export interface ContextItem {
   raw?: unknown;
 }
 
+export interface ResolvedPreview {
+  source: ContextSource;
+  title: string;
+  body: string;
+  subtitle?: string;
+  timestamp?: string;
+  relevance?: number;
+  url?: string;
+}
+
 export interface SavedSnippet {
   id: string;
   item: ContextItem;

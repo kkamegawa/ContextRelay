@@ -59,7 +59,8 @@ export class DocGenerator {
       '### Open Tasks',
       '',
       '- [ ] Review search results and refine queries as needed.',
-      '- [ ] Pin relevant snippets for Copilot handoff.',
+      '- [ ] Select important text from preview and add it to the Handoff tab.',
+      '- [ ] Review saved handoff excerpts and remove anything unnecessary.',
       '- [ ] Generate HANDOFF.md before starting a new Copilot Chat session.',
       ''
     ].join('\n');
@@ -73,7 +74,8 @@ export class DocGenerator {
       '### Test Cases',
       '',
       '- Verify search results match expected content from Microsoft 365.',
-      '- Confirm snippets persist across VS Code window reloads.',
+      '- Confirm selected preview excerpts can be added to the Handoff tab.',
+      '- Confirm saved handoff excerpts persist across VS Code window reloads.',
       '- Validate handoff document format and timestamps.',
       ''
     ].join('\n');
@@ -108,7 +110,7 @@ export class DocGenerator {
       '',
       '- _Add next tasks here._',
       '',
-      '### Saved Snippets',
+      '### Saved Handoff Excerpts',
       '',
       snippetList,
       ''
