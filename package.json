@@ -1,0 +1,176 @@
+{
+  "name": "context-relay",
+  "displayName": "ContextRelay for Microsoft 365",
+  "description": "Surface Microsoft 365 context (SharePoint, OneDrive, Teams, Mail) in a VS Code side panel",
+  "version": "0.1.0",
+  "publisher": "Kazushi Kamegawa",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "contextRelay",
+          "title": "ContextRelay",
+          "icon": "media/contextRelay-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "contextRelay": [
+        {
+          "type": "webview",
+          "id": "contextRelay.panel",
+          "name": "ContextRelay"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "contextRelay.openPanel",
+        "title": "ContextRelay: Open Panel"
+      },
+      {
+        "command": "contextRelay.search",
+        "title": "ContextRelay: Search"
+      },
+      {
+        "command": "contextRelay.clearCache",
+        "title": "ContextRelay: Clear Cache"
+      },
+      {
+        "command": "contextRelay.clearSnippets",
+        "title": "ContextRelay: Clear All Snippets"
+      },
+      {
+        "command": "contextRelay.generateHandoffDocs",
+        "title": "ContextRelay: Generate Handoff Docs"
+      },
+      {
+        "command": "contextRelay.openCopilotChat",
+        "title": "ContextRelay: Open Copilot Chat with Handoff Prompt"
+      },
+      {
+        "command": "contextRelay.openHandoffDoc",
+        "title": "ContextRelay: Open HANDOFF Document"
+      },
+      {
+        "command": "contextRelay.copyHandoffPrompt",
+        "title": "ContextRelay: Copy Handoff Prompt to Clipboard"
+      }
+    ],
+    "configuration": {
+      "title": "ContextRelay",
+      "properties": {
+        "contextRelay.maxResults": {
+          "type": "number",
+          "default": 10,
+          "description": "Number of search results returned per source"
+        },
+        "contextRelay.outputDir": {
+          "type": "string",
+          "default": ".contextrelay",
+          "description": "Directory where handoff documents are saved"
+        },
+        "contextRelay.auth.clientId": {
+          "type": "string",
+          "default": "",
+          "description": "Microsoft Entra application (client) ID injected into the built-in VS Code Microsoft auth provider via VSCODE_CLIENT_ID"
+        },
+        "contextRelay.auth.tenantId": {
+          "type": "string",
+          "default": "organizations",
+          "description": "Tenant ID or domain injected into the built-in VS Code Microsoft auth provider via VSCODE_TENANT"
+        },
+        "contextRelay.cache.ttlSeconds": {
+          "type": "number",
+          "default": 300,
+          "description": "Cache TTL in seconds"
+        },
+        "contextRelay.cache.maxEntries": {
+          "type": "number",
+          "default": 200,
+          "description": "Maximum number of cached entries (LRU eviction)"
+        },
+        "contextRelay.cache.persistWorkspaceState": {
+          "type": "boolean",
+          "default": true,
+          "description": "Persist cache snapshot in workspace state"
+        },
+        "contextRelay.enableChatPreview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Chat tab (Copilot Chat API is in beta)"
+        },
+        "contextRelay.adapters.mail": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Exchange Mail adapter"
+        },
+        "contextRelay.adapters.teams": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Teams adapter"
+        },
+        "contextRelay.adapters.sharepoint": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable SharePoint adapter"
+        },
+        "contextRelay.adapters.onedrive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable OneDrive adapter"
+        },
+        "contextRelay.adapters.connectors": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Copilot connectors adapter"
+        }
+      }
+    }
+  },
+  "overrides": {
+    "flatted": "3.4.2",
+    "serialize-javascript": "7.0.4"
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "security:check": "npm audit --audit-level=moderate",
+    "precompile": "npm run security:check",
+    "compile:types": "tsc -p ./",
+    "compile": "npm run compile:types && webpack --mode development --devtool hidden-source-map",
+    "watch": "tsc -watch -p ./",
+    "prepackage": "npm run security:check",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p ./tsconfig.test.json",
+    "pretest": "npm run compile-tests",
+    "test": "mocha --ui tdd --timeout 10000 \"out-test/src/test/suite/**/*.test.js\"",
+    "test:security": "npm run security:check",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "@vscode/test-electron": "^2.3.8",
+    "chai": "^4.4.1",
+    "eslint": "^9.39.0",
+    "mocha": "^10.2.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+}

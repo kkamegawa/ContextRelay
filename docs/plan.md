@@ -174,22 +174,27 @@ Parses the input text, extracts the optional slash prefix, and dispatches to the
 
 ### 7.5 Authentication
 
-Uses the VS Code Authentication API to obtain delegated tokens from the built-in Microsoft authentication provider.
+Uses the VS Code Authentication API with the built-in Microsoft authentication provider, but injects a custom Entra app registration through provider scope overrides.
 
 ```ts
 const session = await vscode.authentication.getSession(
   'microsoft',
-  scopes,
+  [
+    'https://graph.microsoft.com/User.Read',
+    'https://graph.microsoft.com/Mail.Read',
+    'VSCODE_CLIENT_ID:<your-client-id>',
+    'VSCODE_TENANT:organizations'
+  ],
   { createIfNone: true }
 );
-const accessToken = session.accessToken;
 ```
 
-- No custom Azure AD app registration required by the user.
-- No `clientId` or `tenantId` configuration needed.
-- Tokens are managed by VS Code's credential store; no raw tokens are written to disk by the extension.
+- A Microsoft Entra app registration is required for the Graph scopes used by this extension.
+- `contextRelay.auth.clientId` is required; `contextRelay.auth.tenantId` is optional and defaults to `organizations`.
+- The built-in VS Code provider still owns the auth UX, token cache, and refresh behavior.
 - The extension requests the union of scopes needed for enabled adapters.
-- [VS Code Authentication API](https://code.visualstudio.com/api/references/vscode-api) | [Microsoft auth provider](https://github.com/microsoft/vscode/blob/main/extensions/microsoft-authentication/README.md)
+- Root cause of `AADSTS65002`: VS Code's default first-party client ID is not preauthorized for this extension's Graph scopes.
+- [VS Code Microsoft auth provider issue #115626](https://github.com/microsoft/vscode/issues/115626) | [Scopes and permissions](https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc)
 
 ---
 
