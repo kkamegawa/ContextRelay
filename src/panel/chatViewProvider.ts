@@ -21,6 +21,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'contextRelay.chatView';
 
   private _view?: vscode.WebviewView;
+  private _currentQueryId = 0;
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -73,10 +74,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       case 'openLink':
         if (message.url) {
-          const uri = vscode.Uri.parse(message.url);
-          // Only allow http/https schemes to prevent command: / file: injection
-          if (uri.scheme === 'http' || uri.scheme === 'https') {
-            await vscode.env.openExternal(uri);
+          try {
+            const uri = vscode.Uri.parse(message.url);
+            // Only allow http/https schemes to prevent command: / file: injection
+            if (uri.scheme === 'http' || uri.scheme === 'https') {
+              await vscode.env.openExternal(uri);
+            }
+          } catch {
+            vscode.window.showWarningMessage('Unable to open link: invalid URL format.');
           }
         }
         break;
@@ -100,6 +105,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * Handle a user query — parse slash commands and dispatch.
    */
   private async _handleQuery(text: string): Promise<void> {
+    const queryId = ++this._currentQueryId;
     const parsed = parseSlashCommand(text);
     const timestamp = new Date().toISOString();
 
@@ -130,31 +136,40 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       });
     }
 
-    // Dispatch to adapters (stub implementation for now)
-    for (const source of parsed.targetSources) {
-      try {
-        const items = await this._fetchResults(source, parsed.query);
+    // Dispatch to all adapters in parallel
+    const results = await Promise.allSettled(
+      parsed.targetSources.map((source) => this._fetchResults(source, parsed.query))
+    );
+
+    // Ignore stale results if a newer query has already been submitted
+    if (queryId !== this._currentQueryId) {
+      for (const source of parsed.targetSources) {
+        this.postMessage({ command: 'loading', source, isLoading: false });
+      }
+      return;
+    }
+
+    for (let i = 0; i < parsed.targetSources.length; i++) {
+      const source = parsed.targetSources[i];
+      const result = results[i];
+      if (result.status === 'fulfilled') {
         this.postMessage({
           command: 'queryResult',
-          items,
+          items: result.value,
           source,
           query: parsed.query,
           timestamp: new Date().toISOString(),
         });
-      } catch (err) {
+      } else {
+        const err = result.reason;
         this.postMessage({
           command: 'queryError',
           source,
           message: err instanceof Error ? err.message : String(err),
           timestamp: new Date().toISOString(),
         });
-      } finally {
-        this.postMessage({
-          command: 'loading',
-          source,
-          isLoading: false,
-        });
       }
+      this.postMessage({ command: 'loading', source, isLoading: false });
     }
   }
 

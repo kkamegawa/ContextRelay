@@ -11,7 +11,7 @@ export interface ParsedCommand {
   targetSources: ContextSource[];
 }
 
-const ALL_SOURCES: ContextSource[] = ['sharepoint', 'onedrive', 'mail', 'teams'];
+const ALL_SOURCES: ContextSource[] = ['sharepoint', 'onedrive', 'mail', 'teams', 'connectors'];
 
 /**
  * Parse user input and route to the appropriate adapter(s).

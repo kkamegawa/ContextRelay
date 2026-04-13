@@ -5,15 +5,7 @@
  * to prevent XSS from untrusted result data.
  */
 
-interface ContextItem {
-  source: string;
-  title: string;
-  snippet: string;
-  url?: string;
-  timestamp?: string;
-  relevance?: number;
-  cache: { hit: boolean; storedAt?: string; ttlSeconds?: number };
-}
+import type { ContextItem } from '../panel/types';
 
 type VsCodeApi = {
   postMessage(message: unknown): void;
@@ -145,10 +137,20 @@ export class ChatRenderer {
 
     const icon = SOURCE_ICONS[source] || '⚠️';
     const label = SOURCE_LABELS[source] || source;
-    const sanitized = DOMPurify.sanitize(message);
     const timeStr = this.formatTime(timestamp);
 
-    el.innerHTML = `${icon} <strong>${label}</strong>: ${sanitized} <span class="timestamp">(${timeStr})</span>`;
+    el.appendChild(document.createTextNode(`${icon} `));
+
+    const labelEl = document.createElement('strong');
+    labelEl.textContent = label;
+    el.appendChild(labelEl);
+
+    el.appendChild(document.createTextNode(`: ${message} `));
+
+    const tsEl = document.createElement('span');
+    tsEl.className = 'timestamp';
+    tsEl.textContent = `(${timeStr})`;
+    el.appendChild(tsEl);
 
     this.chatArea.appendChild(el);
     this.scrollToBottom();
@@ -161,6 +163,12 @@ export class ChatRenderer {
     if (isLoading) {
       this.hideWelcome();
 
+      // Remove any existing spinner for this source before creating a new one
+      const existing = this.loadingElements.get(source);
+      if (existing) {
+        existing.remove();
+      }
+
       const el = document.createElement('div');
       el.className = 'loading';
       el.setAttribute('aria-label', `Loading ${SOURCE_LABELS[source] || source} results`);
@@ -168,10 +176,14 @@ export class ChatRenderer {
       const label = SOURCE_LABELS[source] || source;
       const icon = SOURCE_ICONS[source] || '🔍';
 
-      el.innerHTML = `
-        <div class="spinner" aria-hidden="true"></div>
-        <span>${icon} Searching ${label}...</span>
-      `;
+      const spinner = document.createElement('div');
+      spinner.className = 'spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      el.appendChild(spinner);
+
+      const text = document.createElement('span');
+      text.textContent = `${icon} Searching ${label}...`;
+      el.appendChild(text);
 
       this.loadingElements.set(source, el);
       this.chatArea.appendChild(el);

@@ -3,26 +3,13 @@
  * Shows a floating menu when the user types "/" in the input.
  */
 
-interface SlashMenuItem {
-  command: string;
-  label: string;
-  description: string;
-  icon: string;
-}
-
-const SLASH_ITEMS: SlashMenuItem[] = [
-  { command: '/mail', label: '/mail', description: 'Search Exchange mail', icon: '📧' },
-  { command: '/teams', label: '/teams', description: 'Search Teams messages', icon: '💬' },
-  { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: '📄' },
-  { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: '☁️' },
-  { command: '/all', label: '/all', description: 'Search all sources', icon: '🔍' },
-];
+import { type SlashCommand, SLASH_COMMANDS } from '../panel/types';
 
 export class SlashMenu {
   private menu: HTMLElement;
   private input: HTMLTextAreaElement;
   private selectedIndex = -1;
-  private filteredItems: SlashMenuItem[] = [];
+  private filteredItems: SlashCommand[] = [];
   private onSelect: (command: string) => void;
 
   constructor(
@@ -34,7 +21,7 @@ export class SlashMenu {
     this.input = inputEl;
     this.onSelect = onSelect;
 
-    this._renderItems(SLASH_ITEMS);
+    this._renderItems(SLASH_COMMANDS);
   }
 
   /**
@@ -42,7 +29,8 @@ export class SlashMenu {
    * Returns true if the menu is visible.
    */
   update(text: string): boolean {
-    const trimmed = text.trim();
+    // Use trimStart only — trailing whitespace (e.g. "/mail ") intentionally hides the menu
+    const trimmed = text.trimStart();
 
     // Show menu only when input starts with "/" and has no space (still typing command)
     if (!trimmed.startsWith('/') || trimmed.includes(' ')) {
@@ -51,7 +39,7 @@ export class SlashMenu {
     }
 
     const partial = trimmed.toLowerCase();
-    this.filteredItems = SLASH_ITEMS.filter((item) =>
+    this.filteredItems = SLASH_COMMANDS.filter((item) =>
       item.command.startsWith(partial)
     );
 
@@ -126,7 +114,7 @@ export class SlashMenu {
     return this.menu.classList.contains('visible');
   }
 
-  private _renderItems(items: SlashMenuItem[]): void {
+  private _renderItems(items: SlashCommand[]): void {
     this.menu.innerHTML = items
       .map(
         (item, index) => `

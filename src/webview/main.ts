@@ -9,6 +9,7 @@
 
 import { SlashMenu } from './slashMenu';
 import { ChatRenderer } from './chatRenderer';
+import type { ContextItem } from '../panel/types';
 
 // Acquire the VS Code API (available in webview context)
 declare function acquireVsCodeApi(): {
@@ -118,15 +119,7 @@ window.addEventListener('message', (event) => {
 
     case 'queryResult':
       renderer.renderQueryResult(
-        message.items as Array<{
-          source: string;
-          title: string;
-          snippet: string;
-          url?: string;
-          timestamp?: string;
-          relevance?: number;
-          cache: { hit: boolean; storedAt?: string; ttlSeconds?: number };
-        }>,
+        message.items as ContextItem[],
         message.source as string,
         message.query as string,
         message.timestamp as string
