@@ -1,18 +1,18 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { PanelProvider } from './panel/panelProvider';
+import { ChatViewProvider } from './panel/chatViewProvider';
 import { AuthProvider } from './auth/authProvider';
 
 export function activate(context: vscode.ExtensionContext): void {
   const authProvider = new AuthProvider(context);
-  const panelProvider = new PanelProvider(context, authProvider, context.extensionUri);
+  const chatViewProvider = new ChatViewProvider(context, authProvider, context.extensionUri);
   const focusPanel = async (): Promise<void> => {
-    await vscode.commands.executeCommand(`${PanelProvider.viewType}.focus`);
+    await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
   };
 
   const generateHandoffDocs = async (): Promise<string[]> => {
-    const docGenerator = panelProvider.getDocGenerator();
-    const handoffContext = panelProvider.getHandoffContext();
+    const docGenerator = chatViewProvider.getDocGenerator();
+    const handoffContext = chatViewProvider.getHandoffContext();
 
     try {
       const files = await docGenerator.generateAll(handoffContext);
@@ -29,7 +29,7 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   const ensureHandoffDocExists = async (): Promise<string> => {
-    const docGenerator = panelProvider.getDocGenerator();
+    const docGenerator = chatViewProvider.getDocGenerator();
     const handoffPath = docGenerator.getHandoffPath();
 
     if (!fs.existsSync(handoffPath)) {
@@ -80,23 +80,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register the WebviewView provider
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(PanelProvider.viewType, panelProvider, {
+    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
-    })
-  );
-
-  // Listen for session changes
-  context.subscriptions.push(
-    authProvider.onSessionChange(async () => {
-      await panelProvider.refreshAuthState();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(async event => {
-      if (event.affectsConfiguration('contextRelay.enableChatPreview')) {
-        await panelProvider.refreshUiState();
-      }
     })
   );
 
@@ -115,22 +100,28 @@ export function activate(context: vscode.ExtensionContext): void {
       });
       if (query) {
         await focusPanel();
-        panelProvider.postMessage({ type: 'setQuery', query });
+        await chatViewProvider.submitQuery(query);
       }
     })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.clearCache', () => {
-      panelProvider.clearCache();
+      chatViewProvider.clearCache();
       vscode.window.showInformationMessage('ContextRelay: Cache cleared.');
     })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.clearSnippets', () => {
-      panelProvider.clearSnippets();
+      chatViewProvider.clearSnippets();
       vscode.window.showInformationMessage('ContextRelay: All snippets cleared.');
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.clearChat', () => {
+      chatViewProvider.clearChat();
     })
   );
 

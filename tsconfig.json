@@ -15,5 +15,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["src/test/**/*", "node_modules"]
+  "exclude": ["src/test/**/*", "src/webview/**/*", "node_modules"]
 }

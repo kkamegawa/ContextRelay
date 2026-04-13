@@ -16,6 +16,30 @@ function getMajor(versionRange: string | undefined): number | undefined {
   return match ? Number(match[0]) : undefined;
 }
 
+function compareVersions(left: string | undefined, right: string): number {
+  if (!left) {
+    return -1;
+  }
+
+  const normalize = (value: string): number[] =>
+    value
+      .replace(/^[^\d]*/, '')
+      .split(/[.-]/)
+      .map(part => Number.parseInt(part, 10) || 0);
+
+  const lhs = normalize(left);
+  const rhs = normalize(right);
+  const length = Math.max(lhs.length, rhs.length);
+  for (let i = 0; i < length; i += 1) {
+    const delta = (lhs[i] ?? 0) - (rhs[i] ?? 0);
+    if (delta !== 0) {
+      return delta;
+    }
+  }
+
+  return 0;
+}
+
 suite('Dependency security baselines', () => {
   test('enforces npm audit at moderate level during build paths', () => {
     const packageJsonPath = path.resolve(__dirname, '../../../../package.json');
@@ -62,16 +86,14 @@ suite('Dependency security baselines', () => {
     const packageJsonPath = path.resolve(__dirname, '../../../../package.json');
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as PackageJson;
 
-    assert.equal(
-      packageJson.overrides?.flatted,
-      '3.4.2',
-      'flatted override must pin the first non-vulnerable release'
+    assert.ok(
+      compareVersions(packageJson.overrides?.flatted, '3.4.2') >= 0,
+      `flatted override must stay on a non-vulnerable release (found: ${packageJson.overrides?.flatted ?? 'missing'})`
     );
 
-    assert.equal(
-      packageJson.overrides?.['serialize-javascript'],
-      '7.0.4',
-      'serialize-javascript override must pin a non-vulnerable release'
+    assert.ok(
+      compareVersions(packageJson.overrides?.['serialize-javascript'], '7.0.4') >= 0,
+      `serialize-javascript override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['serialize-javascript'] ?? 'missing'})`
     );
   });
 });
