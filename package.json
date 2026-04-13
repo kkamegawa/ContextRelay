@@ -1,0 +1,123 @@
+{
+  "name": "context-relay",
+  "displayName": "ContextRelay",
+  "description": "Surface relevant Microsoft 365 context directly in VS Code while you design and code.",
+  "version": "0.0.1",
+  "publisher": "kkamegawa",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:contextRelay.chatView"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "contextRelay",
+          "title": "ContextRelay",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "contextRelay": [
+        {
+          "type": "webview",
+          "id": "contextRelay.chatView",
+          "name": "ContextRelay"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "contextRelay.openPanel",
+        "title": "ContextRelay: Open Panel"
+      },
+      {
+        "command": "contextRelay.clearChat",
+        "title": "ContextRelay: Clear Chat"
+      }
+    ],
+    "configuration": {
+      "title": "ContextRelay",
+      "properties": {
+        "contextRelay.maxResults": {
+          "type": "number",
+          "default": 10,
+          "description": "Number of search results returned per source."
+        },
+        "contextRelay.outputDir": {
+          "type": "string",
+          "default": ".contextrelay",
+          "description": "Directory where handoff documents are saved."
+        },
+        "contextRelay.cache.ttlSeconds": {
+          "type": "number",
+          "default": 300,
+          "description": "Cache TTL in seconds."
+        },
+        "contextRelay.cache.maxEntries": {
+          "type": "number",
+          "default": 200,
+          "description": "Maximum number of cached entries (LRU eviction)."
+        },
+        "contextRelay.cache.persistWorkspaceState": {
+          "type": "boolean",
+          "default": true,
+          "description": "Persist cache in workspace state."
+        },
+        "contextRelay.enableChatPreview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Chat tab (Copilot Chat API is in beta)."
+        },
+        "contextRelay.adapters.mail": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Exchange Mail adapter."
+        },
+        "contextRelay.adapters.teams": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Teams adapter."
+        },
+        "contextRelay.adapters.sharepoint": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable SharePoint adapter."
+        },
+        "contextRelay.adapters.onedrive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable OneDrive adapter."
+        },
+        "contextRelay.adapters.connectors": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Copilot connectors adapter."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@types/vscode-webview": "^1.57.5",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.4.0"
+  }
+}
