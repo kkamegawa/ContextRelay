@@ -70,8 +70,32 @@
       {
         "command": "contextRelay.copyHandoffPrompt",
         "title": "ContextRelay: Copy Handoff Prompt to Clipboard"
+      },
+      {
+        "command": "contextRelay.moveToSecondarySideBar",
+        "title": "ContextRelay: Move to Secondary Side Bar",
+        "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "contextRelay.moveToPrimarySideBar",
+        "title": "ContextRelay: Move to Primary Side Bar",
+        "icon": "$(layout-sidebar-left)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "contextRelay.moveToSecondarySideBar",
+          "when": "view == contextRelay.chatView && contextRelay.viewLocation != 'secondarySideBar'",
+          "group": "navigation@100"
+        },
+        {
+          "command": "contextRelay.moveToPrimarySideBar",
+          "when": "view == contextRelay.chatView && contextRelay.viewLocation == 'secondarySideBar'",
+          "group": "navigation@100"
+        }
+      ]
+    },
     "configuration": {
       "title": "ContextRelay",
       "properties": {

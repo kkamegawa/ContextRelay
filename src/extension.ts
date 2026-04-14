@@ -10,6 +10,38 @@ export function activate(context: vscode.ExtensionContext): void {
     await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
   };
 
+  // Track which sidebar the view is in so the title-bar icon can toggle
+  void vscode.commands.executeCommand('setContext', 'contextRelay.viewLocation', 'primarySideBar');
+
+  const moveToSecondarySideBar = async (): Promise<void> => {
+    try {
+      await vscode.commands.executeCommand('vscode.moveViews', {
+        viewIds: [ChatViewProvider.viewType],
+        destinationId: '_.auxiliarybar.newcontainer'
+      });
+      await vscode.commands.executeCommand('setContext', 'contextRelay.viewLocation', 'secondarySideBar');
+      await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+    } catch {
+      // Fallback: let the user pick the destination via the built-in quick pick
+      await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+      await vscode.commands.executeCommand('workbench.action.moveFocusedView');
+    }
+  };
+
+  const moveToPrimarySideBar = async (): Promise<void> => {
+    try {
+      await vscode.commands.executeCommand('vscode.moveViews', {
+        viewIds: [ChatViewProvider.viewType],
+        destinationId: 'workbench.view.extension.contextRelay'
+      });
+      await vscode.commands.executeCommand('setContext', 'contextRelay.viewLocation', 'primarySideBar');
+      await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+    } catch {
+      await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+      await vscode.commands.executeCommand('workbench.action.moveFocusedView');
+    }
+  };
+
   const generateHandoffDocs = async (): Promise<string[]> => {
     const docGenerator = chatViewProvider.getDocGenerator();
     const handoffContext = chatViewProvider.getHandoffContext();
@@ -139,6 +171,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.copyHandoffPrompt', copyHandoffPrompt)
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.moveToSecondarySideBar', moveToSecondarySideBar)
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.moveToPrimarySideBar', moveToPrimarySideBar)
   );
 }
 

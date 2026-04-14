@@ -5,6 +5,13 @@ import * as path from 'path';
 interface PackageCommand {
   command: string;
   title: string;
+  icon?: string;
+}
+
+interface ViewTitleMenuItem {
+  command: string;
+  when?: string;
+  group?: string;
 }
 
 interface PackageJson {
@@ -14,6 +21,9 @@ interface PackageJson {
     commands?: PackageCommand[];
     viewsContainers?: {
       activitybar?: Array<{ id: string; title: string; icon?: string }>;
+    };
+    menus?: {
+      'view/title'?: ViewTitleMenuItem[];
     };
   };
 }
@@ -49,6 +59,49 @@ suite('Extension manifest consistency', () => {
     assert.ok(
       compileScript.includes('webpack'),
       'compile script must generate the webpack runtime bundle used by package.json#main'
+    );
+  });
+
+  test('contributes move-to-sidebar commands with icons for view/title menu', () => {
+    const commands = packageJson.contributes?.commands ?? [];
+
+    const moveRight = commands.find(c => c.command === 'contextRelay.moveToSecondarySideBar');
+    const moveLeft = commands.find(c => c.command === 'contextRelay.moveToPrimarySideBar');
+
+    assert.ok(moveRight, 'contextRelay.moveToSecondarySideBar command must be contributed');
+    assert.ok(moveRight?.icon, 'moveToSecondarySideBar must have an icon for the title bar');
+    assert.ok(moveLeft, 'contextRelay.moveToPrimarySideBar command must be contributed');
+    assert.ok(moveLeft?.icon, 'moveToPrimarySideBar must have an icon for the title bar');
+  });
+
+  test('registers view/title menu entries for sidebar move commands', () => {
+    const viewTitleMenu = packageJson.contributes?.menus?.['view/title'] ?? [];
+
+    const moveRightEntry = viewTitleMenu.find(
+      m => m.command === 'contextRelay.moveToSecondarySideBar'
+    );
+    const moveLeftEntry = viewTitleMenu.find(
+      m => m.command === 'contextRelay.moveToPrimarySideBar'
+    );
+
+    assert.ok(moveRightEntry, 'view/title must include moveToSecondarySideBar');
+    assert.ok(
+      moveRightEntry?.when?.includes('contextRelay.chatView'),
+      'moveToSecondarySideBar menu entry must be scoped to the chatView'
+    );
+    assert.ok(
+      moveRightEntry?.group?.startsWith('navigation'),
+      'moveToSecondarySideBar must appear in the navigation group'
+    );
+
+    assert.ok(moveLeftEntry, 'view/title must include moveToPrimarySideBar');
+    assert.ok(
+      moveLeftEntry?.when?.includes('contextRelay.chatView'),
+      'moveToPrimarySideBar menu entry must be scoped to the chatView'
+    );
+    assert.ok(
+      moveLeftEntry?.group?.startsWith('navigation'),
+      'moveToPrimarySideBar must appear in the navigation group'
     );
   });
 });
