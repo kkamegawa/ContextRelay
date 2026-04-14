@@ -145,7 +145,8 @@
   },
   "overrides": {
     "flatted": "3.4.2",
-    "serialize-javascript": "7.0.5"
+    "serialize-javascript": "7.0.5",
+    "glob": "13.0.6"
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -177,7 +178,7 @@
     "concurrently": "^9.2.1",
     "esbuild": "^0.28.0",
     "eslint": "^10.2.0",
-    "mocha": "^11.7.5",
+    "mocha": "11.3.0",
     "ts-loader": "^9.5.7",
     "typescript": "^6.0.2",
     "webpack": "^5.106.1",
