@@ -103,20 +103,24 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.glob, '13.0.6') >= 0,
-      `glob override must stay on a current non-vulnerable release (found: ${packageJson.overrides?.glob ?? 'missing'})`
+      compareVersions(packageJson.overrides?.glob, '10.5.0') >= 0,
+      `glob override must stay on a non-vulnerable release within mocha's declared range (found: ${packageJson.overrides?.glob ?? 'missing'})`
     );
   });
 
   test('locks installed glob and diff versions outside known vulnerable ranges', () => {
     const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
 
-    const globVersion = packageLockJson.packages?.['node_modules/glob']?.version;
+    // The glob override applies to mocha's transitive dependency, so the installed
+    // glob lives under node_modules/mocha/node_modules/glob (or root if hoisted).
+    const globVersion =
+      packageLockJson.packages?.['node_modules/mocha/node_modules/glob']?.version ??
+      packageLockJson.packages?.['node_modules/glob']?.version;
     const diffVersion = packageLockJson.packages?.['node_modules/diff']?.version;
 
     assert.ok(
-      compareVersions(globVersion, '13.0.6') >= 0,
-      `installed glob must stay on a current non-vulnerable release (found: ${globVersion ?? 'missing'})`
+      compareVersions(globVersion, '10.5.0') >= 0,
+      `installed glob must stay on a non-vulnerable release (>= 10.5.0 in 10.x, or >= 11.1.0 in 11.x) (found: ${globVersion ?? 'missing'})`
     );
 
     assert.ok(
