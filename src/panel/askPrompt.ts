@@ -4,30 +4,59 @@ import type { SavedSnippet } from '../models/contextItem';
 // Prevents a runaway prompt when many large documents are pinned.
 export const MAX_ASK_CONTEXT_CHARS = 60_000;
 
+function truncateToBudget(body: string, budget: number): string {
+  if (budget <= 0) {
+    return '';
+  }
+
+  if (body.length <= budget) {
+    return body;
+  }
+
+  for (let prefixLength = Math.min(body.length, budget); prefixLength > 0; prefixLength--) {
+    const omittedChars = body.length - prefixLength;
+    const suffix = `\n…[truncated ${omittedChars} chars]`;
+    if (prefixLength + suffix.length <= budget) {
+      return `${body.slice(0, prefixLength)}${suffix}`;
+    }
+  }
+
+  return body.slice(0, budget);
+}
+
 /**
  * Build the full prompt sent to Microsoft 365 Copilot for /ask.
  *
  * Combines the user's instruction with the pinned snippets (already hydrated
- * with full document content where possible). Individual snippets are
- * truncated to an equal share of the budget so a single large document
- * cannot crowd out the others.
+ * with full document content where possible). The combined pinned context is
+ * capped by MAX_ASK_CONTEXT_CHARS so a large number of snippets cannot cause
+ * the prompt to grow without bound.
  */
 export function buildAskPrompt(userPrompt: string, snippets: SavedSnippet[]): string {
-  const perSnippetBudget = Math.max(500, Math.floor(MAX_ASK_CONTEXT_CHARS / Math.max(1, snippets.length)));
-
   const contextBlocks: string[] = [];
-  for (let i = 0; i < snippets.length; i++) {
+  let remainingContextBudget = MAX_ASK_CONTEXT_CHARS;
+
+  for (let i = 0; i < snippets.length && remainingContextBudget > 0; i++) {
     const snippet = snippets[i];
     const item = snippet.item;
     const body = (item.snippet ?? '').trim();
-    const truncated = body.length > perSnippetBudget
-      ? `${body.slice(0, perSnippetBudget)}\n…[truncated ${body.length - perSnippetBudget} chars]`
-      : body;
     const header = [
       `### Pinned document ${i + 1}: ${snippet.name || item.title}`,
       `Source: ${item.source}${item.url ? ` — ${item.url}` : ''}`
     ].join('\n');
+
+    const separator = contextBlocks.length > 0 ? '\n\n' : '';
+    const blockPrefix = `${header}\n\n`;
+    const fixedCost = separator.length + blockPrefix.length;
+
+    if (fixedCost >= remainingContextBudget) {
+      break;
+    }
+
+    const truncated = truncateToBudget(body, remainingContextBudget - fixedCost);
+    const block = `${separator}${blockPrefix}${truncated}`;
     contextBlocks.push(`${header}\n\n${truncated}`);
+    remainingContextBudget -= block.length;
   }
 
   return [

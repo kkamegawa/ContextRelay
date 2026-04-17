@@ -16,6 +16,13 @@ suite('detectOutputLanguage', () => {
     assert.equal(result.content, '# Title\n\nBody');
   });
 
+  test('strips a single wrapping fenced block with CRLF line endings', () => {
+    const response = '```json\r\n{"a":1}\r\n```';
+    const result = detectOutputLanguage('convert to json', response);
+    assert.equal(result.language, 'json');
+    assert.equal(result.content, '{"a":1}');
+  });
+
   test('does not strip fences when the response contains multiple blocks', () => {
     const response = 'Intro\n\n```ts\nconst a = 1;\n```\n\n```ts\nconst b = 2;\n```';
     const result = detectOutputLanguage('explain', response);
@@ -25,6 +32,13 @@ suite('detectOutputLanguage', () => {
 
   test('picks dominant inner fence language when response is mixed content', () => {
     const response = 'Here is the data:\n\n```yaml\nkey: value\n```\n\nDone.';
+    const result = detectOutputLanguage('do the thing', response);
+    assert.equal(result.language, 'yaml');
+    assert.equal(result.content, response);
+  });
+
+  test('picks dominant inner fence language with CRLF line endings', () => {
+    const response = 'Here is the data:\r\n\r\n```yaml\r\nkey: value\r\n```\r\n\r\nDone.';
     const result = detectOutputLanguage('do the thing', response);
     assert.equal(result.language, 'yaml');
     assert.equal(result.content, response);

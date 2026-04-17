@@ -79,8 +79,8 @@ function normalizeFenceLanguage(raw: string | undefined): string | undefined {
 
 function stripSingleWrappingFence(response: string): DetectedOutput | undefined {
   const trimmed = response.trim();
-  // ^```lang\n ... \n```$
-  const match = trimmed.match(/^```([^\n`]*)\n([\s\S]*?)\n```$/);
+  // ^```lang\r?\n ... \r?\n```$
+  const match = trimmed.match(/^```([^\r\n`]*)\r?\n([\s\S]*?)\r?\n```$/);
   if (!match) {
     return undefined;
   }
@@ -96,7 +96,7 @@ function stripSingleWrappingFence(response: string): DetectedOutput | undefined 
 
 function findDominantFenceLanguage(response: string): string | undefined {
   const counts = new Map<string, number>();
-  const fenceRegex = /```([^\n`]*)\n/g;
+  const fenceRegex = /```([^\r\n`]*)\r?\n/g;
   let m: RegExpExecArray | null;
   while ((m = fenceRegex.exec(response)) !== null) {
     const lang = normalizeFenceLanguage(m[1]);

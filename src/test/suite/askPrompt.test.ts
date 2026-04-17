@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import { buildAskPrompt } from '../../panel/askPrompt';
+import { buildAskPrompt, MAX_ASK_CONTEXT_CHARS } from '../../panel/askPrompt';
 import type { SavedSnippet } from '../../models/contextItem';
 
 function snippet(name: string, body: string): SavedSnippet {
@@ -42,5 +42,22 @@ suite('buildAskPrompt', () => {
   test('references Microsoft 365 Copilot as the responder', () => {
     const result = buildAskPrompt('hi', [snippet('a', 'b')]);
     assert.ok(result.toLowerCase().includes('microsoft 365 copilot'));
+  });
+
+  test('caps combined pinned context even with many snippets', () => {
+    const snippets = Array.from({ length: 200 }, (_, index) =>
+      snippet(`doc-${index}.txt`, 'x'.repeat(1_000))
+    );
+
+    const result = buildAskPrompt('summarize', snippets);
+    const start = result.indexOf('--- Pinned context ---\n');
+    const end = result.indexOf('\n--- End of pinned context ---');
+
+    assert.notEqual(start, -1);
+    assert.notEqual(end, -1);
+
+    const context = result.slice(start + '--- Pinned context ---\n'.length, end);
+    assert.ok(context.length <= MAX_ASK_CONTEXT_CHARS);
+    assert.ok(context.includes('[truncated'));
   });
 });
