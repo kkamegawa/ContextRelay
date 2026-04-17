@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import * as vscode from 'vscode';
+import { askCopilot } from '../adapters/chatAdapter';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
 import { searchMail } from '../adapters/mailAdapter';
 import { searchRetrieval } from '../adapters/retrievalAdapter';
@@ -10,6 +11,8 @@ import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
 import { type ContextItem, type ContextSource } from '../models/contextItem';
 import { type RouteTarget, getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
+import { buildAskPrompt } from './askPrompt';
+import { detectOutputLanguage } from './outputLanguage';
 import { buildSearchSummary, type SearchSummaryResult } from './searchSummary';
 import { type HostToWebviewMessage, type WebviewToHostMessage } from './types';
 
@@ -211,6 +214,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (parsed.target === 'ask') {
+      await this.handleAskCommand(parsed.query);
+      return;
+    }
+
     const targetSources = this.getTargetSources(parsed.target);
     if (targetSources.length === 0) {
       const message = 'No ContextRelay adapters are enabled.';
@@ -305,17 +313,75 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private getTargetSources(target: RouteTarget): ContextSource[] {
-    if (target !== 'all') {
-      return [target];
+  private async handleAskCommand(prompt: string): Promise<void> {
+    const snippets = this.snippetStore.getAll();
+    if (snippets.length === 0) {
+      const message = 'Pin one or more snippets first to use /ask. The pinned content is sent to Microsoft 365 Copilot as context.';
+      vscode.window.showWarningMessage(`ContextRelay: ${message}`);
+      this.postMessage({
+        command: 'queryError',
+        source: 'all',
+        message,
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
 
-    const config = vscode.workspace.getConfiguration('contextRelay');
-    const sources = [...DEFAULT_SOURCES];
-    if (config.get<boolean>('adapters.connectors', false)) {
-      sources.push('connectors');
+    let token: string;
+    try {
+      token = await this.authProvider.getAccessToken();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Authentication required.';
+      this.postMessage({
+        command: 'queryError',
+        source: 'all',
+        message,
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
-    return sources;
+
+    this.postMessage({ command: 'loading', source: 'all', isLoading: true });
+
+    try {
+      const fullPrompt = buildAskPrompt(prompt, snippets);
+      const reply = await askCopilot(token, fullPrompt);
+      const { language, content } = detectOutputLanguage(prompt, reply);
+
+      const doc = await vscode.workspace.openTextDocument({ language, content });
+      await vscode.window.showTextDocument(doc, { preview: false });
+
+      this.postMessage({
+        command: 'assistantMessage',
+        kind: 'ask',
+        text: `Microsoft 365 Copilot response opened in a new editor (${language}). ${snippets.length} pinned snippet(s) used as context.`,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`ContextRelay: /ask failed — ${message}`);
+      this.postMessage({
+        command: 'queryError',
+        source: 'all',
+        message,
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      this.postMessage({ command: 'loading', source: 'all', isLoading: false });
+    }
+  }
+
+  private getTargetSources(target: RouteTarget): ContextSource[] {
+    if (target === 'ask' || target === 'all') {
+      const config = vscode.workspace.getConfiguration('contextRelay');
+      const sources = [...DEFAULT_SOURCES];
+      if (config.get<boolean>('adapters.connectors', false)) {
+        sources.push('connectors');
+      }
+      return target === 'all' ? sources : [];
+    }
+
+    return [target];
   }
 
   private async fetchResults(
@@ -742,6 +808,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         <h2>ContextRelay</h2>
         <p>Search Microsoft 365 context with slash commands.</p>
         <p style="font-size: 0.8em;">Type <code>/</code> for available commands, or enter a keyword to search all sources.</p>
+        <p style="font-size: 0.8em;">Pin snippets and run <code>/ask</code> to process them with Microsoft 365 Copilot and open the result in a new editor.</p>
       </div>
     </div>
 

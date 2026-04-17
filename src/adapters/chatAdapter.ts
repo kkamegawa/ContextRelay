@@ -48,3 +48,16 @@ export async function sendMessage(
     ?? '';
   return content;
 }
+
+/**
+ * Convenience wrapper that creates a fresh Microsoft 365 Copilot conversation
+ * and sends a single prompt, returning the assistant reply text.
+ */
+export async function askCopilot(token: string, prompt: string): Promise<string> {
+  const conversationId = await createConversation(token);
+  const reply = await sendMessage(token, conversationId, prompt);
+  if (!reply.trim()) {
+    throw new Error('Microsoft 365 Copilot returned an empty response.');
+  }
+  return reply;
+}

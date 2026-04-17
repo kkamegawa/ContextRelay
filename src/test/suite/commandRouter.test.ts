@@ -94,4 +94,22 @@ suite('CommandRouter', () => {
     const text = getHelpText('unknown');
     assert.ok(text.length > 0);
   });
+
+  test('/ask command routes to ask and preserves newlines in the query', () => {
+    const result = parseCommand('/ask translate to Japanese\nand output as markdown');
+    assert.equal(result.target, 'ask');
+    assert.equal(result.query, 'translate to Japanese\nand output as markdown');
+    assert.equal(result.isEmpty, false);
+  });
+
+  test('empty /ask triggers isEmpty for slash help', () => {
+    const result = parseCommand('/ask');
+    assert.equal(result.target, 'ask');
+    assert.equal(result.isEmpty, true);
+  });
+
+  test('getHelpText for ask mentions Microsoft 365 Copilot', () => {
+    const text = getHelpText('ask');
+    assert.ok(text.toLowerCase().includes('microsoft 365 copilot'));
+  });
 });
