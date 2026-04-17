@@ -21,7 +21,15 @@ function truncateToBudget(body: string, budget: number): string {
     }
   }
 
-  return body.slice(0, budget);
+  // Budget is too small to fit both a prefix and the truncation suffix.
+  // Return the marker (possibly itself truncated) so the caller always knows
+  // content was omitted rather than silently returning raw untagged content.
+  const markerOnly = `\n…[truncated ${body.length} chars]`;
+  if (markerOnly.length <= budget) {
+    return markerOnly;
+  }
+
+  return markerOnly.slice(0, budget);
 }
 
 /**
@@ -55,7 +63,7 @@ export function buildAskPrompt(userPrompt: string, snippets: SavedSnippet[]): st
 
     const truncated = truncateToBudget(body, remainingContextBudget - fixedCost);
     const block = `${separator}${blockPrefix}${truncated}`;
-    contextBlocks.push(`${header}\n\n${truncated}`);
+    contextBlocks.push(block);
     remainingContextBudget -= block.length;
   }
 
@@ -65,7 +73,7 @@ export function buildAskPrompt(userPrompt: string, snippets: SavedSnippet[]): st
     'If the user asks for a specific output format (markdown, JSON, HTML, etc.), produce only that format with no additional commentary.',
     '',
     '--- Pinned context ---',
-    contextBlocks.join('\n\n'),
+    contextBlocks.join(''),
     '--- End of pinned context ---',
     '',
     'User instruction:',
