@@ -70,8 +70,32 @@
       {
         "command": "contextRelay.copyHandoffPrompt",
         "title": "ContextRelay: Copy Handoff Prompt to Clipboard"
+      },
+      {
+        "command": "contextRelay.moveToSecondarySideBar",
+        "title": "ContextRelay: Move to Secondary Side Bar",
+        "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "contextRelay.moveToPrimarySideBar",
+        "title": "ContextRelay: Move to Primary Side Bar",
+        "icon": "$(layout-sidebar-left)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "contextRelay.moveToSecondarySideBar",
+          "when": "view == contextRelay.chatView && contextRelay.viewLocation != 'secondarySideBar'",
+          "group": "navigation@100"
+        },
+        {
+          "command": "contextRelay.moveToPrimarySideBar",
+          "when": "view == contextRelay.chatView && contextRelay.viewLocation == 'secondarySideBar'",
+          "group": "navigation@100"
+        }
+      ]
+    },
     "configuration": {
       "title": "ContextRelay",
       "properties": {
@@ -145,7 +169,8 @@
   },
   "overrides": {
     "flatted": "3.4.2",
-    "serialize-javascript": "7.0.5"
+    "serialize-javascript": "7.0.5",
+    "glob": "10.5.0"
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -177,7 +202,7 @@
     "concurrently": "^9.2.1",
     "esbuild": "^0.28.0",
     "eslint": "^10.2.0",
-    "mocha": "^11.7.5",
+    "mocha": "11.3.0",
     "ts-loader": "^9.5.7",
     "typescript": "^6.0.2",
     "webpack": "^5.106.1",

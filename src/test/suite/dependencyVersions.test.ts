@@ -8,6 +8,15 @@ interface PackageJson {
   overrides?: Record<string, string>;
 }
 
+interface PackageLockJson {
+  packages?: Record<string, { version?: string }>;
+}
+
+function readRepoJson<T>(fileName: string): T {
+  const filePath = path.resolve(__dirname, '../../../../', fileName);
+  return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+}
+
 function getMajor(versionRange: string | undefined): number | undefined {
   if (!versionRange) {
     return undefined;
@@ -42,8 +51,7 @@ function compareVersions(left: string | undefined, right: string): number {
 
 suite('Dependency security baselines', () => {
   test('enforces npm audit at moderate level during build paths', () => {
-    const packageJsonPath = path.resolve(__dirname, '../../../../package.json');
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as PackageJson;
+    const packageJson = readRepoJson<PackageJson>('package.json');
 
     const securityCheck = packageJson.scripts?.['security:check'];
     const precompile = packageJson.scripts?.precompile;
@@ -62,8 +70,7 @@ suite('Dependency security baselines', () => {
   });
 
   test('uses non-vulnerable @typescript-eslint major versions', () => {
-    const packageJsonPath = path.resolve(__dirname, '../../../../package.json');
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as PackageJson;
+    const packageJson = readRepoJson<PackageJson>('package.json');
 
     const pluginVersion = packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'];
     const parserVersion = packageJson.devDependencies?.['@typescript-eslint/parser'];
@@ -83,8 +90,7 @@ suite('Dependency security baselines', () => {
   });
 
   test('pins safe override versions for vulnerable transitive dependencies', () => {
-    const packageJsonPath = path.resolve(__dirname, '../../../../package.json');
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as PackageJson;
+    const packageJson = readRepoJson<PackageJson>('package.json');
 
     assert.ok(
       compareVersions(packageJson.overrides?.flatted, '3.4.2') >= 0,
@@ -94,6 +100,33 @@ suite('Dependency security baselines', () => {
     assert.ok(
       compareVersions(packageJson.overrides?.['serialize-javascript'], '7.0.4') >= 0,
       `serialize-javascript override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['serialize-javascript'] ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(packageJson.overrides?.glob, '10.5.0') >= 0,
+      `glob override must stay on a non-vulnerable release within mocha's declared range (found: ${packageJson.overrides?.glob ?? 'missing'})`
+    );
+  });
+
+  test('locks installed glob and diff versions outside known vulnerable ranges', () => {
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+
+    // The glob override applies to mocha's transitive dependency, so the installed
+    // glob lives under node_modules/mocha/node_modules/glob (or root if hoisted).
+    const globVersion =
+      packageLockJson.packages?.['node_modules/mocha/node_modules/glob']?.version ??
+      packageLockJson.packages?.['node_modules/glob']?.version;
+    const diffVersion = packageLockJson.packages?.['node_modules/diff']?.version;
+
+    assert.ok(
+      compareVersions(globVersion, '10.5.0') >= 0,
+      `installed glob must stay on a non-vulnerable release (>= 10.5.0 in 10.x, or >= 11.1.0 in 11.x) (found: ${globVersion ?? 'missing'})`
+    );
+
+    assert.ok(
+      Boolean(diffVersion) &&
+        (compareVersions(diffVersion, '6.0.0') < 0 || compareVersions(diffVersion, '8.0.3') >= 0),
+      `installed diff must stay outside the vulnerable range 6.0.0-8.0.2 (found: ${diffVersion ?? 'missing'})`
     );
   });
 });
