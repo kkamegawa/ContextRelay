@@ -25,6 +25,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: '📄', source: 'sharepoint' },
   { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: '☁️', source: 'onedrive' },
   { command: '/all', label: '/all', description: 'Search all sources', icon: '🔍', source: 'all' },
+  { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets as context', icon: '🤖' },
 ];
 
 // --- Messages: Webview → Extension host ---
@@ -99,10 +100,18 @@ export interface ClearChatMessage {
   command: 'clearChat';
 }
 
+export interface AssistantMessage {
+  command: 'assistantMessage';
+  text: string;
+  timestamp: string;
+  kind?: 'info' | 'ask';
+}
+
 export type HostToWebviewMessage =
   | UserMessageDisplay
   | QueryResultMessage
   | QueryErrorMessage
   | LoadingMessage
   | SlashHelpMessage
-  | ClearChatMessage;
+  | ClearChatMessage
+  | AssistantMessage;

@@ -491,6 +491,7 @@ To target a specific source, prefix your query with a slash command:
 /teams sprint review decisions
 /sharepoint API design document
 /onedrive architecture diagram
+/ask Translate the pinned documents into Japanese as markdown
 ```
 
 ### Building a Handoff from Search Results
@@ -529,6 +530,23 @@ Use the built-in commands to hand off context to GitHub Copilot:
 - **ContextRelay: Copy Handoff Prompt to Clipboard** -- Copies a ready-to-paste Copilot prompt.
 
 Attach `HANDOFF.md` in Copilot Chat using VS Code's context mechanisms (#-mentions / Add Context).
+
+### `/ask` — Process pinned snippets with Microsoft 365 Copilot
+
+Use `/ask` to let **Microsoft 365 Copilot** (not GitHub Copilot) process your currently pinned snippets and write the answer into a brand-new editor tab.
+
+1. Pin one or more documents (`.docx`, SharePoint / OneDrive files, mail, Teams messages). ContextRelay hydrates full document text where possible.
+2. In the chat input, type `/ask` followed by your instruction, for example:
+
+  ```
+  /ask Translate the pinned document into Japanese and output as markdown.
+  /ask Summarize the pinned documents as a bullet list.
+  /ask Extract every action item as JSON with fields owner, due, task.
+  ```
+
+3. ContextRelay sends the pinned content plus your instruction to Microsoft 365 Copilot and opens the response in a new untitled editor. The editor language is auto-detected from the response format (markdown, JSON, HTML, YAML, TypeScript, etc.), so you can save the file with the right extension.
+
+If no snippets are pinned, `/ask` is aborted with a warning. Because this feature relies on the Microsoft 365 Copilot API (preview), you must have a Microsoft 365 Copilot license on the signed-in account and `contextRelay.enableChatPreview` enabled.
 
 To sign out, use the **Accounts** menu in VS Code.
 

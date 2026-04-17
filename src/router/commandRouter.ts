@@ -1,4 +1,4 @@
-export type RouteTarget = 'mail' | 'teams' | 'sharepoint' | 'onedrive' | 'all';
+export type RouteTarget = 'mail' | 'teams' | 'sharepoint' | 'onedrive' | 'all' | 'ask';
 
 export interface ParsedCommand {
   target: RouteTarget;
@@ -11,7 +11,8 @@ const SLASH_COMMANDS: Record<string, RouteTarget> = {
   teams: 'teams',
   sharepoint: 'sharepoint',
   onedrive: 'onedrive',
-  all: 'all'
+  all: 'all',
+  ask: 'ask'
 };
 
 function normalizeQuery(input: string): string {
@@ -25,8 +26,10 @@ export function parseCommand(input: string): ParsedCommand {
   if (trimmed.startsWith('/')) {
     const commandMatch = trimmed.match(/^\/(\S+)(?:\s+([\s\S]*))?$/);
     const command = commandMatch?.[1]?.toLowerCase() ?? trimmed.slice(1).toLowerCase();
-    const query = normalizeQuery(commandMatch?.[2] ?? '');
+    const rawQuery = commandMatch?.[2] ?? '';
+    // For /ask, preserve newlines in the user's instruction so the prompt keeps its original shape.
     const target = SLASH_COMMANDS[command];
+    const query = target === 'ask' ? rawQuery.trim() : normalizeQuery(rawQuery);
 
     if (target) {
       return { target, query, isEmpty: query.length === 0 };
@@ -44,7 +47,8 @@ export function getHelpText(command: string): string {
     teams: 'Example: /teams sprint review\nExample: /teams from:bob mentions:me',
     sharepoint: 'Example: /sharepoint VPN setup guide\nExample: /sharepoint architecture',
     onedrive: 'Example: /onedrive architecture diagram\nExample: /onedrive Q3 report',
-    all: 'Example: /all architecture decisions\nOr just type a query without a slash command.'
+    all: 'Example: /all architecture decisions\nOr just type a query without a slash command.',
+    ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is opened in a new editor tab.'
   };
   return examples[command] ?? 'Type a query to search Microsoft 365 content.';
 }

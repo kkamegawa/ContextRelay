@@ -161,5 +161,12 @@ window.addEventListener('message', (event) => {
     case 'clearChat':
       renderer.clear();
       break;
+
+    case 'assistantMessage':
+      renderer.renderAssistantMessage(
+        message.text as string,
+        message.timestamp as string
+      );
+      break;
   }
 });

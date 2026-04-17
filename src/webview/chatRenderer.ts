@@ -97,6 +97,32 @@ export class ChatRenderer {
   }
 
   /**
+   * Render a plain assistant text message (used by /ask for status updates).
+   */
+  renderAssistantMessage(text: string, timestamp: string): void {
+    this.hideWelcome();
+
+    const el = document.createElement('div');
+    el.className = 'message assistant';
+    el.setAttribute('role', 'article');
+
+    const textDiv = document.createElement('div');
+    textDiv.textContent = text;
+    el.appendChild(textDiv);
+
+    const timeStr = this.formatTime(timestamp);
+    if (timeStr) {
+      const tsDiv = document.createElement('div');
+      tsDiv.className = 'timestamp';
+      tsDiv.textContent = timeStr;
+      el.appendChild(tsDiv);
+    }
+
+    this.chatArea.appendChild(el);
+    this.scrollToBottom();
+  }
+
+  /**
    * Render query results as an assistant message with result cards.
    */
   renderQueryResult(
@@ -239,6 +265,7 @@ export class ChatRenderer {
       <h2>ContextRelay</h2>
       <p>Search Microsoft 365 context with slash commands.</p>
       <p style="font-size: 0.8em;">Type <code>/</code> for available commands, or enter a keyword to search all sources.</p>
+      <p style="font-size: 0.8em;">Pin snippets and run <code>/ask</code> to process them with Microsoft 365 Copilot.</p>
     `;
     this.chatArea.appendChild(welcome);
     this.welcomeEl = welcome;
