@@ -1,3 +1,4 @@
+import './suppressPunycodeDeprecation';
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { ChatViewProvider } from './panel/chatViewProvider';
