@@ -14,9 +14,29 @@ interface CreateConversationResponse {
   id?: string;
 }
 
-interface MessageResponse {
-  value?: { content?: string }[];
-  content?: string;
+interface CopilotChatResponseMessage {
+  '@odata.type'?: string;
+  id?: string;
+  text?: string;
+  createdDateTime?: string;
+}
+
+interface ChatResponse {
+  messages?: CopilotChatResponseMessage[];
+}
+
+/**
+ * Resolve the IANA time zone for the `locationHint` parameter required by the
+ * Microsoft 365 Copilot Chat API. Falls back to `UTC` when the runtime does not
+ * provide a resolvable time zone.
+ */
+function resolveTimeZone(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return tz && tz.length > 0 ? tz : 'UTC';
+  } catch {
+    return 'UTC';
+  }
 }
 
 export async function createConversation(token: string): Promise<string> {
@@ -37,16 +57,30 @@ export async function sendMessage(
   conversationId: string,
   message: string
 ): Promise<string> {
-  const url = `${GRAPH_BASE}/beta/copilot/conversations/${conversationId}/messages`;
-  const body = JSON.stringify({ content: message });
+  // Microsoft 365 Copilot Chat API (preview):
+  // POST /beta/copilot/conversations/{conversationId}/chat
+  // See: https://learn.microsoft.com/microsoft-365/copilot/extensibility/api/ai-services/chat/copilotconversation-chat
+  const url = `${GRAPH_BASE}/beta/copilot/conversations/${conversationId}/chat`;
+  const body = JSON.stringify({
+    message: { text: message },
+    locationHint: { timeZone: resolveTimeZone() }
+  });
 
   const response = await graphFetchWithRetry(url, token, { method: 'POST', body });
-  const data = await handleGraphResponse(response) as MessageResponse;
+  const data = await handleGraphResponse(response) as ChatResponse;
 
-  const content = (data as { content?: string })?.content
-    ?? data?.value?.[0]?.content
-    ?? '';
-  return content;
+  // Response contains the full conversation turn: the echoed user message
+  // followed by the assistant reply. Pick the last message that has non-empty
+  // text and is not the prompt we just sent.
+  const messages = Array.isArray(data?.messages) ? data.messages : [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const text = messages[i]?.text;
+    if (typeof text === 'string' && text.trim().length > 0 && text !== message) {
+      return text;
+    }
+  }
+
+  return '';
 }
 
 /**
