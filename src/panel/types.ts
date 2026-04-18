@@ -26,6 +26,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: '☁️', source: 'onedrive' },
   { command: '/all', label: '/all', description: 'Search all sources', icon: '🔍', source: 'all' },
   { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets as context', icon: '🤖' },
+  { command: '/clear', label: '/clear', description: 'Clear chat and discard pinned snippets', icon: '🧹' },
 ];
 
 // --- Messages: Webview → Extension host ---

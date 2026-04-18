@@ -1,4 +1,4 @@
-export type RouteTarget = 'mail' | 'teams' | 'sharepoint' | 'onedrive' | 'all' | 'ask';
+export type RouteTarget = 'mail' | 'teams' | 'sharepoint' | 'onedrive' | 'all' | 'ask' | 'clear';
 
 export interface ParsedCommand {
   target: RouteTarget;
@@ -12,7 +12,8 @@ const SLASH_COMMANDS: Record<string, RouteTarget> = {
   sharepoint: 'sharepoint',
   onedrive: 'onedrive',
   all: 'all',
-  ask: 'ask'
+  ask: 'ask',
+  clear: 'clear'
 };
 
 function normalizeQuery(input: string): string {
@@ -29,10 +30,16 @@ export function parseCommand(input: string): ParsedCommand {
     const rawQuery = commandMatch?.[2] ?? '';
     // For /ask, preserve newlines in the user's instruction so the prompt keeps its original shape.
     const target = SLASH_COMMANDS[command];
-    const query = target === 'ask' ? rawQuery.trim() : normalizeQuery(rawQuery);
+    const query = target === 'ask'
+      ? rawQuery.trim()
+      : target === 'clear'
+        ? ''
+        : normalizeQuery(rawQuery);
 
     if (target) {
-      return { target, query, isEmpty: query.length === 0 };
+      // /clear takes no arguments and is never treated as empty so it always executes.
+      const isEmpty = target === 'clear' ? false : query.length === 0;
+      return { target, query, isEmpty };
     }
     // Unknown slash command — treat as /all with the original input
     return { target: 'all', query: normalized, isEmpty: normalized.length === 0 };
@@ -48,7 +55,8 @@ export function getHelpText(command: string): string {
     sharepoint: 'Example: /sharepoint VPN setup guide\nExample: /sharepoint architecture',
     onedrive: 'Example: /onedrive architecture diagram\nExample: /onedrive Q3 report',
     all: 'Example: /all architecture decisions\nOr just type a query without a slash command.',
-    ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is opened in a new editor tab.'
+    ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is opened in a new editor tab.',
+    clear: 'Example: /clear\nClears the current chat transcript and discards all pinned snippets.'
   };
   return examples[command] ?? 'Type a query to search Microsoft 365 content.';
 }

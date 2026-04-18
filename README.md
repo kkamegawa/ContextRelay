@@ -16,6 +16,8 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/sharepoint <query>` | SharePoint sites & pages |
 | `/onedrive <query>` | OneDrive files |
 | `/all <query>` | All enabled sources (same as no prefix) |
+| `/ask <instruction>` | Send pinned snippets to Microsoft 365 Copilot and open the reply in a new editor |
+| `/clear` | Clear the chat transcript and discard all pinned snippets |
 
 - **Snippet pinning** -- Save any search result as a named snippet, visible across sessions.
 - **Timestamped handoff docs** -- Generate Markdown documents that capture current context.
