@@ -123,6 +123,7 @@ suite('CommandRouter', () => {
   test('/clear ignores trailing arguments but still executes', () => {
     const result = parseCommand('/clear everything now');
     assert.equal(result.target, 'clear');
+    assert.equal(result.query, '');
     assert.equal(result.isEmpty, false);
   });
 

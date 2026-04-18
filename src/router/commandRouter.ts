@@ -30,7 +30,11 @@ export function parseCommand(input: string): ParsedCommand {
     const rawQuery = commandMatch?.[2] ?? '';
     // For /ask, preserve newlines in the user's instruction so the prompt keeps its original shape.
     const target = SLASH_COMMANDS[command];
-    const query = target === 'ask' ? rawQuery.trim() : normalizeQuery(rawQuery);
+    const query = target === 'ask'
+      ? rawQuery.trim()
+      : target === 'clear'
+        ? ''
+        : normalizeQuery(rawQuery);
 
     if (target) {
       // /clear takes no arguments and is never treated as empty so it always executes.
