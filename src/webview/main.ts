@@ -168,5 +168,9 @@ window.addEventListener('message', (event) => {
         message.timestamp as string
       );
       break;
+
+    case 'pinnedItems':
+      renderer.setPinnedItems((message.keys as string[]) ?? []);
+      break;
   }
 });

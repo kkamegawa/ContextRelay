@@ -45,11 +45,57 @@ export class ChatRenderer {
   private welcomeEl: HTMLElement | null;
   private vscode: VsCodeApi;
   private loadingElements: Map<string, HTMLElement> = new Map();
+  private pinnedKeys: Set<string> = new Set();
 
   constructor(chatArea: HTMLElement, vscode: VsCodeApi) {
     this.chatArea = chatArea;
     this.welcomeEl = chatArea.querySelector('#welcome');
     this.vscode = vscode;
+  }
+
+  /**
+   * Build the same stable item key the extension host uses.
+   * Must stay in sync with getContextItemKey() in src/models/contextItem.ts.
+   */
+  private getItemKey(item: ContextItem): string {
+    const discriminator =
+      item.url?.trim() ||
+      item.timestamp?.trim() ||
+      item.snippet.trim() ||
+      '';
+
+    return `${item.source}::${discriminator}::${item.title}`;
+  }
+
+  /**
+   * Update the set of currently pinned items and refresh every rendered card
+   * so the 📌 indicator and Pin/Unpin button reflect the latest state.
+   */
+  setPinnedItems(keys: string[]): void {
+    this.pinnedKeys = new Set(keys);
+    const cards = this.chatArea.querySelectorAll<HTMLElement>('.result-card[data-item-key]');
+    cards.forEach(card => {
+      const key = card.dataset.itemKey;
+      if (key) {
+        this.applyPinState(card, this.pinnedKeys.has(key));
+      }
+    });
+  }
+
+  private applyPinState(card: HTMLElement, isPinned: boolean): void {
+    card.classList.toggle('pinned', isPinned);
+
+    const indicator = card.querySelector<HTMLElement>('.pin-indicator');
+    if (indicator) {
+      indicator.style.display = isPinned ? '' : 'none';
+    }
+
+    const pinBtn = card.querySelector<HTMLButtonElement>('.action-pin');
+    if (pinBtn) {
+      pinBtn.textContent = isPinned ? 'Unpin' : 'Pin';
+      pinBtn.title = isPinned ? 'Unpin snippet' : 'Pin snippet';
+      pinBtn.setAttribute('aria-pressed', isPinned ? 'true' : 'false');
+    }
   }
 
   /**
@@ -282,6 +328,8 @@ export class ChatRenderer {
     // Store data safely via dataset (auto-escapes)
     if (item.url) { card.dataset.url = item.url; }
     card.dataset.snippet = item.snippet;
+    const itemKey = this.getItemKey(item);
+    card.dataset.itemKey = itemKey;
 
     // Title row
     const titleDiv = document.createElement('div');
@@ -297,6 +345,16 @@ export class ChatRenderer {
     const titleText = document.createElement('span');
     titleText.textContent = item.title;
     titleDiv.appendChild(titleText);
+
+    // Visible 📌 indicator that toggles with the pin state.
+    const pinIndicator = document.createElement('span');
+    pinIndicator.className = 'pin-indicator';
+    pinIndicator.textContent = '📌';
+    pinIndicator.title = 'Pinned snippet';
+    pinIndicator.setAttribute('aria-label', 'Pinned');
+    pinIndicator.style.marginLeft = '4px';
+    pinIndicator.style.display = 'none';
+    titleDiv.appendChild(pinIndicator);
 
     const badge = document.createElement('span');
     badge.className = 'source-badge';
@@ -347,6 +405,7 @@ export class ChatRenderer {
     pinBtn.className = 'action-pin';
     pinBtn.title = 'Pin snippet';
     pinBtn.textContent = 'Pin';
+    pinBtn.setAttribute('aria-pressed', 'false');
     pinBtn.addEventListener('click', () => {
       this.vscode.postMessage({
         command: 'pinSnippet',
@@ -356,6 +415,10 @@ export class ChatRenderer {
     actionsDiv.appendChild(pinBtn);
 
     card.appendChild(actionsDiv);
+
+    // Apply current pin state so a card built after a previous pin shows 📌 immediately.
+    this.applyPinState(card, this.pinnedKeys.has(itemKey));
+
     return card;
   }
 

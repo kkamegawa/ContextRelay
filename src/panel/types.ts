@@ -107,6 +107,11 @@ export interface AssistantMessage {
   kind?: 'info' | 'ask';
 }
 
+export interface PinnedItemsMessage {
+  command: 'pinnedItems';
+  keys: string[];
+}
+
 export type HostToWebviewMessage =
   | UserMessageDisplay
   | QueryResultMessage
@@ -114,4 +119,5 @@ export type HostToWebviewMessage =
   | LoadingMessage
   | SlashHelpMessage
   | ClearChatMessage
-  | AssistantMessage;
+  | AssistantMessage
+  | PinnedItemsMessage;

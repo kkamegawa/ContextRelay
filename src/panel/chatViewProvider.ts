@@ -8,7 +8,7 @@ import { searchTeams } from '../adapters/teamsAdapter';
 import { AuthProvider } from '../auth/authProvider';
 import { CacheStore } from '../cache/cacheStore';
 import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
-import { type ContextItem, type ContextSource } from '../models/contextItem';
+import { type ContextItem, type ContextSource, getContextItemKey } from '../models/contextItem';
 import { type RouteTarget, getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
 import { buildAskPrompt } from './askPrompt';
@@ -102,6 +102,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public clearSnippets(): void {
     this.snippetStore.clear();
+    this.sendPinnedItems();
   }
 
   public getDocGenerator(): DocGenerator {
@@ -132,6 +133,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'webviewReady':
         this.webviewReady = true;
         this.flushPendingMessages();
+        this.sendPinnedItems();
         break;
       case 'submitQuery':
         await this.handleQuery(message.text);
@@ -169,6 +171,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handlePinSnippet(item: ContextItem): Promise<void> {
+    const key = getContextItemKey(item);
+
+    // Toggle: if this item is already pinned, unpin it instead of saving again.
+    if (this.snippetStore.removeByItemKey(key)) {
+      this.sendPinnedItems();
+      vscode.window.showInformationMessage(`Snippet "${item.title}" unpinned.`);
+      return;
+    }
+
     let handoffItem = item;
 
     if (item.source === 'mail' || item.source === 'sharepoint' || item.source === 'onedrive') {
@@ -183,7 +194,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     const snippet = this.snippetStore.save(handoffItem);
+    this.sendPinnedItems();
     vscode.window.showInformationMessage(`Snippet "${snippet.name}" saved.`);
+  }
+
+  private sendPinnedItems(): void {
+    this.postMessage({
+      command: 'pinnedItems',
+      keys: this.snippetStore.getPinnedKeys()
+    });
   }
 
   private async handleQuery(text: string): Promise<void> {
