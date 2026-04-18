@@ -1,13 +1,12 @@
-// Side-effect module that suppresses Node.js DEP0040
-// ("The `punycode` module is deprecated. Please use a userland alternative instead.").
+// Pure module that exports `installPunycodeDeprecationFilter`.
+// It does NOT install the filter at import time — call the function explicitly,
+// or import the side-effect entry `suppressPunycodeDeprecation.install.ts`.
 //
-// Our extension does not `require('punycode')` itself, but the VS Code
-// Extension Host / other modules loaded in the same Node process may, and the
-// resulting warning is noisy in the Debug Console. We filter only DEP0040 and
-// leave all other warnings untouched.
-//
-// Import this module as the very first import in `extension.ts` so the patch
-// is installed before any other module evaluates.
+// The filter suppresses the Node.js DEP0040 ("The `punycode` module is
+// deprecated") warning. A warning is dropped when EITHER:
+//   - its explicit code is 'DEP0040', OR
+//   - no code is provided and the message text matches the punycode pattern.
+// All other warnings are forwarded to the original `process.emitWarning`.
 
 type EmitWarning = typeof process.emitWarning;
 
@@ -64,5 +63,3 @@ export function installPunycodeDeprecationFilter(): void {
   patched.__contextRelayPunycodePatch = true;
   process.emitWarning = patched;
 }
-
-installPunycodeDeprecationFilter();
