@@ -80,6 +80,22 @@
         "command": "contextRelay.moveToPrimarySideBar",
         "title": "ContextRelay: Move to Primary Side Bar",
         "icon": "$(layout-sidebar-left)"
+      },
+      {
+        "command": "contextRelay.moveChatToEditorArea",
+        "title": "Move Chat into Editor Area"
+      },
+      {
+        "command": "contextRelay.moveChatToNewWindow",
+        "title": "Move Chat into New Window"
+      },
+      {
+        "command": "contextRelay.showDebugLog",
+        "title": "Show Debug Log"
+      },
+      {
+        "command": "contextRelay.openSettings",
+        "title": "Chat Settings"
       }
     ],
     "menus": {
@@ -93,6 +109,26 @@
           "command": "contextRelay.moveToPrimarySideBar",
           "when": "view == contextRelay.chatView && contextRelay.viewLocation == 'secondarySideBar'",
           "group": "navigation@100"
+        },
+        {
+          "command": "contextRelay.moveChatToEditorArea",
+          "when": "view == contextRelay.chatView",
+          "group": "1_move@1"
+        },
+        {
+          "command": "contextRelay.moveChatToNewWindow",
+          "when": "view == contextRelay.chatView",
+          "group": "1_move@2"
+        },
+        {
+          "command": "contextRelay.showDebugLog",
+          "when": "view == contextRelay.chatView",
+          "group": "2_debug@1"
+        },
+        {
+          "command": "contextRelay.openSettings",
+          "when": "view == contextRelay.chatView",
+          "group": "3_settings@1"
         }
       ]
     },

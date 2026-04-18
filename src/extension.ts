@@ -3,8 +3,14 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { ChatViewProvider } from './panel/chatViewProvider';
 import { AuthProvider } from './auth/authProvider';
+import { setGraphLogger } from './adapters/graphClient';
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Create debug output channel for Graph API logging
+  const debugChannel = vscode.window.createOutputChannel('ContextRelay Debug');
+  context.subscriptions.push(debugChannel);
+  setGraphLogger({ log: (msg: string) => debugChannel.appendLine(`[${new Date().toISOString()}] ${msg}`) });
+
   const authProvider = new AuthProvider(context);
   const chatViewProvider = new ChatViewProvider(context, authProvider, context.extensionUri);
   const focusPanel = async (): Promise<void> => {
@@ -193,6 +199,54 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.moveToPrimarySideBar', moveToPrimarySideBar)
+  );
+
+  // --- Ellipsis menu commands ---
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.moveChatToEditorArea', async () => {
+      try {
+        await vscode.commands.executeCommand('vscode.moveViews', {
+          viewIds: [ChatViewProvider.viewType],
+          destinationId: 'workbench.editor.chatSessionEditor'
+        });
+      } catch {
+        // Fallback for older VS Code versions: use the generic move command
+        await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+        await vscode.commands.executeCommand('workbench.action.moveFocusedView');
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.moveChatToNewWindow', async () => {
+      try {
+        // Move view to editor area first, then to a new window
+        await vscode.commands.executeCommand('vscode.moveViews', {
+          viewIds: [ChatViewProvider.viewType],
+          destinationId: 'workbench.editor.chatSessionEditor'
+        });
+        // Small delay to allow the view to settle in the editor area
+        await new Promise<void>(resolve => setTimeout(resolve, 300));
+        await vscode.commands.executeCommand('workbench.action.moveEditorToNewWindow');
+      } catch {
+        // Fallback: focus the view and let the user pick
+        await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+        await vscode.commands.executeCommand('workbench.action.moveFocusedView');
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.showDebugLog', () => {
+      debugChannel.show(true);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.openSettings', async () => {
+      await vscode.commands.executeCommand('workbench.action.openSettings', 'contextRelay');
+    })
   );
 }
 

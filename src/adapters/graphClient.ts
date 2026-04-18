@@ -2,11 +2,30 @@ import { ContextItem, ContextSource } from '../models/contextItem';
 
 const GRAPH_BASE = 'https://graph.microsoft.com';
 
+/**
+ * Logger interface for Graph API debug logging.
+ * Implementations should write to a VS Code OutputChannel.
+ */
+export interface GraphLogger {
+  log(message: string): void;
+}
+
+let _logger: GraphLogger | undefined;
+
+/**
+ * Set the global Graph API logger. Call once during extension activation.
+ */
+export function setGraphLogger(logger: GraphLogger): void {
+  _logger = logger;
+}
+
 export async function graphFetch(
   url: string,
   token: string,
   options: RequestInit = {}
 ): Promise<Response> {
+  _logger?.log(`→ ${options.method ?? 'GET'} ${url}`);
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -15,6 +34,9 @@ export async function graphFetch(
       ...(options.headers as Record<string, string> ?? {})
     }
   });
+
+  _logger?.log(`← ${response.status} ${response.statusText} ${url}`);
+
   return response;
 }
 
@@ -37,6 +59,7 @@ export async function graphFetchWithRetry(
         : delay;
 
       if (attempt < maxRetries) {
+        _logger?.log(`⚠ Throttled (${response.status}), retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms`);
         await sleep(Math.min(retryDelay, 30000));
         delay = Math.min(delay * 2, 30000);
         continue;
@@ -65,6 +88,8 @@ export async function handleGraphResponse(response: Response): Promise<unknown> 
   } catch {
     // ignore
   }
+
+  _logger?.log(`✖ Graph API error ${status}: ${body.slice(0, 500)}`);
 
   if (status === 401) {
     throw Object.assign(new Error('Unauthorized: session expired, please re-authenticate.'), { code: 401 });
