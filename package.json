@@ -80,6 +80,26 @@
         "command": "contextRelay.moveToPrimarySideBar",
         "title": "ContextRelay: Move to Primary Side Bar",
         "icon": "$(layout-sidebar-left)"
+      },
+      {
+        "command": "contextRelay.moveChatToEditorArea",
+        "title": "ContextRelay: Move Chat into Editor Area",
+        "shortTitle": "Move Chat into Editor Area"
+      },
+      {
+        "command": "contextRelay.moveChatToNewWindow",
+        "title": "ContextRelay: Move Chat into New Window",
+        "shortTitle": "Move Chat into New Window"
+      },
+      {
+        "command": "contextRelay.showDebugLog",
+        "title": "ContextRelay: Show Debug Log",
+        "shortTitle": "Show Debug Log"
+      },
+      {
+        "command": "contextRelay.openSettings",
+        "title": "ContextRelay: Chat Settings",
+        "shortTitle": "Chat Settings"
       }
     ],
     "menus": {
@@ -91,8 +111,28 @@
         },
         {
           "command": "contextRelay.moveToPrimarySideBar",
-          "when": "view == contextRelay.chatView && contextRelay.viewLocation == 'secondarySideBar'",
+          "when": "view == contextRelay.chatView && contextRelay.viewLocation != 'primarySideBar'",
           "group": "navigation@100"
+        },
+        {
+          "command": "contextRelay.moveChatToEditorArea",
+          "when": "view == contextRelay.chatView",
+          "group": "1_move@1"
+        },
+        {
+          "command": "contextRelay.moveChatToNewWindow",
+          "when": "view == contextRelay.chatView",
+          "group": "1_move@2"
+        },
+        {
+          "command": "contextRelay.showDebugLog",
+          "when": "view == contextRelay.chatView",
+          "group": "2_debug@1"
+        },
+        {
+          "command": "contextRelay.openSettings",
+          "when": "view == contextRelay.chatView",
+          "group": "3_settings@1"
         }
       ]
     },
@@ -138,6 +178,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable the Chat tab (Copilot Chat API is in beta)"
+        },
+        "contextRelay.enableGraphDebugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Graph API debug logging in the ContextRelay Debug output channel"
         },
         "contextRelay.adapters.mail": {
           "type": "boolean",
