@@ -8,23 +8,26 @@ import {
   stripSearchMarkup
 } from './retrievalSearchUtils';
 
-interface RetrievalResource {
-  webUrl?: string;
-  name?: string;
-}
-
 interface RetrievalExtract {
   text?: string;
 }
 
+interface RetrievalResourceMetadata {
+  title?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
 interface RetrievalHit {
-  resource?: RetrievalResource;
+  webUrl?: string;
   extracts?: RetrievalExtract[];
-  relevanceScore?: number;
+  resourceMetadata?: RetrievalResourceMetadata;
+  resourceType?: string;
+  sensitivityLabel?: unknown;
 }
 
 interface RetrievalResponse {
-  value?: RetrievalHit[];
+  retrievalHits?: RetrievalHit[];
 }
 
 interface SearchHitResource {
@@ -162,26 +165,44 @@ async function searchFiles(
 async function searchExternalItems(token: string, query: string): Promise<ContextItem[]> {
   const config = vscode.workspace.getConfiguration('contextRelay');
   const maxResults = config.get<number>('maxResults', 10);
+  // The Copilot retrieval API caps queryString at 1,500 characters and works best with a
+  // single natural-language sentence. Trim excessively long input rather than letting the
+  // service reject the request with HTTP 400.
+  const queryString = query.length > 1500 ? query.slice(0, 1500) : query;
   const url = `${GRAPH_BASE}/v1.0/copilot/retrieval`;
+  // Request body shape per Microsoft Graph retrieval API:
+  //   queryString (top-level string), dataSource, resourceMetadata, maximumNumberOfResults.
+  // The previous shape ({ query: { queryString }, size }) triggered a Graph API 400
+  // "BadRequest" response.
   const body = JSON.stringify({
-    query: { queryString: query },
+    queryString,
     dataSource: 'externalItem',
-    size: maxResults
+    resourceMetadata: ['title'],
+    maximumNumberOfResults: Math.min(Math.max(maxResults, 1), 25)
   });
 
   const response = await graphFetchWithRetry(url, token, { method: 'POST', body });
   const data = await handleGraphResponse(response) as RetrievalResponse;
 
-  return (data?.value ?? []).map(hit => ({
-    source: 'connectors',
-    title: hit.resource?.name ?? 'Untitled',
-    snippet: hit.extracts?.map(e => e.text ?? '').join(' ') ?? '',
-    url: hit.resource?.webUrl,
-    relevance: hit.relevanceScore,
-    cache: { hit: false },
-    raw: {
-      extracts: hit.extracts?.map(e => e.text ?? '').filter(Boolean) ?? []
-    }
-  }));
+  return (data?.retrievalHits ?? []).map(hit => {
+    const extracts = hit.extracts?.map(e => e.text ?? '').filter(Boolean) ?? [];
+    const title =
+      (typeof hit.resourceMetadata?.title === 'string' && hit.resourceMetadata.title) ||
+      (typeof hit.resourceMetadata?.name === 'string' && hit.resourceMetadata.name) ||
+      getTitleFromUrl(hit.webUrl ?? '') ||
+      'Untitled';
+
+    return {
+      source: 'connectors',
+      title,
+      snippet: extracts.join(' '),
+      url: hit.webUrl,
+      cache: { hit: false },
+      raw: {
+        extracts,
+        resourceType: hit.resourceType
+      }
+    };
+  });
 }
 
