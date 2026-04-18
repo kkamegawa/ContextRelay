@@ -58,7 +58,13 @@ export class ChatRenderer {
    * Must stay in sync with getContextItemKey() in src/models/contextItem.ts.
    */
   private getItemKey(item: ContextItem): string {
-    return `${item.source}::${item.url ?? ''}::${item.title}`;
+    const discriminator =
+      item.url?.trim() ||
+      item.timestamp?.trim() ||
+      item.snippet.trim() ||
+      '';
+
+    return `${item.source}::${discriminator}::${item.title}`;
   }
 
   /**

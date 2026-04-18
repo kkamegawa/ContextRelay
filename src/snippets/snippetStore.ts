@@ -17,10 +17,6 @@ export class SnippetStore {
     return this.getAll().map(s => getContextItemKey(s.item));
   }
 
-  findByItemKey(key: string): SavedSnippet | undefined {
-    return this.getAll().find(s => getContextItemKey(s.item) === key);
-  }
-
   save(item: ContextItem, name?: string): SavedSnippet {
     const snippets = this.getAll();
     const id = `snippet-${Date.now()}-${Math.random().toString(36).slice(2)}`;

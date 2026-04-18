@@ -36,6 +36,14 @@ export interface SavedSnippet {
  * Build a stable key for a context item so the UI and the snippet store
  * agree on whether two items are "the same" for pin toggling.
  */
-export function getContextItemKey(item: Pick<ContextItem, 'source' | 'title' | 'url'>): string {
-  return `${item.source}::${item.url ?? ''}::${item.title}`;
+export function getContextItemKey(
+  item: Pick<ContextItem, 'source' | 'title' | 'url' | 'timestamp' | 'snippet'>
+): string {
+  const discriminator =
+    item.url?.trim() ||
+    item.timestamp?.trim() ||
+    item.snippet.trim() ||
+    '';
+
+  return `${item.source}::${discriminator}::${item.title}`;
 }
