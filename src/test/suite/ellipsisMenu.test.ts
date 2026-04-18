@@ -29,10 +29,10 @@ suite('Ellipsis menu manifest entries', () => {
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as PackageJson;
 
   const ellipsisCommands = [
-    { id: 'contextRelay.moveChatToEditorArea', title: 'Move Chat into Editor Area', group: '1_move' },
-    { id: 'contextRelay.moveChatToNewWindow', title: 'Move Chat into New Window', group: '1_move' },
-    { id: 'contextRelay.showDebugLog', title: 'Show Debug Log', group: '2_debug' },
-    { id: 'contextRelay.openSettings', title: 'Chat Settings', group: '3_settings' },
+    { id: 'contextRelay.moveChatToEditorArea', title: 'ContextRelay: Move Chat into Editor Area', group: '1_move' },
+    { id: 'contextRelay.moveChatToNewWindow', title: 'ContextRelay: Move Chat into New Window', group: '1_move' },
+    { id: 'contextRelay.showDebugLog', title: 'ContextRelay: Show Debug Log', group: '2_debug' },
+    { id: 'contextRelay.openSettings', title: 'ContextRelay: Chat Settings', group: '3_settings' },
   ];
 
   for (const cmd of ellipsisCommands) {

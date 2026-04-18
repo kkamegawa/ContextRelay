@@ -206,12 +206,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.moveChatToEditorArea', async () => {
       try {
-        await vscode.commands.executeCommand('vscode.moveViews', {
-          viewIds: [ChatViewProvider.viewType],
-          destinationId: 'workbench.editor.chatSessionEditor'
-        });
+        await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+        await vscode.commands.executeCommand('workbench.action.moveEditorToFirstGroup');
       } catch {
-        // Fallback for older VS Code versions: use the generic move command
+        // Fallback: let the user pick the destination via the built-in quick pick
         await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
         await vscode.commands.executeCommand('workbench.action.moveFocusedView');
       }
@@ -221,16 +219,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.moveChatToNewWindow', async () => {
       try {
-        // Move view to editor area first, then to a new window
-        await vscode.commands.executeCommand('vscode.moveViews', {
-          viewIds: [ChatViewProvider.viewType],
-          destinationId: 'workbench.editor.chatSessionEditor'
-        });
-        // Small delay to allow the view to settle in the editor area
-        await new Promise<void>(resolve => setTimeout(resolve, 300));
+        await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
         await vscode.commands.executeCommand('workbench.action.moveEditorToNewWindow');
       } catch {
-        // Fallback: focus the view and let the user pick
+        // Fallback: let the user pick the destination via the built-in quick pick
         await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
         await vscode.commands.executeCommand('workbench.action.moveFocusedView');
       }

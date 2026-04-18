@@ -83,19 +83,23 @@
       },
       {
         "command": "contextRelay.moveChatToEditorArea",
-        "title": "Move Chat into Editor Area"
+        "title": "ContextRelay: Move Chat into Editor Area",
+        "shortTitle": "Move Chat into Editor Area"
       },
       {
         "command": "contextRelay.moveChatToNewWindow",
-        "title": "Move Chat into New Window"
+        "title": "ContextRelay: Move Chat into New Window",
+        "shortTitle": "Move Chat into New Window"
       },
       {
         "command": "contextRelay.showDebugLog",
-        "title": "Show Debug Log"
+        "title": "ContextRelay: Show Debug Log",
+        "shortTitle": "Show Debug Log"
       },
       {
         "command": "contextRelay.openSettings",
-        "title": "Chat Settings"
+        "title": "ContextRelay: Chat Settings",
+        "shortTitle": "Chat Settings"
       }
     ],
     "menus": {
