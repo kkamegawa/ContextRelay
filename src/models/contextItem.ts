@@ -31,3 +31,11 @@ export interface SavedSnippet {
   name: string;
   savedAt: string;
 }
+
+/**
+ * Build a stable key for a context item so the UI and the snippet store
+ * agree on whether two items are "the same" for pin toggling.
+ */
+export function getContextItemKey(item: Pick<ContextItem, 'source' | 'title' | 'url'>): string {
+  return `${item.source}::${item.url ?? ''}::${item.title}`;
+}
