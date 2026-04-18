@@ -238,6 +238,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (parsed.target === 'clear') {
+      this.handleClearCommand();
+      return;
+    }
+
     const targetSources = this.getTargetSources(parsed.target);
     if (targetSources.length === 0) {
       const message = 'No ContextRelay adapters are enabled.';
@@ -332,6 +337,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private handleClearCommand(): void {
+    const hadSnippets = this.snippetStore.getAll().length > 0;
+    this.snippetStore.clear();
+    this.latestSearchSummary = undefined;
+    this.postMessage({ command: 'clearChat' });
+    this.sendPinnedItems();
+    const text = hadSnippets
+      ? 'Chat cleared. All pinned snippets discarded.'
+      : 'Chat cleared.';
+    this.postMessage({
+      command: 'assistantMessage',
+      kind: 'info',
+      text,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   private async handleAskCommand(prompt: string): Promise<void> {
     const snippets = this.snippetStore.getAll();
     if (snippets.length === 0) {
@@ -398,6 +420,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         sources.push('connectors');
       }
       return target === 'all' ? sources : [];
+    }
+
+    if (target === 'clear') {
+      return [];
     }
 
     return [target];

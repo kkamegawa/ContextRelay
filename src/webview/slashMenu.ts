@@ -17,6 +17,7 @@ const SLASH_ITEMS: SlashMenuItem[] = [
   { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: '☁️' },
   { command: '/all', label: '/all', description: 'Search all sources', icon: '🔍' },
   { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets', icon: '🤖' },
+  { command: '/clear', label: '/clear', description: 'Clear chat and discard pinned snippets', icon: '🧹' },
 ];
 
 export class SlashMenu {

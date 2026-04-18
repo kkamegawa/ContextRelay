@@ -112,4 +112,23 @@ suite('CommandRouter', () => {
     const text = getHelpText('ask');
     assert.ok(text.toLowerCase().includes('microsoft 365 copilot'));
   });
+
+  test('/clear command routes to clear with empty query but is not isEmpty', () => {
+    const result = parseCommand('/clear');
+    assert.equal(result.target, 'clear');
+    assert.equal(result.query, '');
+    assert.equal(result.isEmpty, false);
+  });
+
+  test('/clear ignores trailing arguments but still executes', () => {
+    const result = parseCommand('/clear everything now');
+    assert.equal(result.target, 'clear');
+    assert.equal(result.isEmpty, false);
+  });
+
+  test('getHelpText for clear describes the effect', () => {
+    const text = getHelpText('clear');
+    assert.ok(text.toLowerCase().includes('clear'));
+    assert.ok(text.toLowerCase().includes('pinned'));
+  });
 });
