@@ -1,7 +1,7 @@
 import { strict as assert } from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
-import { setGraphLogger, GraphLogger } from '../../adapters/graphClient';
+import { graphFetch, handleGraphResponse, setGraphLogger, GraphLogger } from '../../adapters/graphClient';
 
 interface PackageCommand {
   command: string;
@@ -20,6 +20,12 @@ interface PackageJson {
     commands?: PackageCommand[];
     menus?: {
       'view/title'?: ViewTitleMenuItem[];
+    };
+    configuration?: {
+      properties?: Record<string, {
+        type?: string;
+        default?: unknown;
+      }>;
     };
   };
 }
@@ -69,19 +75,78 @@ suite('Ellipsis menu manifest entries', () => {
       );
     }
   });
+
+  test('declares opt-in graph debug logging configuration', () => {
+    const setting = packageJson.contributes?.configuration?.properties?.['contextRelay.enableGraphDebugLogging'];
+    assert.ok(setting, 'contextRelay.enableGraphDebugLogging must be declared');
+    assert.equal(setting?.type, 'boolean');
+    assert.equal(setting?.default, false);
+  });
 });
 
 suite('Graph API debug logger', () => {
-  test('setGraphLogger accepts a logger implementation', () => {
+  test('setGraphLogger accepts a logger implementation without emitting logs', () => {
     const messages: string[] = [];
     const logger: GraphLogger = { log: (msg: string) => messages.push(msg) };
-    // Should not throw
-    setGraphLogger(logger);
-    assert.ok(true, 'setGraphLogger accepted a logger without error');
+
+    assert.doesNotThrow(() => setGraphLogger(logger));
+    assert.deepEqual(messages, []);
+    setGraphLogger(undefined);
   });
 
   test('GraphLogger interface has log method', () => {
     const logger: GraphLogger = { log: () => {} };
     assert.equal(typeof logger.log, 'function');
+  });
+
+  test('graphFetch logs request and response details', async () => {
+    const messages: string[] = [];
+    const originalFetch = globalThis.fetch;
+
+    setGraphLogger({ log: (msg: string) => messages.push(msg) });
+    globalThis.fetch = (async () => new Response('{}', {
+      status: 200,
+      statusText: 'OK',
+      headers: { 'Content-Type': 'application/json' }
+    })) as typeof globalThis.fetch;
+
+    try {
+      await graphFetch('https://graph.microsoft.com/v1.0/me', 'token-abc', { method: 'POST' });
+      assert.deepEqual(messages, [
+        '→ POST https://graph.microsoft.com/v1.0/me',
+        '← 200 OK https://graph.microsoft.com/v1.0/me'
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+      setGraphLogger(undefined);
+    }
+  });
+
+  test('handleGraphResponse logs redacted error details', async () => {
+    const messages: string[] = [];
+    setGraphLogger({ log: (msg: string) => messages.push(msg) });
+
+    const response = new Response(JSON.stringify({
+      error: {
+        code: 'Forbidden',
+        message: 'secret body content'
+      }
+    }), {
+      status: 403,
+      headers: {
+        'Content-Type': 'application/json',
+        'request-id': 'req-123'
+      }
+    });
+
+    try {
+      await assert.rejects(() => handleGraphResponse(response), /Forbidden \(403\)/);
+      assert.deepEqual(messages, [
+        '✖ Graph API error 403 code=Forbidden requestId=req-123'
+      ]);
+      assert.ok(!messages[0].includes('secret body content'));
+    } finally {
+      setGraphLogger(undefined);
+    }
   });
 });

@@ -15,7 +15,7 @@ let _logger: GraphLogger | undefined;
 /**
  * Set the global Graph API logger. Call once during extension activation.
  */
-export function setGraphLogger(logger: GraphLogger): void {
+export function setGraphLogger(logger: GraphLogger | undefined): void {
   _logger = logger;
 }
 
@@ -89,7 +89,7 @@ export async function handleGraphResponse(response: Response): Promise<unknown> 
     // ignore
   }
 
-  _logger?.log(`✖ Graph API error ${status}: ${body.slice(0, 500)}`);
+  _logger?.log(buildGraphErrorLog(status, body, response));
 
   if (status === 401) {
     throw Object.assign(new Error('Unauthorized: session expired, please re-authenticate.'), { code: 401 });
@@ -108,6 +108,35 @@ export async function handleGraphResponse(response: Response): Promise<unknown> 
   }
 
   throw new Error(`Graph API error ${status}: ${body}`);
+}
+
+function buildGraphErrorLog(status: number, body: string, response: Response): string {
+  const errorCode = getGraphErrorCode(body);
+  const requestId = response.headers.get('request-id') ?? response.headers.get('client-request-id');
+  const parts = [`✖ Graph API error ${status}`];
+
+  if (errorCode) {
+    parts.push(`code=${errorCode}`);
+  }
+
+  if (requestId) {
+    parts.push(`requestId=${requestId}`);
+  }
+
+  return parts.join(' ');
+}
+
+function getGraphErrorCode(body: string): string | undefined {
+  if (!body) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: string } };
+    return parsed.error?.code;
+  } catch {
+    return undefined;
+  }
 }
 
 export { GRAPH_BASE, ContextItem, ContextSource };

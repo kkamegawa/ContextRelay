@@ -5,11 +5,47 @@ import { ChatViewProvider } from './panel/chatViewProvider';
 import { AuthProvider } from './auth/authProvider';
 import { setGraphLogger } from './adapters/graphClient';
 
+type ViewLocation = 'primarySideBar' | 'secondarySideBar' | 'editorArea';
+
 export function activate(context: vscode.ExtensionContext): void {
-  // Create debug output channel for Graph API logging
-  const debugChannel = vscode.window.createOutputChannel('ContextRelay Debug');
-  context.subscriptions.push(debugChannel);
-  setGraphLogger({ log: (msg: string) => debugChannel.appendLine(`[${new Date().toISOString()}] ${msg}`) });
+  const GRAPH_DEBUG_LOGGING_CONFIG_KEY = 'enableGraphDebugLogging';
+  let debugChannel: vscode.OutputChannel | undefined;
+
+  const ensureDebugChannel = (): vscode.OutputChannel => {
+    if (!debugChannel) {
+      debugChannel = vscode.window.createOutputChannel('ContextRelay Debug');
+      context.subscriptions.push(debugChannel);
+    }
+
+    return debugChannel;
+  };
+
+  const enableGraphDebugLogging = (): vscode.OutputChannel => {
+    const channel = ensureDebugChannel();
+    setGraphLogger({
+      log: (msg: string) => channel.appendLine(`[${new Date().toISOString()}] ${msg}`)
+    });
+    return channel;
+  };
+
+  const syncGraphDebugLogging = (): void => {
+    const isEnabled = vscode.workspace
+      .getConfiguration('contextRelay')
+      .get<boolean>(GRAPH_DEBUG_LOGGING_CONFIG_KEY, false);
+
+    setGraphLogger(isEnabled ? {
+      log: (msg: string) => ensureDebugChannel().appendLine(`[${new Date().toISOString()}] ${msg}`)
+    } : undefined);
+  };
+
+  syncGraphDebugLogging();
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(`contextRelay.${GRAPH_DEBUG_LOGGING_CONFIG_KEY}`)) {
+        syncGraphDebugLogging();
+      }
+    })
+  );
 
   const authProvider = new AuthProvider(context);
   const chatViewProvider = new ChatViewProvider(context, authProvider, context.extensionUri);
@@ -21,10 +57,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // Restore the last-known location from globalState so the toggle is correct
   // across VS Code sessions (not always reset to primarySideBar on activation).
   const VIEW_LOCATION_KEY = 'contextRelay.viewLocation';
-  const savedLocation = context.globalState.get<string>(VIEW_LOCATION_KEY, 'primarySideBar');
+  const savedLocation = context.globalState.get<ViewLocation>(VIEW_LOCATION_KEY, 'primarySideBar');
   void vscode.commands.executeCommand('setContext', VIEW_LOCATION_KEY, savedLocation);
 
-  const setViewLocation = async (location: string): Promise<void> => {
+  const setViewLocation = async (location: ViewLocation): Promise<void> => {
     await context.globalState.update(VIEW_LOCATION_KEY, location);
     await vscode.commands.executeCommand('setContext', VIEW_LOCATION_KEY, location);
   };
@@ -60,6 +96,15 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand('workbench.action.moveFocusedView');
       await setViewLocation('primarySideBar');
     }
+  };
+
+  const moveToEditorArea = async (): Promise<void> => {
+    await vscode.commands.executeCommand('vscode.moveViews', {
+      viewIds: [ChatViewProvider.viewType],
+      destinationId: '_.editor.newcontainer'
+    });
+    await setViewLocation('editorArea');
+    await focusPanel();
   };
 
   const generateHandoffDocs = async (): Promise<string[]> => {
@@ -206,12 +251,12 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.moveChatToEditorArea', async () => {
       try {
-        await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
-        await vscode.commands.executeCommand('workbench.action.moveEditorToFirstGroup');
+        await moveToEditorArea();
       } catch {
         // Fallback: let the user pick the destination via the built-in quick pick
         await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
         await vscode.commands.executeCommand('workbench.action.moveFocusedView');
+        await setViewLocation('editorArea');
       }
     })
   );
@@ -219,19 +264,26 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.moveChatToNewWindow', async () => {
       try {
-        await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+        await moveToEditorArea();
+        await focusPanel();
         await vscode.commands.executeCommand('workbench.action.moveEditorToNewWindow');
       } catch {
-        // Fallback: let the user pick the destination via the built-in quick pick
-        await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
-        await vscode.commands.executeCommand('workbench.action.moveFocusedView');
+        try {
+          await focusPanel();
+          await vscode.commands.executeCommand('workbench.action.moveFocusedView');
+        } catch {
+          // Ignore fallback errors and surface a clear message below.
+        }
+        vscode.window.showWarningMessage(
+          'ContextRelay: Could not move chat directly into a new window. Move it into the editor area first, then move the active editor to a new window.'
+        );
       }
     })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.showDebugLog', () => {
-      debugChannel.show(true);
+      enableGraphDebugLogging().show(true);
     })
   );
 

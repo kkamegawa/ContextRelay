@@ -111,7 +111,7 @@
         },
         {
           "command": "contextRelay.moveToPrimarySideBar",
-          "when": "view == contextRelay.chatView && contextRelay.viewLocation == 'secondarySideBar'",
+          "when": "view == contextRelay.chatView && contextRelay.viewLocation != 'primarySideBar'",
           "group": "navigation@100"
         },
         {
@@ -178,6 +178,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable the Chat tab (Copilot Chat API is in beta)"
+        },
+        "contextRelay.enableGraphDebugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Graph API debug logging in the ContextRelay Debug output channel"
         },
         "contextRelay.adapters.mail": {
           "type": "boolean",
