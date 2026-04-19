@@ -11,6 +11,7 @@ import {
   openChatInEditorArea,
   openChatInNewWindow
 } from './panel/chatMoveCommands';
+import { persistViewLocation, readStoredViewLocation } from './panel/viewLocationState';
 import { AuthProvider } from './auth/authProvider';
 import { setGraphLogger } from './adapters/graphClient';
 
@@ -61,7 +62,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
 
   // Set the initial view location context key so only one move button is visible
-  await vscode.commands.executeCommand('setContext', VIEW_LOCATION_CONTEXT_KEY, 'sidebar');
+  await vscode.commands.executeCommand(
+    'setContext',
+    VIEW_LOCATION_CONTEXT_KEY,
+    readStoredViewLocation(context)
+  );
 
   const moveRuntime: ChatMoveRuntime = {
     executeCommand: (command: string, ...args: unknown[]) => vscode.commands.executeCommand(command, ...args),
@@ -70,6 +75,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await vscode.commands.executeCommand('workbench.action.focusAuxiliaryBar');
     },
     setViewLocation: async (location: ViewLocation) => {
+      await persistViewLocation(context, location);
       await vscode.commands.executeCommand('setContext', VIEW_LOCATION_CONTEXT_KEY, location);
     },
     openInEditorArea: () => chatViewProvider.openInEditorArea()
