@@ -215,7 +215,7 @@
   "overrides": {
     "flatted": "3.4.2",
     "serialize-javascript": "7.0.5",
-    "glob": "10.5.0"
+    "glob": "12.0.0"
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

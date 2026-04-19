@@ -9,7 +9,7 @@ interface PackageJson {
 }
 
 interface PackageLockJson {
-  packages?: Record<string, { version?: string }>;
+  packages?: Record<string, { deprecated?: string; version?: string }>;
 }
 
 function readRepoJson<T>(fileName: string): T {
@@ -103,8 +103,8 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.glob, '10.5.0') >= 0,
-      `glob override must stay on a non-vulnerable release within mocha's declared range (found: ${packageJson.overrides?.glob ?? 'missing'})`
+      compareVersions(packageJson.overrides?.glob, '12.0.0') >= 0,
+      `glob override must stay on a supported, non-deprecated release (found: ${packageJson.overrides?.glob ?? 'missing'})`
     );
   });
 
@@ -113,14 +113,21 @@ suite('Dependency security baselines', () => {
 
     // The glob override applies to mocha's transitive dependency, so the installed
     // glob lives under node_modules/mocha/node_modules/glob (or root if hoisted).
-    const globVersion =
-      packageLockJson.packages?.['node_modules/mocha/node_modules/glob']?.version ??
-      packageLockJson.packages?.['node_modules/glob']?.version;
+    const globPackage =
+      packageLockJson.packages?.['node_modules/mocha/node_modules/glob'] ??
+      packageLockJson.packages?.['node_modules/glob'];
+    const globVersion = globPackage?.version;
     const diffVersion = packageLockJson.packages?.['node_modules/diff']?.version;
 
     assert.ok(
-      compareVersions(globVersion, '10.5.0') >= 0,
-      `installed glob must stay on a non-vulnerable release (>= 10.5.0 in 10.x, or >= 11.1.0 in 11.x) (found: ${globVersion ?? 'missing'})`
+      compareVersions(globVersion, '12.0.0') >= 0,
+      `installed glob must stay on a supported, non-deprecated release (found: ${globVersion ?? 'missing'})`
+    );
+
+    assert.equal(
+      globPackage?.deprecated,
+      undefined,
+      `installed glob must not be deprecated (found: ${globPackage?.deprecated ?? 'not deprecated'})`
     );
 
     assert.ok(

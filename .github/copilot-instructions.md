@@ -5,6 +5,7 @@
 - For any build/package/dependency change, maintain **zero vulnerabilities at moderate/high/critical** level.
 - Use `npm run security:check` as the required gate.
 - If you add any new npm package, apply the same zero-vulnerability rule before completion.
+- Do not introduce or retain deprecated npm packages; resolve any `npm WARN deprecated` output before completion.
 - If a dependency is upgraded to remediate vulnerabilities, add or update tests in the same change.
 
 ## Required Validation Before Completion
