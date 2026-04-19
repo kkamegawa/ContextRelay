@@ -2,10 +2,15 @@ import './suppressPunycodeDeprecation.install';
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { ChatViewProvider } from './panel/chatViewProvider';
+import {
+  ChatMoveRuntime,
+  moveChatToPrimarySideBar,
+  moveChatToSecondarySideBar,
+  openChatInEditorArea,
+  openChatInNewWindow
+} from './panel/chatMoveCommands';
 import { AuthProvider } from './auth/authProvider';
 import { setGraphLogger } from './adapters/graphClient';
-
-type ViewLocation = 'primarySideBar' | 'secondarySideBar' | 'editorArea';
 
 export function activate(context: vscode.ExtensionContext): void {
   const GRAPH_DEBUG_LOGGING_CONFIG_KEY = 'enableGraphDebugLogging';
@@ -52,59 +57,35 @@ export function activate(context: vscode.ExtensionContext): void {
   const focusPanel = async (): Promise<void> => {
     await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
   };
+  const moveRuntime: ChatMoveRuntime = {
+    executeCommand: (command: string, ...args: unknown[]) => vscode.commands.executeCommand(command, ...args),
+    focusView: focusPanel,
+    openInEditorArea: () => chatViewProvider.openInEditorArea()
+  };
 
-  // Track which sidebar the view is in so the title-bar icon can toggle.
-  // Restore the last-known location from globalState so the toggle is correct
-  // across VS Code sessions (not always reset to primarySideBar on activation).
-  const VIEW_LOCATION_KEY = 'contextRelay.viewLocation';
-  const savedLocation = context.globalState.get<ViewLocation>(VIEW_LOCATION_KEY, 'primarySideBar');
-  void vscode.commands.executeCommand('setContext', VIEW_LOCATION_KEY, savedLocation);
-
-  const setViewLocation = async (location: ViewLocation): Promise<void> => {
-    await context.globalState.update(VIEW_LOCATION_KEY, location);
-    await vscode.commands.executeCommand('setContext', VIEW_LOCATION_KEY, location);
+  const runMoveCommand = async (
+    actionLabel: string,
+    action: () => Promise<void>
+  ): Promise<void> => {
+    try {
+      await action();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`ContextRelay: Failed to ${actionLabel}: ${message}`);
+      throw err;
+    }
   };
 
   const moveToSecondarySideBar = async (): Promise<void> => {
-    try {
-      await vscode.commands.executeCommand('vscode.moveViews', {
-        viewIds: [ChatViewProvider.viewType],
-        destinationId: '_.auxiliarybar.newcontainer'
-      });
-      await setViewLocation('secondarySideBar');
-      await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
-    } catch {
-      // Fallback: let the user pick the destination via the built-in quick pick.
-      // Update the context key to our intended destination so the menu can recover.
-      await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
-      await vscode.commands.executeCommand('workbench.action.moveFocusedView');
-      await setViewLocation('secondarySideBar');
-    }
+    await runMoveCommand('move chat to the secondary side bar', () =>
+      moveChatToSecondarySideBar(moveRuntime)
+    );
   };
 
   const moveToPrimarySideBar = async (): Promise<void> => {
-    try {
-      await vscode.commands.executeCommand('vscode.moveViews', {
-        viewIds: [ChatViewProvider.viewType],
-        destinationId: 'workbench.view.extension.contextRelay'
-      });
-      await setViewLocation('primarySideBar');
-      await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
-    } catch {
-      // Fallback: update context key to intended destination so the menu can recover.
-      await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
-      await vscode.commands.executeCommand('workbench.action.moveFocusedView');
-      await setViewLocation('primarySideBar');
-    }
-  };
-
-  const moveToEditorArea = async (): Promise<void> => {
-    await vscode.commands.executeCommand('vscode.moveViews', {
-      viewIds: [ChatViewProvider.viewType],
-      destinationId: '_.editor.newcontainer'
-    });
-    await setViewLocation('editorArea');
-    await focusPanel();
+    await runMoveCommand('move chat to the primary side bar', () =>
+      moveChatToPrimarySideBar(moveRuntime)
+    );
   };
 
   const generateHandoffDocs = async (): Promise<string[]> => {
@@ -250,34 +231,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.moveChatToEditorArea', async () => {
-      try {
-        await moveToEditorArea();
-      } catch {
-        // Fallback: let the user pick the destination via the built-in quick pick
-        await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
-        await vscode.commands.executeCommand('workbench.action.moveFocusedView');
-        await setViewLocation('editorArea');
-      }
+      await runMoveCommand('open chat in the editor area', () =>
+        openChatInEditorArea(moveRuntime)
+      );
     })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('contextRelay.moveChatToNewWindow', async () => {
-      try {
-        await moveToEditorArea();
-        await focusPanel();
-        await vscode.commands.executeCommand('workbench.action.moveEditorToNewWindow');
-      } catch {
-        try {
-          await focusPanel();
-          await vscode.commands.executeCommand('workbench.action.moveFocusedView');
-        } catch {
-          // Ignore fallback errors and surface a clear message below.
-        }
-        vscode.window.showWarningMessage(
-          'ContextRelay: Could not move chat directly into a new window. Move it into the editor area first, then move the active editor to a new window.'
-        );
-      }
+      await runMoveCommand('open chat in a new window', () =>
+        openChatInNewWindow(moveRuntime)
+      );
     })
   );
 

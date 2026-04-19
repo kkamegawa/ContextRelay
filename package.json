@@ -24,6 +24,13 @@
           "title": "ContextRelay",
           "icon": "media/icon.svg"
         }
+      ],
+      "auxiliarybar": [
+        {
+          "id": "contextRelaySecondary",
+          "title": "ContextRelay",
+          "icon": "media/icon.svg"
+        }
       ]
     },
     "views": {
@@ -107,12 +114,12 @@
       "view/title": [
         {
           "command": "contextRelay.moveToSecondarySideBar",
-          "when": "view == contextRelay.chatView && contextRelay.viewLocation != 'secondarySideBar'",
+          "when": "view == contextRelay.chatView && viewContainerLocation != 'auxiliarybar'",
           "group": "navigation@100"
         },
         {
           "command": "contextRelay.moveToPrimarySideBar",
-          "when": "view == contextRelay.chatView && contextRelay.viewLocation != 'primarySideBar'",
+          "when": "view == contextRelay.chatView && viewContainerLocation != 'sidebar'",
           "group": "navigation@100"
         },
         {

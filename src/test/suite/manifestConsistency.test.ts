@@ -21,6 +21,7 @@ interface PackageJson {
     commands?: PackageCommand[];
     viewsContainers?: {
       activitybar?: Array<{ id: string; title: string; icon?: string }>;
+      auxiliarybar?: Array<{ id: string; title: string; icon?: string }>;
     };
     menus?: {
       'view/title'?: ViewTitleMenuItem[];
@@ -46,6 +47,15 @@ suite('Extension manifest consistency', () => {
 
     assert.ok(container, 'ContextRelay activity bar container must exist');
     assert.ok(container?.icon?.endsWith('.svg'), 'Activity bar icon must point to an SVG asset');
+  });
+
+  test('declares a dedicated auxiliary bar container for sidebar moves', () => {
+    const auxiliarybar = packageJson.contributes?.viewsContainers?.auxiliarybar ?? [];
+    const container = auxiliarybar.find(view => view.id === 'contextRelaySecondary');
+
+    assert.ok(container, 'ContextRelay auxiliary bar container must exist');
+    assert.equal(container?.title, 'ContextRelay');
+    assert.ok(container?.icon?.endsWith('.svg'), 'Auxiliary bar icon must point to an SVG asset');
   });
 
   test('compile script produces the declared runtime entrypoint', () => {
@@ -90,6 +100,10 @@ suite('Extension manifest consistency', () => {
       'moveToSecondarySideBar menu entry must be scoped to the chatView'
     );
     assert.ok(
+      moveRightEntry?.when?.includes("viewContainerLocation != 'auxiliarybar'"),
+      'moveToSecondarySideBar must key off the built-in viewContainerLocation context'
+    );
+    assert.ok(
       moveRightEntry?.group?.startsWith('navigation'),
       'moveToSecondarySideBar must appear in the navigation group'
     );
@@ -100,8 +114,17 @@ suite('Extension manifest consistency', () => {
       'moveToPrimarySideBar menu entry must be scoped to the chatView'
     );
     assert.ok(
+      moveLeftEntry?.when?.includes("viewContainerLocation != 'sidebar'"),
+      'moveToPrimarySideBar must key off the built-in viewContainerLocation context'
+    );
+    assert.ok(
       moveLeftEntry?.group?.startsWith('navigation'),
       'moveToPrimarySideBar must appear in the navigation group'
+    );
+    assert.ok(
+      !moveRightEntry?.when?.includes('contextRelay.viewLocation') &&
+      !moveLeftEntry?.when?.includes('contextRelay.viewLocation'),
+      'sidebar move menu entries must not depend on the stale custom location context key'
     );
   });
 });
