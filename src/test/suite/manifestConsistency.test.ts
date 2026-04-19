@@ -21,6 +21,7 @@ interface PackageJson {
     commands?: PackageCommand[];
     viewsContainers?: {
       activitybar?: Array<{ id: string; title: string; icon?: string }>;
+      secondarySidebar?: Array<{ id: string; title: string; icon?: string }>;
       auxiliarybar?: Array<{ id: string; title: string; icon?: string }>;
     };
     menus?: {
@@ -49,13 +50,18 @@ suite('Extension manifest consistency', () => {
     assert.ok(container?.icon?.endsWith('.svg'), 'Activity bar icon must point to an SVG asset');
   });
 
-  test('declares a dedicated auxiliary bar container for sidebar moves', () => {
-    const auxiliarybar = packageJson.contributes?.viewsContainers?.auxiliarybar ?? [];
-    const container = auxiliarybar.find(view => view.id === 'contextRelaySecondary');
+  test('declares a dedicated secondary sidebar container for sidebar moves', () => {
+    const secondarySidebar = packageJson.contributes?.viewsContainers?.secondarySidebar ?? [];
+    const container = secondarySidebar.find(view => view.id === 'contextRelaySecondary');
 
-    assert.ok(container, 'ContextRelay auxiliary bar container must exist');
+    assert.ok(container, 'ContextRelay secondary sidebar container must exist');
     assert.equal(container?.title, 'ContextRelay');
-    assert.ok(container?.icon?.endsWith('.svg'), 'Auxiliary bar icon must point to an SVG asset');
+    assert.ok(container?.icon?.endsWith('.svg'), 'Secondary sidebar icon must point to an SVG asset');
+    assert.equal(
+      packageJson.contributes?.viewsContainers?.auxiliarybar,
+      undefined,
+      'ContextRelay must not use the obsolete viewsContainers.auxiliarybar manifest key'
+    );
   });
 
   test('compile script produces the declared runtime entrypoint', () => {
