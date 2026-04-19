@@ -41,6 +41,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private readonly snippetStore: SnippetStore;
   private readonly docGenerator: DocGenerator;
   private readonly hosts = new Map<ChatHostKind, ChatHostSession>();
+  private static readonly MAX_TRANSCRIPT_LENGTH = 200;
   private transcript: HostToWebviewMessage[] = [];
   private editorPanel?: vscode.WebviewPanel;
 
@@ -107,6 +108,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.transcript = [message];
     } else if (message.command !== 'pinnedItems') {
       this.transcript.push(message);
+      if (this.transcript.length > ChatViewProvider.MAX_TRANSCRIPT_LENGTH) {
+        this.transcript = this.transcript.slice(-ChatViewProvider.MAX_TRANSCRIPT_LENGTH);
+      }
     }
 
     this.broadcastMessage(message);

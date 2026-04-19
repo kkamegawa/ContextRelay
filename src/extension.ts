@@ -72,7 +72,7 @@ export function activate(context: vscode.ExtensionContext): void {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       vscode.window.showErrorMessage(`ContextRelay: Failed to ${actionLabel}: ${message}`);
-      throw err;
+      return;
     }
   };
 
