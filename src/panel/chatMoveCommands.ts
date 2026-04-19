@@ -4,9 +4,13 @@ import {
   SECONDARY_SIDEBAR_CONTAINER_ID
 } from './chatViewConstants';
 
+export type ViewLocation = 'sidebar' | 'auxiliarybar';
+
 export interface ChatMoveRuntime {
   executeCommand(command: string, ...args: unknown[]): Thenable<unknown>;
   focusView(): Promise<void>;
+  focusAuxiliaryBar(): Promise<void>;
+  setViewLocation(location: ViewLocation): Promise<void>;
   openInEditorArea(): Promise<void>;
 }
 
@@ -15,6 +19,7 @@ export async function moveChatToPrimarySideBar(runtime: ChatMoveRuntime): Promis
     viewIds: [CHAT_VIEW_ID],
     destinationId: PRIMARY_SIDEBAR_CONTAINER_ID
   });
+  await runtime.setViewLocation('sidebar');
   await runtime.focusView();
 }
 
@@ -23,6 +28,8 @@ export async function moveChatToSecondarySideBar(runtime: ChatMoveRuntime): Prom
     viewIds: [CHAT_VIEW_ID],
     destinationId: SECONDARY_SIDEBAR_CONTAINER_ID
   });
+  await runtime.setViewLocation('auxiliarybar');
+  await runtime.focusAuxiliaryBar();
   await runtime.focusView();
 }
 

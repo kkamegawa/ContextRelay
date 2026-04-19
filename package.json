@@ -114,12 +114,12 @@
       "view/title": [
         {
           "command": "contextRelay.moveToSecondarySideBar",
-          "when": "view == contextRelay.chatView && viewContainerLocation != 'auxiliarybar'",
+          "when": "view == contextRelay.chatView && contextRelay.viewLocation != 'auxiliarybar'",
           "group": "navigation@100"
         },
         {
           "command": "contextRelay.moveToPrimarySideBar",
-          "when": "view == contextRelay.chatView && viewContainerLocation != 'sidebar'",
+          "when": "view == contextRelay.chatView && contextRelay.viewLocation != 'sidebar'",
           "group": "navigation@100"
         },
         {

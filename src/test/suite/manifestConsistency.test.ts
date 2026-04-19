@@ -100,8 +100,8 @@ suite('Extension manifest consistency', () => {
       'moveToSecondarySideBar menu entry must be scoped to the chatView'
     );
     assert.ok(
-      moveRightEntry?.when?.includes("viewContainerLocation != 'auxiliarybar'"),
-      'moveToSecondarySideBar must key off the built-in viewContainerLocation context'
+      moveRightEntry?.when?.includes("contextRelay.viewLocation != 'auxiliarybar'"),
+      'moveToSecondarySideBar must use the extension-managed contextRelay.viewLocation context key'
     );
     assert.ok(
       moveRightEntry?.group?.startsWith('navigation'),
@@ -114,17 +114,17 @@ suite('Extension manifest consistency', () => {
       'moveToPrimarySideBar menu entry must be scoped to the chatView'
     );
     assert.ok(
-      moveLeftEntry?.when?.includes("viewContainerLocation != 'sidebar'"),
-      'moveToPrimarySideBar must key off the built-in viewContainerLocation context'
+      moveLeftEntry?.when?.includes("contextRelay.viewLocation != 'sidebar'"),
+      'moveToPrimarySideBar must use the extension-managed contextRelay.viewLocation context key'
     );
     assert.ok(
       moveLeftEntry?.group?.startsWith('navigation'),
       'moveToPrimarySideBar must appear in the navigation group'
     );
     assert.ok(
-      !moveRightEntry?.when?.includes('contextRelay.viewLocation') &&
-      !moveLeftEntry?.when?.includes('contextRelay.viewLocation'),
-      'sidebar move menu entries must not depend on the stale custom location context key'
+      !moveRightEntry?.when?.includes('viewContainerLocation') &&
+      !moveLeftEntry?.when?.includes('viewContainerLocation'),
+      'sidebar move menu entries must not depend on the unreliable built-in viewContainerLocation context key'
     );
   });
 });
