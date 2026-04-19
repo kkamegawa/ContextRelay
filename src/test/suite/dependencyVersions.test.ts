@@ -4,6 +4,7 @@ import * as path from 'path';
 
 interface PackageJson {
   devDependencies?: Record<string, string>;
+  engines?: Record<string, string>;
   scripts?: Record<string, string>;
   overrides?: Record<string, string>;
 }
@@ -86,6 +87,17 @@ suite('Dependency security baselines', () => {
     assert.ok(
       (getMajor(parserVersion) ?? 0) >= 8,
       `@typescript-eslint/parser must be v8+ to avoid known high vulnerabilities (found: ${parserVersion})`
+    );
+  });
+
+  test('declares Node 22+ for the supported glob baseline', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const nodeEngine = packageJson.engines?.node;
+
+    assert.ok(nodeEngine, 'package.json must declare a node engine requirement');
+    assert.ok(
+      (getMajor(nodeEngine) ?? 0) >= 22,
+      `package.json must require Node.js 22 or later when using the supported glob baseline (found: ${nodeEngine ?? 'missing'})`
     );
   });
 

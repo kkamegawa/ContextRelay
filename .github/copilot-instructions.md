@@ -19,9 +19,9 @@ Run and report all of the following:
 
 Do not complete the task if any command fails or if security check is non-zero.
 
-## Gitub 
+## GitHub
 
 ### create issue
 
 - create issue before starting work, create branch, and link the PR to the issue.
-- If the issue too large, break it break down sub-issues and link them together.
+- If the issue is too large, break it down into sub-issues and link them together.

@@ -6,6 +6,7 @@
   "publisher": "Kazushi Kamegawa",
   "license": "MIT",
   "engines": {
+    "node": ">=22.0.0",
     "vscode": "^1.85.0"
   },
   "categories": [
