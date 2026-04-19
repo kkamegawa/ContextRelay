@@ -35,6 +35,7 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 
 ## Requirements
 
+- Node.js 22 or later for local development and validation from source
 - [Visual Studio Code](https://code.visualstudio.com/) 1.85 or later
 - A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
 - **For Exchange Mail, Teams, SharePoint, and OneDrive search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
@@ -91,19 +92,25 @@ The following delegated Microsoft Graph permissions are required by feature:
 ### From Source
 
 1. Clone this repository.
-2. Install dependencies:
+2. Use Node.js 22 or later. If you use `nvm`, run:
+
+   ```bash
+   nvm use
+   ```
+
+3. Install dependencies:
 
   ```bash
   npm install
   ```
 
-3. Build the extension:
+4. Build the extension:
 
   ```bash
   npm run compile
   ```
 
-4. Press `F5` in VS Code to launch the Extension Development Host.
+5. Press `F5` in VS Code to launch the Extension Development Host.
 
 Before submitting changes, run:
 
