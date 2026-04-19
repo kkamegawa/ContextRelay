@@ -1,6 +1,7 @@
 import { strict as assert } from 'assert';
 import {
   ChatMoveRuntime,
+  ViewLocation,
   moveChatToPrimarySideBar,
   moveChatToSecondarySideBar,
   openChatInEditorArea,
@@ -17,6 +18,8 @@ suite('Chat move commands', () => {
     const calls: Array<{ command: string; args: unknown[] }> = [];
     let editorOpens = 0;
     let focusCalls = 0;
+    let auxBarFocusCalls = 0;
+    const locationHistory: ViewLocation[] = [];
 
     const runtime: ChatMoveRuntime = {
       executeCommand: async (command: string, ...args: unknown[]) => {
@@ -24,6 +27,12 @@ suite('Chat move commands', () => {
       },
       focusView: async () => {
         focusCalls += 1;
+      },
+      focusAuxiliaryBar: async () => {
+        auxBarFocusCalls += 1;
+      },
+      setViewLocation: async (location: ViewLocation) => {
+        locationHistory.push(location);
       },
       openInEditorArea: async () => {
         editorOpens += 1;
@@ -33,11 +42,15 @@ suite('Chat move commands', () => {
     return {
       runtime,
       calls,
+      locationHistory,
       get editorOpens() {
         return editorOpens;
       },
       get focusCalls() {
         return focusCalls;
+      },
+      get auxBarFocusCalls() {
+        return auxBarFocusCalls;
       }
     };
   };
@@ -56,6 +69,7 @@ suite('Chat move commands', () => {
         }]
       }
     ]);
+    assert.deepEqual(harness.locationHistory, ['sidebar']);
     assert.equal(harness.focusCalls, 1);
   });
 
@@ -73,6 +87,8 @@ suite('Chat move commands', () => {
         }]
       }
     ]);
+    assert.deepEqual(harness.locationHistory, ['auxiliarybar']);
+    assert.equal(harness.auxBarFocusCalls, 1, 'must focus the auxiliary bar after moving');
     assert.equal(harness.focusCalls, 1);
     assert.ok(
       !SECONDARY_SIDEBAR_CONTAINER_ID.startsWith('_.'),

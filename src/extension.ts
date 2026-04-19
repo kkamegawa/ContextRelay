@@ -2,17 +2,20 @@ import './suppressPunycodeDeprecation.install';
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { ChatViewProvider } from './panel/chatViewProvider';
+import { VIEW_LOCATION_CONTEXT_KEY } from './panel/chatViewConstants';
 import {
   ChatMoveRuntime,
+  ViewLocation,
   moveChatToPrimarySideBar,
   moveChatToSecondarySideBar,
   openChatInEditorArea,
   openChatInNewWindow
 } from './panel/chatMoveCommands';
+import { persistViewLocation, readStoredViewLocation } from './panel/viewLocationState';
 import { AuthProvider } from './auth/authProvider';
 import { setGraphLogger } from './adapters/graphClient';
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const GRAPH_DEBUG_LOGGING_CONFIG_KEY = 'enableGraphDebugLogging';
   let debugChannel: vscode.OutputChannel | undefined;
 
@@ -57,9 +60,24 @@ export function activate(context: vscode.ExtensionContext): void {
   const focusPanel = async (): Promise<void> => {
     await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
   };
+
+  // Set the initial view location context key so only one move button is visible
+  await vscode.commands.executeCommand(
+    'setContext',
+    VIEW_LOCATION_CONTEXT_KEY,
+    readStoredViewLocation(context)
+  );
+
   const moveRuntime: ChatMoveRuntime = {
     executeCommand: (command: string, ...args: unknown[]) => vscode.commands.executeCommand(command, ...args),
     focusView: focusPanel,
+    focusAuxiliaryBar: async () => {
+      await vscode.commands.executeCommand('workbench.action.focusAuxiliaryBar');
+    },
+    setViewLocation: async (location: ViewLocation) => {
+      await persistViewLocation(context, location);
+      await vscode.commands.executeCommand('setContext', VIEW_LOCATION_CONTEXT_KEY, location);
+    },
     openInEditorArea: () => chatViewProvider.openInEditorArea()
   };
 
