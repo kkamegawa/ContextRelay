@@ -3,15 +3,42 @@
   "displayName": "ContextRelay for Microsoft 365",
   "description": "Surface Microsoft 365 context (SharePoint, OneDrive, Teams, Mail) in a VS Code side panel",
   "version": "0.1.0",
-  "publisher": "Kazushi Kamegawa",
+  "publisher": "kkamegawa",
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "chat",
+    "copilot",
+    "github-copilot",
+    "microsoft-365",
+    "teams",
+    "m365",
+    "graph",
+    "sharepoint",
+    "onedrive",
+    "outlook",
+    "mail",
+    "handoff",
+    "context",
+    "search",
+    "productivity"
+  ],
+  "preview": true,
+  "pricing": "Free",
   "license": "MIT",
+  "homepage": "https://github.com/kkamegawa/ContextRelay/blob/main/README.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kkamegawa/ContextRelay.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kkamegawa/ContextRelay/issues"
+  },  
   "engines": {
     "node": ">=22.0.0",
     "vscode": "^1.85.0"
   },
-  "categories": [
-    "Other"
-  ],
   "activationEvents": [
     "onView:contextRelay.chatView"
   ],
