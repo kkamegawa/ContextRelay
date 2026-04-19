@@ -15,8 +15,15 @@ import { buildAskPrompt } from './askPrompt';
 import { detectOutputLanguage } from './outputLanguage';
 import { buildSearchSummary, type SearchSummaryResult } from './searchSummary';
 import { type HostToWebviewMessage, type WebviewToHostMessage } from './types';
+import { CHAT_EDITOR_PANEL_ID, CHAT_VIEW_ID } from './chatViewConstants';
 
 const DEFAULT_SOURCES: ContextSource[] = ['mail', 'teams', 'sharepoint', 'onedrive'];
+type ChatHostKind = 'sidebar' | 'editor';
+
+interface ChatHostSession {
+  webview: vscode.Webview;
+  ready: boolean;
+}
 
 /**
  * WebviewViewProvider for the ContextRelay chat panel.
@@ -27,15 +34,16 @@ const DEFAULT_SOURCES: ContextSource[] = ['mail', 'teams', 'sharepoint', 'onedri
  * - VS Code theme variables for styling
  */
 export class ChatViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'contextRelay.chatView';
+  public static readonly viewType = CHAT_VIEW_ID;
 
-  private view?: vscode.WebviewView;
-  private webviewReady = false;
-  private pendingMessages: HostToWebviewMessage[] = [];
   private latestSearchSummary?: string;
   private readonly cache: CacheStore<ContextItem[]>;
   private readonly snippetStore: SnippetStore;
   private readonly docGenerator: DocGenerator;
+  private readonly hosts = new Map<ChatHostKind, ChatHostSession>();
+  private static readonly MAX_TRANSCRIPT_LENGTH = 200;
+  private transcript: HostToWebviewMessage[] = [];
+  private editorPanel?: vscode.WebviewPanel;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -57,18 +65,34 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ): void {
-    this.view = webviewView;
-    this.webviewReady = false;
+    this.attachHost('sidebar', webviewView.webview, this.context.subscriptions);
+  }
 
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [this.extensionUri]
-    };
+  public async openInEditorArea(): Promise<void> {
+    if (this.editorPanel) {
+      this.editorPanel.reveal(vscode.ViewColumn.Active);
+      return;
+    }
 
-    webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
-    webviewView.webview.onDidReceiveMessage(
-      (message: WebviewToHostMessage) => {
-        void this.handleMessage(message);
+    const panel = vscode.window.createWebviewPanel(
+      CHAT_EDITOR_PANEL_ID,
+      'ContextRelay',
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [this.extensionUri]
+      }
+    );
+
+    this.editorPanel = panel;
+    this.attachHost('editor', panel.webview, this.context.subscriptions);
+    panel.onDidDispose(
+      () => {
+        if (this.editorPanel === panel) {
+          this.editorPanel = undefined;
+        }
+        this.hosts.delete('editor');
       },
       undefined,
       this.context.subscriptions
@@ -80,19 +104,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   public postMessage(message: HostToWebviewMessage): void {
-    if (this.view && this.webviewReady) {
-      void this.view.webview.postMessage(message);
-      return;
+    if (message.command === 'clearChat') {
+      this.transcript = [message];
+    } else if (message.command !== 'pinnedItems') {
+      this.transcript.push(message);
+      if (this.transcript.length > ChatViewProvider.MAX_TRANSCRIPT_LENGTH) {
+        this.transcript = this.transcript.slice(-ChatViewProvider.MAX_TRANSCRIPT_LENGTH);
+      }
     }
 
-    this.pendingMessages.push(message);
+    this.broadcastMessage(message);
   }
 
   public clearChat(): void {
-    if (!this.view) {
-      return;
-    }
-
     this.postMessage({ command: 'clearChat' });
   }
 
@@ -116,24 +140,60 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  private flushPendingMessages(): void {
-    if (!this.view || !this.webviewReady || this.pendingMessages.length === 0) {
-      return;
-    }
+  private attachHost(
+    kind: ChatHostKind,
+    webview: vscode.Webview,
+    subscriptions: vscode.Disposable[]
+  ): void {
+    this.hosts.set(kind, { webview, ready: false });
+    webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this.extensionUri]
+    };
+    webview.html = this.getHtmlForWebview(webview);
+    subscriptions.push(
+      webview.onDidReceiveMessage((message: WebviewToHostMessage) => {
+        void this.handleMessage(kind, message);
+      })
+    );
+  }
 
-    const queued = [...this.pendingMessages];
-    this.pendingMessages = [];
-    for (const message of queued) {
-      void this.view.webview.postMessage(message);
+  private broadcastMessage(message: HostToWebviewMessage): void {
+    for (const host of this.hosts.values()) {
+      if (!host.ready) {
+        continue;
+      }
+
+      void host.webview.postMessage(message);
     }
   }
 
-  private async handleMessage(message: WebviewToHostMessage): Promise<void> {
+  private postMessageToHost(kind: ChatHostKind, message: HostToWebviewMessage): void {
+    const host = this.hosts.get(kind);
+    if (!host?.ready) {
+      return;
+    }
+
+    void host.webview.postMessage(message);
+  }
+
+  private markHostReady(kind: ChatHostKind): void {
+    const host = this.hosts.get(kind);
+    if (!host || host.ready) {
+      return;
+    }
+
+    host.ready = true;
+    for (const message of this.transcript) {
+      void host.webview.postMessage(message);
+    }
+    this.sendPinnedItems(kind);
+  }
+
+  private async handleMessage(kind: ChatHostKind, message: WebviewToHostMessage): Promise<void> {
     switch (message.command) {
       case 'webviewReady':
-        this.webviewReady = true;
-        this.flushPendingMessages();
-        this.sendPinnedItems();
+        this.markHostReady(kind);
         break;
       case 'submitQuery':
         await this.handleQuery(message.text);
@@ -198,11 +258,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     vscode.window.showInformationMessage(`Snippet "${snippet.name}" saved.`);
   }
 
-  private sendPinnedItems(): void {
-    this.postMessage({
+  private sendPinnedItems(kind?: ChatHostKind): void {
+    const message: HostToWebviewMessage = {
       command: 'pinnedItems',
       keys: this.snippetStore.getPinnedKeys()
-    });
+    };
+
+    if (kind) {
+      this.postMessageToHost(kind, message);
+      return;
+    }
+
+    this.broadcastMessage(message);
   }
 
   private async handleQuery(text: string): Promise<void> {
