@@ -41,7 +41,10 @@ export class AuthProvider {
     if (config.get<boolean>('adapters.onenote', true)) {
       ONENOTE_SCOPES.forEach(s => featureScopes.add(s));
     }
-    if (config.get<boolean>('adapters.planner', true)) {
+    if (
+      config.get<boolean>('adapters.planner', true) ||
+      config.get<boolean>('adapters.todo', true)
+    ) {
       PLANNER_SCOPES.forEach(s => featureScopes.add(s));
     }
     if (config.get<boolean>('adapters.connectors', false)) {

@@ -25,6 +25,12 @@ interface PlannerItemRaw {
   bucketName?: string;
 }
 
+interface TodoItemRaw {
+  body?: string;
+  listName?: string;
+  status?: string;
+}
+
 interface RetrievalItemRaw {
   extracts?: string[];
 }
@@ -82,6 +88,18 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
     case 'planner': {
       const raw = asPlannerItemRaw(item.raw);
       const subtitle = [raw?.planTitle, raw?.bucketName].filter(Boolean).join(' · ');
+      return {
+        source: item.source,
+        title: item.title,
+        subtitle: subtitle || undefined,
+        body,
+        timestamp: item.timestamp,
+        url: item.url
+      };
+    }
+    case 'todo': {
+      const raw = asTodoItemRaw(item.raw);
+      const subtitle = [raw?.listName, raw?.status].filter(Boolean).join(' · ');
       return {
         source: item.source,
         title: item.title,
@@ -166,6 +184,13 @@ function getFallbackBody(item: ContextItem): string {
     }
   }
 
+  if (item.source === 'todo') {
+    const body = asTodoItemRaw(item.raw)?.body;
+    if (body) {
+      return normalizePreviewText(body) || 'No preview text is available for this item yet.';
+    }
+  }
+
   return normalizePreviewText(item.snippet) || 'No preview text is available for this item yet.';
 }
 
@@ -233,6 +258,10 @@ function asOneNoteItemRaw(raw: unknown): OneNoteItemRaw | undefined {
 
 function asPlannerItemRaw(raw: unknown): PlannerItemRaw | undefined {
   return raw && typeof raw === 'object' ? raw as PlannerItemRaw : undefined;
+}
+
+function asTodoItemRaw(raw: unknown): TodoItemRaw | undefined {
+  return raw && typeof raw === 'object' ? raw as TodoItemRaw : undefined;
 }
 
 function asRetrievalItemRaw(raw: unknown): RetrievalItemRaw | undefined {

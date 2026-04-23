@@ -6,9 +6,10 @@
  */
 
 import { getSourceInlineSvg, getSourceLabel, getSourceTextIcon } from '../sourcePresentation';
+import { canOpenResult } from '../panel/openResult';
 
 interface ContextItem {
-  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'connectors';
+  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';
   title: string;
   snippet: string;
   url?: string;
@@ -385,13 +386,18 @@ export class ChatRenderer {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'actions';
 
-    if (item.url) {
+    if (canOpenResult(item)) {
       const openBtn = document.createElement('button');
       openBtn.className = 'action-open';
-      openBtn.title = 'Open in browser';
+      openBtn.title = item.url ? 'Open in browser' : 'Open preview';
       openBtn.textContent = 'Open';
       openBtn.addEventListener('click', () => {
-        this.vscode.postMessage({ command: 'openLink', url: item.url });
+        if (item.url) {
+          this.vscode.postMessage({ command: 'openLink', url: item.url });
+          return;
+        }
+
+        this.vscode.postMessage({ command: 'openItem', item });
       });
       actionsDiv.appendChild(openBtn);
     }

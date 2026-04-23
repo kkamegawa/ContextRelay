@@ -92,4 +92,19 @@ suite('Item preview', () => {
     assert.equal(preview.subtitle, 'Release train · Ready');
     assert.equal(preview.body, 'Task description');
   });
+
+  test('includes To Do metadata in preview subtitle when available', () => {
+    const preview = createFallbackPreview(makeItem({
+      source: 'todo',
+      snippet: 'Need milk and fruit',
+      raw: {
+        body: 'Need milk and fruit',
+        listName: 'Personal',
+        status: 'notStarted'
+      }
+    }));
+
+    assert.equal(preview.subtitle, 'Personal · notStarted');
+    assert.equal(preview.body, 'Need milk and fruit');
+  });
 });

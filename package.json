@@ -249,6 +249,11 @@
           "default": true,
           "description": "Enable Planner adapter"
         },
+        "contextRelay.adapters.todo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Microsoft To Do adapter"
+        },
         "contextRelay.adapters.connectors": {
           "type": "boolean",
           "default": false,
