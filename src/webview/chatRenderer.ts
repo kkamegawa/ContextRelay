@@ -1,12 +1,14 @@
 /**
  * Chat renderer for the ContextRelay webview.
  * Renders messages, results, loading indicators, and errors.
- * Uses safe DOM APIs (createElement/textContent) instead of innerHTML
- * to prevent XSS from untrusted result data.
+ * Dynamic result content is built with DOM APIs so untrusted data never flows
+ * through HTML injection paths.
  */
 
+import { getSourceInlineSvg, getSourceLabel, getSourceTextIcon } from '../sourcePresentation';
+
 interface ContextItem {
-  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'connectors';
+  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'connectors';
   title: string;
   snippet: string;
   url?: string;
@@ -20,24 +22,6 @@ type VsCodeApi = {
   postMessage(message: unknown): void;
   getState(): unknown;
   setState(state: unknown): void;
-};
-
-const SOURCE_ICONS: Record<string, string> = {
-  mail: '📧',
-  teams: '💬',
-  sharepoint: '📄',
-  onedrive: '☁️',
-  connectors: '🔗',
-  all: '🔍',
-};
-
-const SOURCE_LABELS: Record<string, string> = {
-  mail: 'Exchange Mail',
-  teams: 'Teams',
-  sharepoint: 'SharePoint',
-  onedrive: 'OneDrive',
-  connectors: 'Connectors',
-  all: 'All Sources',
 };
 
 export class ChatRenderer {
@@ -183,13 +167,13 @@ export class ChatRenderer {
     el.className = 'message assistant';
     el.setAttribute('role', 'article');
 
-    const icon = SOURCE_ICONS[source] || '🔍';
-    const label = SOURCE_LABELS[source] || source;
+    const label = getSourceLabel(source);
     const timeStr = this.formatTime(timestamp);
 
     const header = document.createElement('div');
     header.className = 'source-header';
-    header.textContent = `${icon} ${label} — ${items.length} result(s)`;
+    header.appendChild(this.createSourceIcon(source, '🔍'));
+    header.appendChild(document.createTextNode(` ${label} — ${items.length} result(s)`));
     el.appendChild(header);
 
     // Build result cards using DOM APIs to avoid innerHTML injection
@@ -216,11 +200,11 @@ export class ChatRenderer {
     const el = document.createElement('div');
     el.className = 'error-banner';
 
-    const icon = SOURCE_ICONS[source] || '⚠️';
-    const label = SOURCE_LABELS[source] || source;
+    const label = getSourceLabel(source);
     const timeStr = this.formatTime(timestamp);
 
-    el.appendChild(document.createTextNode(`${icon} `));
+    el.appendChild(this.createSourceIcon(source, '⚠️'));
+    el.appendChild(document.createTextNode(' '));
 
     const strong = document.createElement('strong');
     strong.textContent = label;
@@ -247,15 +231,18 @@ export class ChatRenderer {
 
       const el = document.createElement('div');
       el.className = 'loading';
-      el.setAttribute('aria-label', `Loading ${SOURCE_LABELS[source] || source} results`);
+      el.setAttribute('aria-label', `Loading ${getSourceLabel(source)} results`);
 
-      const label = SOURCE_LABELS[source] || source;
-      const icon = SOURCE_ICONS[source] || '🔍';
+      const spinner = document.createElement('div');
+      spinner.className = 'spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      el.appendChild(spinner);
 
-      el.innerHTML = `
-        <div class="spinner" aria-hidden="true"></div>
-        <span>${icon} Searching ${label}...</span>
-      `;
+      const label = getSourceLabel(source);
+      const text = document.createElement('span');
+      text.appendChild(this.createSourceIcon(source, '🔍'));
+      text.appendChild(document.createTextNode(` Searching ${label}...`));
+      el.appendChild(text);
 
       this.loadingElements.set(source, el);
       this.chatArea.appendChild(el);
@@ -307,12 +294,32 @@ export class ChatRenderer {
     const welcome = document.createElement('div');
     welcome.className = 'welcome';
     welcome.id = 'welcome';
-    welcome.innerHTML = `
-      <h2>ContextRelay</h2>
-      <p>Search Microsoft 365 context with slash commands.</p>
-      <p style="font-size: 0.8em;">Type <code>/</code> for available commands, or enter a keyword to search all sources.</p>
-      <p style="font-size: 0.8em;">Pin snippets and run <code>/ask</code> to process them with Microsoft 365 Copilot.</p>
-    `;
+    const heading = document.createElement('h2');
+    heading.textContent = 'ContextRelay';
+    welcome.appendChild(heading);
+
+    const intro = document.createElement('p');
+    intro.textContent = 'Search Microsoft 365 context with slash commands.';
+    welcome.appendChild(intro);
+
+    const commandsHint = document.createElement('p');
+    commandsHint.style.fontSize = '0.8em';
+    commandsHint.appendChild(document.createTextNode('Type '));
+    const slashCode = document.createElement('code');
+    slashCode.textContent = '/';
+    commandsHint.appendChild(slashCode);
+    commandsHint.appendChild(document.createTextNode(' for available commands, or enter a keyword to search all sources.'));
+    welcome.appendChild(commandsHint);
+
+    const askHint = document.createElement('p');
+    askHint.style.fontSize = '0.8em';
+    askHint.appendChild(document.createTextNode('Pin snippets and run '));
+    const askCode = document.createElement('code');
+    askCode.textContent = '/ask';
+    askHint.appendChild(askCode);
+    askHint.appendChild(document.createTextNode(' to process them with Microsoft 365 Copilot.'));
+    welcome.appendChild(askHint);
+
     this.chatArea.appendChild(welcome);
     this.welcomeEl = welcome;
     this.loadingElements.clear();
@@ -335,12 +342,9 @@ export class ChatRenderer {
     const titleDiv = document.createElement('div');
     titleDiv.className = 'title';
 
-    const sourceIcon = SOURCE_ICONS[item.source] || '📎';
-    const sourceLabel = SOURCE_LABELS[item.source] || item.source;
+    const sourceLabel = getSourceLabel(item.source);
 
-    const iconSpan = document.createElement('span');
-    iconSpan.textContent = sourceIcon;
-    titleDiv.appendChild(iconSpan);
+    titleDiv.appendChild(this.createSourceIcon(item.source, '📎'));
 
     const titleText = document.createElement('span');
     titleText.textContent = item.title;
@@ -420,6 +424,49 @@ export class ChatRenderer {
     this.applyPinState(card, this.pinnedKeys.has(itemKey));
 
     return card;
+  }
+
+  private createSourceIcon(source: string, fallback: string): HTMLElement {
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'source-icon';
+    iconSpan.setAttribute('aria-hidden', 'true');
+    iconSpan.style.display = 'inline-flex';
+    iconSpan.style.alignItems = 'center';
+    iconSpan.style.justifyContent = 'center';
+    iconSpan.style.width = '1em';
+    iconSpan.style.height = '1em';
+    iconSpan.style.marginRight = '6px';
+    iconSpan.style.verticalAlign = 'text-bottom';
+
+    const svg = getSourceInlineSvg(source);
+    if (svg) {
+      iconSpan.appendChild(this.buildSvgIcon(svg));
+      return iconSpan;
+    }
+
+    iconSpan.textContent = getSourceTextIcon(source) || fallback;
+    return iconSpan;
+  }
+
+  private buildSvgIcon(icon: NonNullable<ReturnType<typeof getSourceInlineSvg>>): SVGSVGElement {
+    const svgNs = 'http://www.w3.org/2000/svg';
+    const svgEl = document.createElementNS(svgNs, 'svg');
+    svgEl.setAttribute('viewBox', icon.viewBox);
+    svgEl.setAttribute('fill', 'none');
+    svgEl.setAttribute('aria-hidden', 'true');
+    svgEl.setAttribute('focusable', 'false');
+    svgEl.style.width = '1em';
+    svgEl.style.height = '1em';
+
+    for (const shape of icon.shapes) {
+      const child = document.createElementNS(svgNs, shape.tag);
+      for (const [name, value] of Object.entries(shape.attrs)) {
+        child.setAttribute(name, value);
+      }
+      svgEl.appendChild(child);
+    }
+
+    return svgEl;
   }
 
   private formatTime(isoString: string): string {

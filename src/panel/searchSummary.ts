@@ -1,4 +1,5 @@
 import { ContextItem } from '../models/contextItem';
+import { getSourceSummaryLabel } from '../sourcePresentation';
 
 export interface SearchSummaryResult {
   source: string;
@@ -42,13 +43,5 @@ export function buildSearchSummary(query: string, results: SearchSummaryResult[]
 }
 
 function capitalizeSource(source: string): string {
-  const labels: Record<string, string> = {
-    mail: 'Mail',
-    teams: 'Teams',
-    sharepoint: 'SharePoint',
-    onedrive: 'OneDrive',
-    connectors: 'Connectors'
-  };
-
-  return labels[source] ?? source.charAt(0).toUpperCase() + source.slice(1);
+  return getSourceSummaryLabel(source);
 }

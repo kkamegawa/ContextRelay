@@ -4,6 +4,8 @@ import { buildProviderScopes, getBuiltInAuthConfigurationMessage } from './authS
 const MAIL_SCOPES = ['Mail.Read'];
 const TEAMS_SCOPES = ['Chat.Read', 'ChannelMessage.Read.All'];
 const RETRIEVAL_SCOPES = ['Files.Read.All', 'Sites.Read.All'];
+const ONENOTE_SCOPES = ['Notes.Read'];
+const PLANNER_SCOPES = ['Tasks.Read'];
 const CONNECTORS_SCOPES = ['ExternalItem.Read.All'];
 const CHAT_SCOPES = [
   'Sites.Read.All',
@@ -35,6 +37,12 @@ export class AuthProvider {
       config.get<boolean>('adapters.onedrive', true)
     ) {
       RETRIEVAL_SCOPES.forEach(s => featureScopes.add(s));
+    }
+    if (config.get<boolean>('adapters.onenote', true)) {
+      ONENOTE_SCOPES.forEach(s => featureScopes.add(s));
+    }
+    if (config.get<boolean>('adapters.planner', true)) {
+      PLANNER_SCOPES.forEach(s => featureScopes.add(s));
     }
     if (config.get<boolean>('adapters.connectors', false)) {
       CONNECTORS_SCOPES.forEach(s => featureScopes.add(s));
@@ -110,4 +118,12 @@ export class AuthProvider {
   }
 }
 
-export { MAIL_SCOPES, TEAMS_SCOPES, RETRIEVAL_SCOPES, CONNECTORS_SCOPES, CHAT_SCOPES };
+export {
+  MAIL_SCOPES,
+  TEAMS_SCOPES,
+  RETRIEVAL_SCOPES,
+  ONENOTE_SCOPES,
+  PLANNER_SCOPES,
+  CONNECTORS_SCOPES,
+  CHAT_SCOPES
+};

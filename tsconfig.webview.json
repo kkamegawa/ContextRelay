@@ -4,7 +4,7 @@
     "target": "ES2022",
     "lib": ["ES2022", "DOM"],
     "outDir": "dist/webview",
-    "rootDir": "src/webview",
+    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,6 +12,6 @@
     "sourceMap": true,
     "moduleResolution": "bundler"
   },
-  "include": ["src/webview/**/*.ts"],
+  "include": ["src/webview/**/*.ts", "src/sourcePresentation.ts", "src/models/contextItem.ts"],
   "exclude": ["node_modules"]
 }

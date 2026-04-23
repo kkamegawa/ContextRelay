@@ -13,6 +13,18 @@ interface TeamsItemRaw {
   summary?: string;
 }
 
+interface OneNoteItemRaw {
+  sectionName?: string;
+  notebookName?: string;
+  previewText?: string;
+}
+
+interface PlannerItemRaw {
+  description?: string;
+  planTitle?: string;
+  bucketName?: string;
+}
+
 interface RetrievalItemRaw {
   extracts?: string[];
 }
@@ -46,6 +58,30 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
     case 'teams': {
       const raw = asTeamsItemRaw(item.raw);
       const subtitle = [raw?.senderName, raw?.channelName].filter(Boolean).join(' · ');
+      return {
+        source: item.source,
+        title: item.title,
+        subtitle: subtitle || undefined,
+        body,
+        timestamp: item.timestamp,
+        url: item.url
+      };
+    }
+    case 'onenote': {
+      const raw = asOneNoteItemRaw(item.raw);
+      const subtitle = [raw?.sectionName, raw?.notebookName].filter(Boolean).join(' · ');
+      return {
+        source: item.source,
+        title: item.title,
+        subtitle: subtitle || undefined,
+        body,
+        timestamp: item.timestamp,
+        url: item.url
+      };
+    }
+    case 'planner': {
+      const raw = asPlannerItemRaw(item.raw);
+      const subtitle = [raw?.planTitle, raw?.bucketName].filter(Boolean).join(' · ');
       return {
         source: item.source,
         title: item.title,
@@ -116,6 +152,20 @@ function getFallbackBody(item: ContextItem): string {
     }
   }
 
+  if (item.source === 'onenote') {
+    const previewText = asOneNoteItemRaw(item.raw)?.previewText;
+    if (previewText) {
+      return normalizePreviewText(previewText) || 'No preview text is available for this item yet.';
+    }
+  }
+
+  if (item.source === 'planner') {
+    const description = asPlannerItemRaw(item.raw)?.description;
+    if (description) {
+      return normalizePreviewText(description) || 'No preview text is available for this item yet.';
+    }
+  }
+
   return normalizePreviewText(item.snippet) || 'No preview text is available for this item yet.';
 }
 
@@ -175,6 +225,14 @@ function asMailItemRaw(raw: unknown): MailItemRaw | undefined {
 
 function asTeamsItemRaw(raw: unknown): TeamsItemRaw | undefined {
   return raw && typeof raw === 'object' ? raw as TeamsItemRaw : undefined;
+}
+
+function asOneNoteItemRaw(raw: unknown): OneNoteItemRaw | undefined {
+  return raw && typeof raw === 'object' ? raw as OneNoteItemRaw : undefined;
+}
+
+function asPlannerItemRaw(raw: unknown): PlannerItemRaw | undefined {
+  return raw && typeof raw === 'object' ? raw as PlannerItemRaw : undefined;
 }
 
 function asRetrievalItemRaw(raw: unknown): RetrievalItemRaw | undefined {

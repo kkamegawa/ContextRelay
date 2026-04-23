@@ -3,19 +3,24 @@
  * Shows a floating menu when the user types "/" in the input.
  */
 
+import { getSourceInlineSvg, getSourceTextIcon } from '../sourcePresentation';
+
 interface SlashMenuItem {
   command: string;
   label: string;
   description: string;
   icon: string;
+  sourceIcon?: 'mail' | 'teams' | 'sharepoint' | 'onedrive' | 'onenote' | 'planner' | 'all';
 }
 
 const SLASH_ITEMS: SlashMenuItem[] = [
-  { command: '/mail', label: '/mail', description: 'Search Exchange mail', icon: '📧' },
-  { command: '/teams', label: '/teams', description: 'Search Teams messages', icon: '💬' },
-  { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: '📄' },
-  { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: '☁️' },
-  { command: '/all', label: '/all', description: 'Search all sources', icon: '🔍' },
+  { command: '/mail', label: '/mail', description: 'Search Exchange mail', icon: getSourceTextIcon('mail'), sourceIcon: 'mail' },
+  { command: '/teams', label: '/teams', description: 'Search Teams messages', icon: getSourceTextIcon('teams'), sourceIcon: 'teams' },
+  { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: getSourceTextIcon('sharepoint'), sourceIcon: 'sharepoint' },
+  { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: getSourceTextIcon('onedrive'), sourceIcon: 'onedrive' },
+  { command: '/onenote', label: '/onenote', description: 'Search OneNote pages', icon: getSourceTextIcon('onenote'), sourceIcon: 'onenote' },
+  { command: '/task', label: '/task', description: 'Search Planner tasks', icon: getSourceTextIcon('planner'), sourceIcon: 'planner' },
+  { command: '/all', label: '/all', description: 'Search all sources', icon: getSourceTextIcon('all'), sourceIcon: 'all' },
   { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets', icon: '🤖' },
   { command: '/clear', label: '/clear', description: 'Clear chat and discard pinned snippets', icon: '🧹' },
 ];
@@ -129,21 +134,37 @@ export class SlashMenu {
   }
 
   private _renderItems(items: SlashMenuItem[]): void {
-    this.menu.innerHTML = items
-      .map(
-        (item, index) => `
-      <div class="slash-item${index === this.selectedIndex ? ' selected' : ''}"
-           role="option"
-           id="slash-option-${index}"
-           data-command="${item.command}"
-           aria-selected="${index === this.selectedIndex}">
-        <span class="slash-icon">${item.icon}</span>
-        <span class="slash-label">${item.label}</span>
-        <span class="slash-desc">${item.description}</span>
-      </div>
-    `
-      )
-      .join('');
+    this.menu.replaceChildren();
+
+    for (const [index, item] of items.entries()) {
+      const row = document.createElement('div');
+      row.className = `slash-item${index === this.selectedIndex ? ' selected' : ''}`;
+      row.setAttribute('role', 'option');
+      row.id = `slash-option-${index}`;
+      row.dataset.command = item.command;
+      row.setAttribute('aria-selected', String(index === this.selectedIndex));
+
+      const icon = document.createElement('span');
+      icon.className = 'slash-icon';
+      if (item.sourceIcon) {
+        icon.appendChild(this._createSourceIcon(item.sourceIcon, item.icon));
+      } else {
+        icon.textContent = item.icon;
+      }
+      row.appendChild(icon);
+
+      const label = document.createElement('span');
+      label.className = 'slash-label';
+      label.textContent = item.label;
+      row.appendChild(label);
+
+      const description = document.createElement('span');
+      description.className = 'slash-desc';
+      description.textContent = item.description;
+      row.appendChild(description);
+
+      this.menu.appendChild(row);
+    }
 
     // Update aria-activedescendant on the input
     this._updateAriaActiveDescendant();
@@ -158,6 +179,34 @@ export class SlashMenu {
         }
       });
     });
+  }
+
+  private _createSourceIcon(source: NonNullable<SlashMenuItem['sourceIcon']>, fallback: string): Element {
+    const svg = getSourceInlineSvg(source);
+    if (!svg) {
+      const text = document.createElement('span');
+      text.textContent = fallback;
+      return text;
+    }
+
+    const svgNs = 'http://www.w3.org/2000/svg';
+    const svgEl = document.createElementNS(svgNs, 'svg');
+    svgEl.setAttribute('viewBox', svg.viewBox);
+    svgEl.setAttribute('fill', 'none');
+    svgEl.setAttribute('aria-hidden', 'true');
+    svgEl.setAttribute('focusable', 'false');
+    svgEl.style.width = '1em';
+    svgEl.style.height = '1em';
+
+    for (const shape of svg.shapes) {
+      const child = document.createElementNS(svgNs, shape.tag);
+      for (const [name, value] of Object.entries(shape.attrs)) {
+        child.setAttribute(name, value);
+      }
+      svgEl.appendChild(child);
+    }
+
+    return svgEl;
   }
 
   private _updateSelection(): void {

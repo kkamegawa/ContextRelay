@@ -62,4 +62,34 @@ suite('Item preview', () => {
 
     assert.equal(preview.body, 'Short summary from Teams');
   });
+
+  test('includes OneNote hierarchy in preview subtitle when available', () => {
+    const preview = createFallbackPreview(makeItem({
+      source: 'onenote',
+      snippet: 'Page preview',
+      raw: {
+        sectionName: 'Architecture',
+        notebookName: 'Engineering wiki',
+        previewText: 'Page preview'
+      }
+    }));
+
+    assert.equal(preview.subtitle, 'Architecture · Engineering wiki');
+    assert.equal(preview.body, 'Page preview');
+  });
+
+  test('includes Planner metadata in preview subtitle when available', () => {
+    const preview = createFallbackPreview(makeItem({
+      source: 'planner',
+      snippet: 'Task description',
+      raw: {
+        description: 'Task description',
+        planTitle: 'Release train',
+        bucketName: 'Ready'
+      }
+    }));
+
+    assert.equal(preview.subtitle, 'Release train · Ready');
+    assert.equal(preview.body, 'Task description');
+  });
 });

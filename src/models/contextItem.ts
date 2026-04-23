@@ -1,4 +1,11 @@
-export type ContextSource = 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'connectors';
+export type ContextSource =
+  | 'sharepoint'
+  | 'onedrive'
+  | 'mail'
+  | 'teams'
+  | 'onenote'
+  | 'planner'
+  | 'connectors';
 
 export interface ContextItem {
   source: ContextSource;

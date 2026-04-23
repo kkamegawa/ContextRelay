@@ -34,6 +34,18 @@ suite('CommandRouter', () => {
     assert.equal(result.query, 'architecture diagram');
   });
 
+  test('/onenote command routes to onenote', () => {
+    const result = parseCommand('/onenote architecture decision log');
+    assert.equal(result.target, 'onenote');
+    assert.equal(result.query, 'architecture decision log');
+  });
+
+  test('/task command routes to planner', () => {
+    const result = parseCommand('/task release checklist');
+    assert.equal(result.target, 'planner');
+    assert.equal(result.query, 'release checklist');
+  });
+
   test('slash command accepts newline-separated query', () => {
     const result = parseCommand('/onedrive\nLendHub_Requirements_Document_Fictional.docx');
     assert.equal(result.target, 'onedrive');
@@ -88,6 +100,11 @@ suite('CommandRouter', () => {
     const text = getHelpText('mail');
     assert.ok(text.length > 0);
     assert.ok(text.includes('Example'));
+  });
+
+  test('getHelpText returns onboarding examples for onenote and planner', () => {
+    assert.ok(getHelpText('onenote').includes('/onenote'));
+    assert.ok(getHelpText('planner').includes('/task'));
   });
 
   test('getHelpText returns fallback for unknown command', () => {
