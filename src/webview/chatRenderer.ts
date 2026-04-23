@@ -6,7 +6,7 @@
  */
 
 import { getSourceInlineSvg, getSourceLabel, getSourceTextIcon } from '../sourcePresentation';
-import { canOpenResult } from '../panel/openResult';
+import { canOpenResult } from '../models/contextItem';
 
 interface ContextItem {
   source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';

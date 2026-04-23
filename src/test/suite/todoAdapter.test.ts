@@ -66,7 +66,8 @@ suite('To Do adapter', () => {
           value: [
             {
               id: 'list-1',
-              displayName: 'Personal'
+              displayName: 'Personal',
+              wellknownListName: 'defaultList'
             }
           ]
         });
@@ -83,9 +84,83 @@ suite('To Do adapter', () => {
       assert.equal(items[0].title, 'Buy groceries');
       assert.ok(items[0].snippet.includes('Need milk and fruit'));
       assert.ok(items[0].snippet.includes('List: Personal'));
-      assert.ok(items[0].snippet.includes('Status: notStarted'));
-      assert.ok(items[0].snippet.includes('Importance: high'));
-      assert.ok(items[0].snippet.includes('Categories: Errands'));
+        assert.ok(items[0].snippet.includes('Status: notStarted'));
+        assert.ok(items[0].snippet.includes('Importance: high'));
+        assert.ok(items[0].snippet.includes('Categories: Errands'));
+        assert.deepEqual(items[0].raw, {
+          body: 'Need milk and fruit',
+          listName: 'Personal',
+          wellknownListName: 'defaultList',
+          status: 'notStarted',
+          importance: 'high',
+          categories: ['Errands']
+        });
+      } finally {
+        globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('limits To Do list fan-out and task volume per query', async () => {
+    const originalFetch = globalThis.fetch;
+    let activeTaskRequests = 0;
+    let maxActiveTaskRequests = 0;
+    const fetchedListIds: string[] = [];
+    const requestedTaskPageSizes: number[] = [];
+
+    globalThis.fetch = (async (input: Parameters<typeof fetch>[0]): Promise<Response> => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.endsWith('/v1.0/me/todo/lists')) {
+        return jsonResponse({
+          value: Array.from({ length: 12 }, (_, index) => ({
+            id: `list-${index + 1}`,
+            displayName: `List ${index + 1}`
+          }))
+        });
+      }
+
+      const taskMatch = url.match(/\/v1\.0\/me\/todo\/lists\/([^/]+)\/tasks\?\$top=(\d+)/);
+      if (taskMatch) {
+        fetchedListIds.push(taskMatch[1]);
+        requestedTaskPageSizes.push(Number(taskMatch[2]));
+        activeTaskRequests += 1;
+        maxActiveTaskRequests = Math.max(maxActiveTaskRequests, activeTaskRequests);
+        await Promise.resolve();
+        activeTaskRequests -= 1;
+        return jsonResponse({
+          value: [
+            {
+              id: `todo-${taskMatch[1]}`,
+              title: `Groceries ${taskMatch[1]}`,
+              createdDateTime: '2026-04-01T00:00:00Z',
+              body: {
+                contentType: 'text',
+                content: 'groceries metadata'
+              }
+            }
+          ]
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    }) as typeof fetch;
+
+    try {
+      const items = await searchTodo('token', 'metadata groceries');
+
+      assert.equal(items.length, 8);
+      assert.equal(fetchedListIds.length, 8);
+      assert.deepEqual(fetchedListIds, [
+        'list-1',
+        'list-2',
+        'list-3',
+        'list-4',
+        'list-5',
+        'list-6',
+        'list-7',
+        'list-8'
+      ]);
+      assert.deepEqual(requestedTaskPageSizes, Array(8).fill(10));
+      assert.equal(maxActiveTaskRequests, 4);
     } finally {
       globalThis.fetch = originalFetch;
     }

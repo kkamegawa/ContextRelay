@@ -41,8 +41,13 @@ interface TodoTaskResponse {
 interface TodoCandidate {
   task: TodoTask;
   listName: string;
+  wellknownListName?: string;
   score: number;
 }
+
+const MAX_CONCURRENT_LIST_REQUESTS = 4;
+const MAX_LISTS_PER_QUERY = 8;
+const MAX_TOTAL_TASKS_PER_QUERY = 80;
 
 export async function searchTodo(token: string, query: string): Promise<ContextItem[]> {
   const config = vscode.workspace.getConfiguration('contextRelay');
@@ -55,8 +60,9 @@ export async function searchTodo(token: string, query: string): Promise<ContextI
   const candidates = taskListsWithTasks.flatMap(({ list, tasks }) =>
     tasks.map(task => {
       const listName = list.displayName?.trim() || getFallbackListName(list);
+      const wellknownListName = list.wellknownListName?.trim() || undefined;
       const score = computeTodoScore(task, listName, intent.includePlannerMetadata, intent.searchTerms);
-      return { task, listName, score };
+      return { task, listName, wellknownListName, score };
     })
   );
 
@@ -78,10 +84,27 @@ async function listTasksByList(
   lists: TodoTaskList[],
   scanLimit: number
 ): Promise<Array<{ list: TodoTaskList; tasks: TodoTask[] }>> {
-  return Promise.all(lists.map(async list => ({
-    list,
-    tasks: await listTasks(token, list.id as string, scanLimit)
-  })));
+  const listsToScan = lists.slice(0, MAX_LISTS_PER_QUERY);
+  if (listsToScan.length === 0) {
+    return [];
+  }
+
+  const perListScanLimit = Math.max(
+    1,
+    Math.min(scanLimit, Math.ceil(MAX_TOTAL_TASKS_PER_QUERY / listsToScan.length))
+  );
+  const results: Array<{ list: TodoTaskList; tasks: TodoTask[] }> = [];
+
+  for (let index = 0; index < listsToScan.length; index += MAX_CONCURRENT_LIST_REQUESTS) {
+    const chunk = listsToScan.slice(index, index + MAX_CONCURRENT_LIST_REQUESTS);
+    const chunkResults = await Promise.all(chunk.map(async list => ({
+      list,
+      tasks: await listTasks(token, list.id as string, perListScanLimit)
+    })));
+    results.push(...chunkResults);
+  }
+
+  return results;
 }
 
 async function listTasks(token: string, listId: string, scanLimit: number): Promise<TodoTask[]> {
@@ -127,7 +150,7 @@ function compareTodoCandidates(left: TodoCandidate, right: TodoCandidate): numbe
 }
 
 function mapTodoCandidate(candidate: TodoCandidate, includeMetadata: boolean): ContextItem {
-  const { task, listName } = candidate;
+  const { task, listName, wellknownListName } = candidate;
   const body = task.body?.content?.trim() ?? '';
   const snippetParts = [body || 'No task notes available.'];
 
@@ -157,7 +180,7 @@ function mapTodoCandidate(candidate: TodoCandidate, includeMetadata: boolean): C
     raw: {
       body,
       listName,
-      wellknownListName: undefined,
+      ...(wellknownListName ? { wellknownListName } : {}),
       status: task.status,
       importance: task.importance,
       categories: task.categories ?? []

@@ -40,6 +40,12 @@ export interface SavedSnippet {
   savedAt: string;
 }
 
+const INTERNAL_PREVIEW_SOURCES = new Set<ContextSource>(['planner', 'todo']);
+
+export function canOpenResult(item: Pick<ContextItem, 'source' | 'url'>): boolean {
+  return Boolean(item.url?.trim()) || INTERNAL_PREVIEW_SOURCES.has(item.source);
+}
+
 /**
  * Build a stable key for a context item so the UI and the snippet store
  * agree on whether two items are "the same" for pin toggling.
