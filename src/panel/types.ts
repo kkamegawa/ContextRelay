@@ -24,6 +24,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { command: '/teams', label: '/teams', description: 'Search Teams messages', icon: '💬', source: 'teams' },
   { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: '📄', source: 'sharepoint' },
   { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: '☁️', source: 'onedrive' },
+  { command: '/onenote', label: '/onenote', description: 'Search OneNote pages', icon: '🗒️', source: 'onenote' },
+  { command: '/task', label: '/task', description: 'Search Planner tasks', icon: '✅', source: 'planner' },
   { command: '/all', label: '/all', description: 'Search all sources', icon: '🔍', source: 'all' },
   { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets as context', icon: '🤖' },
   { command: '/clear', label: '/clear', description: 'Clear chat and discard pinned snippets', icon: '🧹' },

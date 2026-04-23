@@ -212,6 +212,16 @@
           "default": true,
           "description": "Enable OneDrive adapter"
         },
+        "contextRelay.adapters.onenote": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable OneNote adapter"
+        },
+        "contextRelay.adapters.planner": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Planner adapter"
+        },
         "contextRelay.adapters.connectors": {
           "type": "boolean",
           "default": false,

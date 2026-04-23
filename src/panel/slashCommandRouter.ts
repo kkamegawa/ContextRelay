@@ -10,7 +10,7 @@ export interface ParsedCommand {
   targetSources: ContextSource[];
 }
 
-const ALL_SOURCES: ContextSource[] = ['sharepoint', 'onedrive', 'mail', 'teams'];
+const ALL_SOURCES: ContextSource[] = ['sharepoint', 'onedrive', 'onenote', 'planner', 'mail', 'teams'];
 
 /**
  * Parse user input and route to the appropriate adapter(s).
@@ -85,6 +85,16 @@ export function getSlashHelp(commandName: string): string[] {
       return [
         '/all architecture decisions',
         '/all incident review',
+      ];
+    case '/onenote':
+      return [
+        '/onenote architecture decision log',
+        '/onenote section notebook architecture',
+      ];
+    case '/task':
+      return [
+        '/task release checklist',
+        '/task metadata comments onboarding',
       ];
     default:
       return [];

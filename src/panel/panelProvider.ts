@@ -7,6 +7,8 @@ import { SnippetStore } from '../snippets/snippetStore';
 import { DocGenerator } from '../docs/docGenerator';
 import { parseCommand, getHelpText } from '../router/commandRouter';
 import { searchMail } from '../adapters/mailAdapter';
+import { searchOneNote } from '../adapters/onenoteAdapter';
+import { searchPlanner } from '../adapters/plannerAdapter';
 import { searchTeams } from '../adapters/teamsAdapter';
 import { searchRetrieval } from '../adapters/retrievalAdapter';
 import { createConversation, sendMessage } from '../adapters/chatAdapter';
@@ -278,6 +280,14 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       promises.push(runAdapter('onedrive', enabled, `onedrive:${q}`, () =>
         searchRetrieval(token, q, 'oneDriveBusiness')));
     }
+    if (runAll || target === 'onenote') {
+      const enabled = config.get<boolean>('adapters.onenote', true);
+      promises.push(runAdapter('onenote', enabled, `onenote:${q}`, () => searchOneNote(token, q)));
+    }
+    if (runAll || target === 'planner') {
+      const enabled = config.get<boolean>('adapters.planner', true);
+      promises.push(runAdapter('planner', enabled, `planner:${q}`, () => searchPlanner(token, q)));
+    }
     if (runAll && config.get<boolean>('adapters.connectors', false)) {
       promises.push(runAdapter('connectors', true, `connectors:${q}`, () =>
         searchRetrieval(token, q, 'externalItem')));
@@ -396,7 +406,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
   private async handlePinSnippet(item: ContextItem, name?: string): Promise<void> {
     let handoffItem = item;
 
-    if (item.source === 'mail' || item.source === 'sharepoint' || item.source === 'onedrive') {
+    if (item.source === 'mail' || item.source === 'sharepoint' || item.source === 'onedrive' || item.source === 'onenote') {
       try {
         const token = await this.authProvider.getAccessToken();
         handoffItem = await hydrateItemForHandoff(token, item);

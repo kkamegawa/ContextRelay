@@ -3,6 +3,8 @@
  * Shows a floating menu when the user types "/" in the input.
  */
 
+import { getSourceInlineSvg, getSourceTextIcon } from './sourcePresentation';
+
 interface SlashMenuItem {
   command: string;
   label: string;
@@ -11,11 +13,13 @@ interface SlashMenuItem {
 }
 
 const SLASH_ITEMS: SlashMenuItem[] = [
-  { command: '/mail', label: '/mail', description: 'Search Exchange mail', icon: '📧' },
-  { command: '/teams', label: '/teams', description: 'Search Teams messages', icon: '💬' },
-  { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: '📄' },
-  { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: '☁️' },
-  { command: '/all', label: '/all', description: 'Search all sources', icon: '🔍' },
+  { command: '/mail', label: '/mail', description: 'Search Exchange mail', icon: getSourceTextIcon('mail') },
+  { command: '/teams', label: '/teams', description: 'Search Teams messages', icon: getSourceTextIcon('teams') },
+  { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: getSourceTextIcon('sharepoint') },
+  { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: getSourceTextIcon('onedrive') },
+  { command: '/onenote', label: '/onenote', description: 'Search OneNote pages', icon: getSourceInlineSvg('onenote') ?? getSourceTextIcon('onenote') },
+  { command: '/task', label: '/task', description: 'Search Planner tasks', icon: getSourceInlineSvg('planner') ?? getSourceTextIcon('planner') },
+  { command: '/all', label: '/all', description: 'Search all sources', icon: getSourceTextIcon('all') },
   { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets', icon: '🤖' },
   { command: '/clear', label: '/clear', description: 'Clear chat and discard pinned snippets', icon: '🧹' },
 ];

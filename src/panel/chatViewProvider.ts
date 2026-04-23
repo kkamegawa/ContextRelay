@@ -3,6 +3,8 @@ import * as vscode from 'vscode';
 import { askCopilot } from '../adapters/chatAdapter';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
 import { searchMail } from '../adapters/mailAdapter';
+import { searchOneNote } from '../adapters/onenoteAdapter';
+import { searchPlanner } from '../adapters/plannerAdapter';
 import { searchRetrieval } from '../adapters/retrievalAdapter';
 import { searchTeams } from '../adapters/teamsAdapter';
 import { AuthProvider } from '../auth/authProvider';
@@ -17,7 +19,7 @@ import { buildSearchSummary, type SearchSummaryResult } from './searchSummary';
 import { type HostToWebviewMessage, type WebviewToHostMessage } from './types';
 import { CHAT_EDITOR_PANEL_ID, CHAT_VIEW_ID } from './chatViewConstants';
 
-const DEFAULT_SOURCES: ContextSource[] = ['mail', 'teams', 'sharepoint', 'onedrive'];
+const DEFAULT_SOURCES: ContextSource[] = ['mail', 'teams', 'sharepoint', 'onedrive', 'onenote', 'planner'];
 type ChatHostKind = 'sidebar' | 'editor';
 
 interface ChatHostSession {
@@ -242,7 +244,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     let handoffItem = item;
 
-    if (item.source === 'mail' || item.source === 'sharepoint' || item.source === 'onedrive') {
+    if (item.source === 'mail' || item.source === 'sharepoint' || item.source === 'onedrive' || item.source === 'onenote') {
       try {
         const token = await this.authProvider.getAccessToken();
         handoffItem = await hydrateItemForHandoff(token, item);
@@ -288,9 +290,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const parsed = parseCommand(text);
     if (parsed.isEmpty) {
       if (trimmed.startsWith('/')) {
+        const requestedCommand = trimmed.split(/\s+/, 1)[0] || `/${parsed.target}`;
         this.postMessage({
           command: 'slashHelp',
-          commandName: `/${parsed.target}`,
+          commandName: requestedCommand,
           examples: getHelpText(parsed.target)
             .split('\n')
             .map(example => example.trim())
@@ -481,9 +484,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private getTargetSources(target: RouteTarget): ContextSource[] {
     if (target === 'ask' || target === 'all') {
-      const config = vscode.workspace.getConfiguration('contextRelay');
-      const sources = [...DEFAULT_SOURCES];
-      if (config.get<boolean>('adapters.connectors', false)) {
+      const sources = DEFAULT_SOURCES.filter(source => this.isSourceEnabled(source));
+      if (this.isSourceEnabled('connectors')) {
         sources.push('connectors');
       }
       return target === 'all' ? sources : [];
@@ -494,6 +496,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     return [target];
+  }
+
+  private isSourceEnabled(source: ContextSource): boolean {
+    const config = vscode.workspace.getConfiguration('contextRelay');
+    switch (source) {
+      case 'mail':
+        return config.get<boolean>('adapters.mail', true);
+      case 'teams':
+        return config.get<boolean>('adapters.teams', true);
+      case 'sharepoint':
+        return config.get<boolean>('adapters.sharepoint', true);
+      case 'onedrive':
+        return config.get<boolean>('adapters.onedrive', true);
+      case 'onenote':
+        return config.get<boolean>('adapters.onenote', true);
+      case 'planner':
+        return config.get<boolean>('adapters.planner', true);
+      case 'connectors':
+        return config.get<boolean>('adapters.connectors', false);
+    }
   }
 
   private async fetchResults(
@@ -556,6 +578,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           `onedrive:${query}`,
           config.get<boolean>('adapters.onedrive', true),
           () => searchRetrieval(token, query, 'oneDriveBusiness')
+        );
+      case 'onenote':
+        return runCachedSearch(
+          `onenote:${query}`,
+          config.get<boolean>('adapters.onenote', true),
+          () => searchOneNote(token, query)
+        );
+      case 'planner':
+        return runCachedSearch(
+          `planner:${query}`,
+          config.get<boolean>('adapters.planner', true),
+          () => searchPlanner(token, query)
         );
       case 'connectors':
         return runCachedSearch(

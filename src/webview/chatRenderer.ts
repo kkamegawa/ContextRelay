@@ -5,8 +5,10 @@
  * to prevent XSS from untrusted result data.
  */
 
+import { getSourceInlineSvg, getSourceLabel, getSourceTextIcon } from './sourcePresentation';
+
 interface ContextItem {
-  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'connectors';
+  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'connectors';
   title: string;
   snippet: string;
   url?: string;
@@ -20,24 +22,6 @@ type VsCodeApi = {
   postMessage(message: unknown): void;
   getState(): unknown;
   setState(state: unknown): void;
-};
-
-const SOURCE_ICONS: Record<string, string> = {
-  mail: '📧',
-  teams: '💬',
-  sharepoint: '📄',
-  onedrive: '☁️',
-  connectors: '🔗',
-  all: '🔍',
-};
-
-const SOURCE_LABELS: Record<string, string> = {
-  mail: 'Exchange Mail',
-  teams: 'Teams',
-  sharepoint: 'SharePoint',
-  onedrive: 'OneDrive',
-  connectors: 'Connectors',
-  all: 'All Sources',
 };
 
 export class ChatRenderer {
@@ -183,13 +167,13 @@ export class ChatRenderer {
     el.className = 'message assistant';
     el.setAttribute('role', 'article');
 
-    const icon = SOURCE_ICONS[source] || '🔍';
-    const label = SOURCE_LABELS[source] || source;
+    const label = getSourceLabel(source);
     const timeStr = this.formatTime(timestamp);
 
     const header = document.createElement('div');
     header.className = 'source-header';
-    header.textContent = `${icon} ${label} — ${items.length} result(s)`;
+    header.appendChild(this.createSourceIcon(source, '🔍'));
+    header.appendChild(document.createTextNode(` ${label} — ${items.length} result(s)`));
     el.appendChild(header);
 
     // Build result cards using DOM APIs to avoid innerHTML injection
@@ -216,11 +200,11 @@ export class ChatRenderer {
     const el = document.createElement('div');
     el.className = 'error-banner';
 
-    const icon = SOURCE_ICONS[source] || '⚠️';
-    const label = SOURCE_LABELS[source] || source;
+    const label = getSourceLabel(source);
     const timeStr = this.formatTime(timestamp);
 
-    el.appendChild(document.createTextNode(`${icon} `));
+    el.appendChild(this.createSourceIcon(source, '⚠️'));
+    el.appendChild(document.createTextNode(' '));
 
     const strong = document.createElement('strong');
     strong.textContent = label;
@@ -247,15 +231,18 @@ export class ChatRenderer {
 
       const el = document.createElement('div');
       el.className = 'loading';
-      el.setAttribute('aria-label', `Loading ${SOURCE_LABELS[source] || source} results`);
+      el.setAttribute('aria-label', `Loading ${getSourceLabel(source)} results`);
 
-      const label = SOURCE_LABELS[source] || source;
-      const icon = SOURCE_ICONS[source] || '🔍';
+      const spinner = document.createElement('div');
+      spinner.className = 'spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      el.appendChild(spinner);
 
-      el.innerHTML = `
-        <div class="spinner" aria-hidden="true"></div>
-        <span>${icon} Searching ${label}...</span>
-      `;
+      const label = getSourceLabel(source);
+      const text = document.createElement('span');
+      text.appendChild(this.createSourceIcon(source, '🔍'));
+      text.appendChild(document.createTextNode(` Searching ${label}...`));
+      el.appendChild(text);
 
       this.loadingElements.set(source, el);
       this.chatArea.appendChild(el);
@@ -335,12 +322,9 @@ export class ChatRenderer {
     const titleDiv = document.createElement('div');
     titleDiv.className = 'title';
 
-    const sourceIcon = SOURCE_ICONS[item.source] || '📎';
-    const sourceLabel = SOURCE_LABELS[item.source] || item.source;
+    const sourceLabel = getSourceLabel(item.source);
 
-    const iconSpan = document.createElement('span');
-    iconSpan.textContent = sourceIcon;
-    titleDiv.appendChild(iconSpan);
+    titleDiv.appendChild(this.createSourceIcon(item.source, '📎'));
 
     const titleText = document.createElement('span');
     titleText.textContent = item.title;
@@ -420,6 +404,33 @@ export class ChatRenderer {
     this.applyPinState(card, this.pinnedKeys.has(itemKey));
 
     return card;
+  }
+
+  private createSourceIcon(source: string, fallback: string): HTMLElement {
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'source-icon';
+    iconSpan.setAttribute('aria-hidden', 'true');
+    iconSpan.style.display = 'inline-flex';
+    iconSpan.style.alignItems = 'center';
+    iconSpan.style.justifyContent = 'center';
+    iconSpan.style.width = '1em';
+    iconSpan.style.height = '1em';
+    iconSpan.style.marginRight = '6px';
+    iconSpan.style.verticalAlign = 'text-bottom';
+
+    const svg = getSourceInlineSvg(source);
+    if (svg) {
+      iconSpan.innerHTML = svg;
+      const svgEl = iconSpan.querySelector('svg');
+      if (svgEl) {
+        svgEl.style.width = '1em';
+        svgEl.style.height = '1em';
+      }
+      return iconSpan;
+    }
+
+    iconSpan.textContent = getSourceTextIcon(source) || fallback;
+    return iconSpan;
   }
 
   private formatTime(isoString: string): string {

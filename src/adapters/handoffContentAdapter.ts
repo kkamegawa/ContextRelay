@@ -19,6 +19,12 @@ interface DriveItemRaw {
   extracts?: string[];
 }
 
+interface OneNoteItemRaw {
+  pageId?: string;
+  contentUrl?: string;
+  previewText?: string;
+}
+
 type DriveContentMode = 'plainText' | 'docx' | 'htmlConvertible' | 'unsupported';
 
 const TEXT_EXTENSIONS = new Set([
@@ -36,6 +42,8 @@ export async function hydrateItemForHandoff(token: string, item: ContextItem): P
     case 'sharepoint':
     case 'onedrive':
       return hydrateDriveItem(token, item);
+    case 'onenote':
+      return hydrateOneNoteItem(token, item);
     default:
       return item;
   }
@@ -71,6 +79,36 @@ async function hydrateDriveItem(token: string, item: ContextItem): Promise<Conte
     snippet: content,
     raw: {
       ...raw,
+      extracts: [content]
+    }
+  };
+}
+
+async function hydrateOneNoteItem(token: string, item: ContextItem): Promise<ContextItem> {
+  const raw = asOneNoteItemRaw(item.raw);
+  const pageId = raw?.pageId?.trim();
+  if (!pageId) {
+    return item;
+  }
+
+  const url = `${GRAPH_BASE}/v1.0/me/onenote/pages/${encodeURIComponent(pageId)}/content`;
+  const response = await graphFetchWithRetry(url, token, { method: 'GET' });
+  if (!response.ok) {
+    await handleGraphResponse(response);
+  }
+
+  const html = await response.text();
+  const content = normalizePreviewText(html, true);
+  if (!content.trim()) {
+    return item;
+  }
+
+  return {
+    ...item,
+    snippet: content,
+    raw: {
+      ...raw,
+      previewText: content,
       extracts: [content]
     }
   };
@@ -204,4 +242,8 @@ function decodeXmlEntities(value: string): string {
 
 function asDriveItemRaw(raw: unknown): DriveItemRaw | undefined {
   return raw && typeof raw === 'object' ? raw as DriveItemRaw : undefined;
+}
+
+function asOneNoteItemRaw(raw: unknown): OneNoteItemRaw | undefined {
+  return raw && typeof raw === 'object' ? raw as OneNoteItemRaw : undefined;
 }

@@ -1,4 +1,13 @@
-export type RouteTarget = 'mail' | 'teams' | 'sharepoint' | 'onedrive' | 'all' | 'ask' | 'clear';
+export type RouteTarget =
+  | 'mail'
+  | 'teams'
+  | 'sharepoint'
+  | 'onedrive'
+  | 'onenote'
+  | 'planner'
+  | 'all'
+  | 'ask'
+  | 'clear';
 
 export interface ParsedCommand {
   target: RouteTarget;
@@ -11,6 +20,8 @@ const SLASH_COMMANDS: Record<string, RouteTarget> = {
   teams: 'teams',
   sharepoint: 'sharepoint',
   onedrive: 'onedrive',
+  onenote: 'onenote',
+  task: 'planner',
   all: 'all',
   ask: 'ask',
   clear: 'clear'
@@ -54,6 +65,8 @@ export function getHelpText(command: string): string {
     teams: 'Example: /teams sprint review\nExample: /teams from:bob mentions:me',
     sharepoint: 'Example: /sharepoint VPN setup guide\nExample: /sharepoint architecture',
     onedrive: 'Example: /onedrive architecture diagram\nExample: /onedrive Q3 report',
+    onenote: 'Example: /onenote architecture decision log\nExample: /onenote section notebook architecture',
+    planner: 'Example: /task release checklist\nExample: /task metadata comments onboarding',
     all: 'Example: /all architecture decisions\nOr just type a query without a slash command.',
     ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is opened in a new editor tab.',
     clear: 'Example: /clear\nClears the current chat transcript and discards all pinned snippets.'

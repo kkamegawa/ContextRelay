@@ -1,6 +1,6 @@
 # ContextRelay
 
-ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. It provides keyword-first search across Exchange mail, Teams messages, SharePoint sites, and OneDrive — with optional source targeting via slash commands. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
+ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. It provides keyword-first search across Exchange mail, Teams messages, SharePoint sites, OneDrive, OneNote, and Planner tasks — with optional source targeting via slash commands. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
 
 ---
 
@@ -15,6 +15,8 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/teams <query>` | Microsoft Teams messages |
 | `/sharepoint <query>` | SharePoint sites & pages |
 | `/onedrive <query>` | OneDrive files |
+| `/onenote <query>` | OneNote pages |
+| `/task <query>` | Planner tasks |
 | `/all <query>` | All enabled sources (same as no prefix) |
 | `/ask <instruction>` | Send pinned snippets to Microsoft 365 Copilot and open the reply in a new editor |
 | `/clear` | Clear the chat transcript and discard all pinned snippets |
@@ -38,7 +40,7 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 - Node.js 22 or later for local development and validation from source
 - [Visual Studio Code](https://code.visualstudio.com/) 1.85 or later
 - A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
-- **For Exchange Mail, Teams, SharePoint, and OneDrive search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
+- **For Exchange Mail, Teams, SharePoint, OneDrive, OneNote, and Planner search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
 - **For Chat preview / Copilot-grounded features**: Microsoft 365 Copilot license might still be required depending on tenant rollout and API availability
 
 ### Required permissions
@@ -70,6 +72,8 @@ The following delegated Microsoft Graph permissions are required by feature:
 | `Mail.Read` | Exchange Mail search, Chat |
 | `Chat.Read` | Teams search, Chat |
 | `ChannelMessage.Read.All` | Teams search, Chat |
+| `Notes.Read` | OneNote search |
+| `Tasks.Read` | Planner search |
 | `People.Read.All` | Chat |
 | `OnlineMeetingTranscript.Read.All` | Chat |
 | `ExternalItem.Read.All` | Connectors search, Chat (optional) |
@@ -173,6 +177,8 @@ Add the following settings to your `settings.json` (all optional):
   "contextRelay.adapters.teams": true,
   "contextRelay.adapters.sharepoint": true,
   "contextRelay.adapters.onedrive": true,
+  "contextRelay.adapters.onenote": true,
+  "contextRelay.adapters.planner": true,
   "contextRelay.adapters.connectors": false
 }
 ```
@@ -197,6 +203,8 @@ If a tenant admin wants the lowest-friction starting point, begin with a **mail-
   "contextRelay.adapters.teams": false,
   "contextRelay.adapters.sharepoint": false,
   "contextRelay.adapters.onedrive": false,
+  "contextRelay.adapters.onenote": false,
+  "contextRelay.adapters.planner": false,
   "contextRelay.adapters.connectors": false
 }
 ```
@@ -258,6 +266,8 @@ Recommended minimum sets:
 | Mail search only | `User.Read`, `Mail.Read` |
 | Mail + Teams search | `User.Read`, `Mail.Read`, `Chat.Read`, `ChannelMessage.Read.All` |
 | SharePoint / OneDrive search | `User.Read`, `Files.Read.All`, `Sites.Read.All` |
+| OneNote search | `User.Read`, `Notes.Read` |
+| Planner search | `User.Read`, `Tasks.Read` |
 | Chat tab enabled | `User.Read`, `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All` |
 | Connectors enabled | `User.Read`, `ExternalItem.Read.All` |
 
@@ -312,6 +322,8 @@ If you want the smallest possible setup, use one of these patterns.
   - `ChannelMessage.Read.All`
   - `Files.Read.All`
   - `Sites.Read.All`
+  - `Notes.Read`
+  - `Tasks.Read`
   - `People.Read.All`
   - `OnlineMeetingTranscript.Read.All`
 - Admin consent:

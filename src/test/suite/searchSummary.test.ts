@@ -34,13 +34,13 @@ suite('Search summary', () => {
   test('includes source errors', () => {
     const summary = buildSearchSummary('vpn', [
       {
-        source: 'sharepoint',
+        source: 'planner',
         items: [],
         error: 'Authentication required'
       }
     ]);
 
-    assert.ok(summary.includes('SharePoint: error — Authentication required'));
+    assert.ok(summary.includes('Planner: error — Authentication required'));
   });
 
   test('handles empty results', () => {
