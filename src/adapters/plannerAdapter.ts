@@ -210,7 +210,7 @@ function mapPlannerCandidate(
       planTitle ? `Plan: ${planTitle}` : undefined,
       bucketName ? `Bucket: ${bucketName}` : undefined,
       typeof task.percentComplete === 'number' ? `Progress: ${task.percentComplete}%` : undefined,
-      task.dueDateTime ? `Due: ${new Date(task.dueDateTime).toLocaleDateString('en-US')}` : undefined
+      task.dueDateTime ? `Due: ${new Date(task.dueDateTime).toLocaleDateString()}` : undefined
     ].filter(Boolean);
 
     if (metadataParts.length > 0) {

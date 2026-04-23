@@ -1,5 +1,5 @@
 import { ContextItem } from '../models/contextItem';
-import { getSourceLabel } from '../sourcePresentation';
+import { getSourceSummaryLabel } from '../sourcePresentation';
 
 export interface SearchSummaryResult {
   source: string;
@@ -43,5 +43,5 @@ export function buildSearchSummary(query: string, results: SearchSummaryResult[]
 }
 
 function capitalizeSource(source: string): string {
-  return getSourceLabel(source);
+  return getSourceSummaryLabel(source);
 }
