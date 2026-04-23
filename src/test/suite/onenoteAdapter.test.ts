@@ -39,6 +39,8 @@ suite('OneNote adapter', () => {
     globalThis.fetch = (async (input: Parameters<typeof fetch>[0]): Promise<Response> => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/v1.0/me/onenote/pages?')) {
+        assert.ok(url.includes('parentSection($select=id,displayName)'));
+        assert.ok(url.includes('parentNotebook($select=id,displayName)'));
         return jsonResponse({
           value: [
             {
@@ -47,16 +49,16 @@ suite('OneNote adapter', () => {
               lastModifiedDateTime: '2026-04-01T00:00:00Z',
               contentUrl: 'https://graph.microsoft.com/v1.0/me/onenote/pages/page-1/content',
               links: { oneNoteWebUrl: { href: 'https://example.com/onenote/page-1' } },
-              parentSection: { name: 'Architecture' },
-              parentNotebook: { name: 'Engineering wiki' }
+              parentSection: { displayName: 'Architecture' },
+              parentNotebook: { displayName: 'Engineering wiki' }
             },
             {
               id: 'page-2',
               title: 'Random page',
               lastModifiedDateTime: '2026-03-01T00:00:00Z',
               links: { oneNoteWebUrl: { href: 'https://example.com/onenote/page-2' } },
-              parentSection: { name: 'General' },
-              parentNotebook: { name: 'Misc' }
+              parentSection: { displayName: 'General' },
+              parentNotebook: { displayName: 'Misc' }
             }
           ]
         });
