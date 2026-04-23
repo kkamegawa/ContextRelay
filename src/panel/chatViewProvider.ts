@@ -208,7 +208,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         await this.handleOpenLink(message.url);
         break;
       case 'openItem':
-        await this.handleOpenItem(message.item);
+        await this.handleOpenItemRequest(kind, message.item);
         break;
       case 'copySnippet':
         await this.handleCopySnippet(message.text);
@@ -279,6 +279,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     this.broadcastMessage(message);
+  }
+
+  private async handleOpenItemRequest(kind: ChatHostKind, item: ContextItem): Promise<void> {
+    try {
+      await this.handleOpenItem(item);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      const message = `Could not open "${item.title}". ${detail}`;
+      vscode.window.showErrorMessage(`ContextRelay: ${message}`);
+      this.postMessageToHost(kind, {
+        command: 'queryError',
+        source: item.source,
+        message,
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 
   private async handleQuery(text: string): Promise<void> {

@@ -1,12 +1,5 @@
-import { ContextItem, ResolvedPreview } from '../models/contextItem';
+import { ResolvedPreview } from '../models/contextItem';
 import { getSourceLabel } from '../sourcePresentation';
-
-const INTERNAL_PREVIEW_SOURCES = new Set<ContextItem['source']>(['planner', 'todo']);
-
-export function canOpenResult(item: Pick<ContextItem, 'source' | 'url'>): boolean {
-  return Boolean(item.url?.trim()) || INTERNAL_PREVIEW_SOURCES.has(item.source);
-}
-
 export function buildPreviewDocument(preview: ResolvedPreview): string {
   const lines = [`# ${preview.title}`, ''];
   const metadata: string[] = [

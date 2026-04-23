@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ContextItem, GRAPH_BASE, graphFetchWithRetry, handleGraphResponse } from './graphClient';
+import { normalizePreviewText } from '../panel/itemPreview';
 import { parseQueryIntent, scoreMatches } from './queryIntent';
 
 interface TodoTaskList {
@@ -40,10 +41,15 @@ interface TodoTaskResponse {
 
 interface TodoCandidate {
   task: TodoTask;
+  body: string;
   listName: string;
+  wellknownListName?: string;
   score: number;
 }
 
+const MAX_CONCURRENT_LIST_REQUESTS = 4;
+const MAX_LISTS_PER_QUERY = 8;
+const MAX_TOTAL_TASKS_PER_QUERY = 80;
 export async function searchTodo(token: string, query: string): Promise<ContextItem[]> {
   const config = vscode.workspace.getConfiguration('contextRelay');
   const maxResults = config.get<number>('maxResults', 10);
@@ -54,9 +60,11 @@ export async function searchTodo(token: string, query: string): Promise<ContextI
 
   const candidates = taskListsWithTasks.flatMap(({ list, tasks }) =>
     tasks.map(task => {
+      const body = normalizeTodoBody(task.body);
       const listName = list.displayName?.trim() || getFallbackListName(list);
-      const score = computeTodoScore(task, listName, intent.includePlannerMetadata, intent.searchTerms);
-      return { task, listName, score };
+      const wellknownListName = list.wellknownListName?.trim() || undefined;
+      const score = computeTodoScore(task, body, listName, intent.includePlannerMetadata, intent.searchTerms);
+      return { task, body, listName, wellknownListName, score };
     })
   );
 
@@ -78,10 +86,27 @@ async function listTasksByList(
   lists: TodoTaskList[],
   scanLimit: number
 ): Promise<Array<{ list: TodoTaskList; tasks: TodoTask[] }>> {
-  return Promise.all(lists.map(async list => ({
-    list,
-    tasks: await listTasks(token, list.id as string, scanLimit)
-  })));
+  const listsToScan = lists.slice(0, MAX_LISTS_PER_QUERY);
+  if (listsToScan.length === 0) {
+    return [];
+  }
+
+  const perListScanLimit = Math.max(
+    1,
+    Math.min(scanLimit, Math.ceil(MAX_TOTAL_TASKS_PER_QUERY / listsToScan.length))
+  );
+  const results: Array<{ list: TodoTaskList; tasks: TodoTask[] }> = [];
+
+  for (let index = 0; index < listsToScan.length; index += MAX_CONCURRENT_LIST_REQUESTS) {
+    const chunk = listsToScan.slice(index, index + MAX_CONCURRENT_LIST_REQUESTS);
+    const chunkResults = await Promise.all(chunk.map(async list => ({
+      list,
+      tasks: await listTasks(token, list.id as string, perListScanLimit)
+    })));
+    results.push(...chunkResults);
+  }
+
+  return results;
 }
 
 async function listTasks(token: string, listId: string, scanLimit: number): Promise<TodoTask[]> {
@@ -93,6 +118,7 @@ async function listTasks(token: string, listId: string, scanLimit: number): Prom
 
 function computeTodoScore(
   task: TodoTask,
+  body: string,
   listName: string,
   includeMetadata: boolean,
   searchTerms: string[]
@@ -102,7 +128,7 @@ function computeTodoScore(
   }
 
   const titleScore = scoreMatches(task.title ?? '', searchTerms) * 4;
-  const bodyScore = scoreMatches(task.body?.content ?? '', searchTerms) * 3;
+  const bodyScore = scoreMatches(body, searchTerms) * 3;
   const metadataScore = includeMetadata
     ? (
       scoreMatches(listName, searchTerms) +
@@ -127,8 +153,7 @@ function compareTodoCandidates(left: TodoCandidate, right: TodoCandidate): numbe
 }
 
 function mapTodoCandidate(candidate: TodoCandidate, includeMetadata: boolean): ContextItem {
-  const { task, listName } = candidate;
-  const body = task.body?.content?.trim() ?? '';
+  const { task, body, listName, wellknownListName } = candidate;
   const snippetParts = [body || 'No task notes available.'];
 
   if (includeMetadata) {
@@ -157,7 +182,7 @@ function mapTodoCandidate(candidate: TodoCandidate, includeMetadata: boolean): C
     raw: {
       body,
       listName,
-      wellknownListName: undefined,
+      ...(wellknownListName ? { wellknownListName } : {}),
       status: task.status,
       importance: task.importance,
       categories: task.categories ?? []
@@ -167,6 +192,15 @@ function mapTodoCandidate(candidate: TodoCandidate, includeMetadata: boolean): C
 
 function getFallbackListName(list: TodoTaskList): string {
   return list.wellknownListName?.trim() || 'Task list';
+}
+
+function normalizeTodoBody(body?: TodoTaskBody): string {
+  const content = body?.content?.trim() ?? '';
+  if (!content) {
+    return '';
+  }
+
+  return normalizePreviewText(content, body?.contentType === 'html');
 }
 
 function formatDueDate(value?: TodoDateTimeTimeZone): string | undefined {

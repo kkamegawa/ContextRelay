@@ -1,5 +1,6 @@
 import { strict as assert } from 'assert';
-import { buildPreviewDocument, canOpenResult } from '../../panel/openResult';
+import { buildPreviewDocument } from '../../panel/openResult';
+import { canOpenResult } from '../../models/contextItem';
 
 suite('Open result', () => {
   test('shows open action for task results without external URLs', () => {
