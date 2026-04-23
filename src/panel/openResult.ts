@@ -1,6 +1,5 @@
 import { ResolvedPreview } from '../models/contextItem';
 import { getSourceLabel } from '../sourcePresentation';
-
 export function buildPreviewDocument(preview: ResolvedPreview): string {
   const lines = [`# ${preview.title}`, ''];
   const metadata: string[] = [

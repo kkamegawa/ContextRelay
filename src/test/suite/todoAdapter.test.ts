@@ -84,19 +84,72 @@ suite('To Do adapter', () => {
       assert.equal(items[0].title, 'Buy groceries');
       assert.ok(items[0].snippet.includes('Need milk and fruit'));
       assert.ok(items[0].snippet.includes('List: Personal'));
-        assert.ok(items[0].snippet.includes('Status: notStarted'));
-        assert.ok(items[0].snippet.includes('Importance: high'));
-        assert.ok(items[0].snippet.includes('Categories: Errands'));
-        assert.deepEqual(items[0].raw, {
-          body: 'Need milk and fruit',
-          listName: 'Personal',
-          wellknownListName: 'defaultList',
-          status: 'notStarted',
-          importance: 'high',
-          categories: ['Errands']
+      assert.ok(items[0].snippet.includes('Status: notStarted'));
+      assert.ok(items[0].snippet.includes('Importance: high'));
+      assert.ok(items[0].snippet.includes('Categories: Errands'));
+      assert.deepEqual(items[0].raw, {
+        body: 'Need milk and fruit',
+        listName: 'Personal',
+        wellknownListName: 'defaultList',
+        status: 'notStarted',
+        importance: 'high',
+        categories: ['Errands']
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('normalizes HTML task bodies before scoring and display', async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (input: Parameters<typeof fetch>[0]): Promise<Response> => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/v1.0/me/todo/lists/list-1/tasks?')) {
+        return jsonResponse({
+          value: [
+            {
+              id: 'todo-1',
+              title: 'Buy groceries',
+              status: 'notStarted',
+              createdDateTime: '2026-04-01T00:00:00Z',
+              body: {
+                contentType: 'html',
+                content: '<div>Need <strong>milk</strong><br>and fruit</div>'
+              }
+            }
+          ]
         });
-      } finally {
-        globalThis.fetch = originalFetch;
+      }
+
+      if (url.endsWith('/v1.0/me/todo/lists')) {
+        return jsonResponse({
+          value: [
+            {
+              id: 'list-1',
+              displayName: 'Personal'
+            }
+          ]
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    }) as typeof fetch;
+
+    try {
+      const items = await searchTodo('token', 'milk');
+
+      assert.equal(items.length, 1);
+      assert.ok(items[0].snippet.includes('Need milk\nand fruit'));
+      assert.deepEqual(items[0].raw, {
+        body: 'Need milk\nand fruit',
+        listName: 'Personal',
+        status: 'notStarted',
+        importance: undefined,
+        categories: []
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
     }
   });
 
