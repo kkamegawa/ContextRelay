@@ -5,7 +5,7 @@ import { parseQueryIntent, scoreMatches } from './queryIntent';
 
 interface OneNotePageParent {
   id?: string;
-  name?: string;
+  displayName?: string;
 }
 
 interface OneNotePageLinks {
@@ -62,7 +62,7 @@ export async function searchOneNote(token: string, query: string): Promise<Conte
 }
 
 async function listRecentPages(token: string, scanLimit: number): Promise<OneNotePage[]> {
-  const url = `${GRAPH_BASE}/v1.0/me/onenote/pages?$top=${scanLimit}&$select=id,title,createdDateTime,lastModifiedDateTime,contentUrl,links&$expand=parentSection($select=id,name),parentNotebook($select=id,name)`;
+  const url = `${GRAPH_BASE}/v1.0/me/onenote/pages?$top=${scanLimit}&$select=id,title,createdDateTime,lastModifiedDateTime,contentUrl,links&$expand=parentSection($select=id,displayName),parentNotebook($select=id,displayName)`;
   const response = await graphFetchWithRetry(url, token, { method: 'GET' });
   const data = await handleGraphResponse(response) as OneNotePageResponse;
   return data.value?.filter(page => page.id) ?? [];
@@ -96,7 +96,7 @@ function computePageScore(
   const titleScore = scoreMatches(page.title ?? '', searchTerms) * 4;
   const previewScore = scoreMatches(previewText, searchTerms) * 3;
   const hierarchyScore = includeHierarchy
-    ? (scoreMatches(page.parentSection?.name ?? '', searchTerms) + scoreMatches(page.parentNotebook?.name ?? '', searchTerms)) * 2
+    ? (scoreMatches(page.parentSection?.displayName ?? '', searchTerms) + scoreMatches(page.parentNotebook?.displayName ?? '', searchTerms)) * 2
     : 0;
 
   return titleScore + previewScore + hierarchyScore;
@@ -115,8 +115,8 @@ function compareCandidates(left: PageCandidate, right: PageCandidate): number {
 
 function mapCandidate(candidate: PageCandidate, includeHierarchy: boolean): ContextItem {
   const { page, previewText } = candidate;
-  const sectionName = page.parentSection?.name?.trim();
-  const notebookName = page.parentNotebook?.name?.trim();
+  const sectionName = page.parentSection?.displayName?.trim();
+  const notebookName = page.parentNotebook?.displayName?.trim();
   const hierarchy = [sectionName, notebookName].filter(Boolean).join(' · ');
   const body = previewText || 'No preview text is available for this page yet.';
 
