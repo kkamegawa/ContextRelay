@@ -11,6 +11,7 @@ import { searchOneNote } from '../adapters/onenoteAdapter';
 import { searchPlanner } from '../adapters/plannerAdapter';
 import { searchTeams } from '../adapters/teamsAdapter';
 import { searchRetrieval } from '../adapters/retrievalAdapter';
+import { searchTodo } from '../adapters/todoAdapter';
 import { createConversation, sendMessage } from '../adapters/chatAdapter';
 import { ContextItem } from '../models/contextItem';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
@@ -284,9 +285,13 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       const enabled = config.get<boolean>('adapters.onenote', true);
       promises.push(runAdapter('onenote', enabled, `onenote:${q}`, () => searchOneNote(token, q)));
     }
-    if (runAll || target === 'planner') {
+    if (runAll || target === 'planner' || target === 'task') {
       const enabled = config.get<boolean>('adapters.planner', true);
       promises.push(runAdapter('planner', enabled, `planner:${q}`, () => searchPlanner(token, q)));
+    }
+    if (runAll || target === 'task') {
+      const enabled = config.get<boolean>('adapters.todo', true);
+      promises.push(runAdapter('todo', enabled, `todo:${q}`, () => searchTodo(token, q)));
     }
     if (runAll && config.get<boolean>('adapters.connectors', false)) {
       promises.push(runAdapter('connectors', true, `connectors:${q}`, () =>

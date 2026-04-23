@@ -5,6 +5,7 @@ export type ContextSource =
   | 'teams'
   | 'onenote'
   | 'planner'
+  | 'todo'
   | 'connectors';
 
 export interface ContextItem {

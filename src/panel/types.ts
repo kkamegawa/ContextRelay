@@ -17,6 +17,7 @@ export interface SlashCommand {
   description: string;
   icon: string;
   source?: ContextSource | 'all';
+  sources?: ContextSource[];
 }
 
 export const SLASH_COMMANDS: SlashCommand[] = [
@@ -25,7 +26,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: '📄', source: 'sharepoint' },
   { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: '☁️', source: 'onedrive' },
   { command: '/onenote', label: '/onenote', description: 'Search OneNote pages', icon: '🗒️', source: 'onenote' },
-  { command: '/task', label: '/task', description: 'Search Planner tasks', icon: '✅', source: 'planner' },
+  { command: '/task', label: '/task', description: 'Search Planner and Microsoft To Do tasks', icon: '☑️', sources: ['planner', 'todo'] },
   { command: '/all', label: '/all', description: 'Search all sources', icon: '🔍', source: 'all' },
   { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets as context', icon: '🤖' },
   { command: '/clear', label: '/clear', description: 'Clear chat and discard pinned snippets', icon: '🧹' },
@@ -52,6 +53,11 @@ export interface OpenLinkMessage {
   url: string;
 }
 
+export interface OpenItemMessage {
+  command: 'openItem';
+  item: ContextItem;
+}
+
 export interface CopySnippetMessage {
   command: 'copySnippet';
   text: string;
@@ -62,6 +68,7 @@ export type WebviewToHostMessage =
   | WebviewReadyMessage
   | PinSnippetMessage
   | OpenLinkMessage
+  | OpenItemMessage
   | CopySnippetMessage;
 
 // --- Messages: Extension host → Webview ---

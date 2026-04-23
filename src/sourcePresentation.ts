@@ -18,6 +18,7 @@ export const SOURCE_TEXT_ICONS: Record<DisplaySource, string> = {
   onedrive: '☁️',
   onenote: '🗒️',
   planner: '✅',
+  todo: '☑️',
   connectors: '🔗',
   all: '🔍'
 };
@@ -29,6 +30,7 @@ export const SOURCE_LABELS: Record<DisplaySource, string> = {
   onedrive: 'OneDrive',
   onenote: 'OneNote',
   planner: 'Planner',
+  todo: 'Microsoft To Do',
   connectors: 'Connectors',
   all: 'All Sources'
 };

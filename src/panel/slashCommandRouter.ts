@@ -10,7 +10,7 @@ export interface ParsedCommand {
   targetSources: ContextSource[];
 }
 
-const ALL_SOURCES: ContextSource[] = ['sharepoint', 'onedrive', 'onenote', 'planner', 'mail', 'teams'];
+const ALL_SOURCES: ContextSource[] = ['sharepoint', 'onedrive', 'onenote', 'planner', 'todo', 'mail', 'teams'];
 
 /**
  * Parse user input and route to the appropriate adapter(s).
@@ -45,7 +45,9 @@ export function parseSlashCommand(input: string): ParsedCommand {
   }
 
   const targetSources: ContextSource[] =
-    matched.source === 'all' || !matched.source
+    matched.sources?.length
+      ? matched.sources
+      : matched.source === 'all' || !matched.source
       ? ALL_SOURCES
       : [matched.source];
 

@@ -40,9 +40,9 @@ suite('CommandRouter', () => {
     assert.equal(result.query, 'architecture decision log');
   });
 
-  test('/task command routes to planner', () => {
+  test('/task command routes to combined task search', () => {
     const result = parseCommand('/task release checklist');
-    assert.equal(result.target, 'planner');
+    assert.equal(result.target, 'task');
     assert.equal(result.query, 'release checklist');
   });
 
@@ -102,9 +102,9 @@ suite('CommandRouter', () => {
     assert.ok(text.includes('Example'));
   });
 
-  test('getHelpText returns onboarding examples for onenote and planner', () => {
+  test('getHelpText returns onboarding examples for onenote and task search', () => {
     assert.ok(getHelpText('onenote').includes('/onenote'));
-    assert.ok(getHelpText('planner').includes('/task'));
+    assert.ok(getHelpText('task').includes('/task'));
   });
 
   test('getHelpText returns fallback for unknown command', () => {

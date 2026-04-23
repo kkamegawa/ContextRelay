@@ -16,7 +16,7 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/sharepoint <query>` | SharePoint sites & pages |
 | `/onedrive <query>` | OneDrive files |
 | `/onenote <query>` | OneNote pages |
-| `/task <query>` | Planner tasks |
+| `/task <query>` | Planner and Microsoft To Do tasks |
 | `/all <query>` | All enabled sources (same as no prefix) |
 | `/ask <instruction>` | Send pinned snippets to Microsoft 365 Copilot and open the reply in a new editor |
 | `/clear` | Clear the chat transcript and discard all pinned snippets |
@@ -40,7 +40,7 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 - Node.js 22 or later for local development and validation from source
 - [Visual Studio Code](https://code.visualstudio.com/) 1.85 or later
 - A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
-- **For Exchange Mail, Teams, SharePoint, OneDrive, OneNote, and Planner search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
+- **For Exchange Mail, Teams, SharePoint, OneDrive, OneNote, Planner, and Microsoft To Do search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
 - **For Chat preview / Copilot-grounded features**: Microsoft 365 Copilot license might still be required depending on tenant rollout and API availability
 
 ### Required permissions
@@ -73,7 +73,7 @@ The following delegated Microsoft Graph permissions are required by feature:
 | `Chat.Read` | Teams search, Chat |
 | `ChannelMessage.Read.All` | Teams search, Chat |
 | `Notes.Read` | OneNote search |
-| `Tasks.Read` | Planner search |
+| `Tasks.Read` | Planner and Microsoft To Do task search |
 | `People.Read.All` | Chat |
 | `OnlineMeetingTranscript.Read.All` | Chat |
 | `ExternalItem.Read.All` | Connectors search, Chat (optional) |

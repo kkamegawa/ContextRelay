@@ -48,6 +48,7 @@ suite('AuthProvider', () => {
     configValues.set('adapters.teams', false);
     configValues.set('adapters.sharepoint', false);
     configValues.set('adapters.onedrive', false);
+    configValues.set('adapters.todo', false);
     configValues.set('adapters.connectors', false);
   });
 
@@ -62,9 +63,21 @@ suite('AuthProvider', () => {
     assert.ok(scopes.includes('https://graph.microsoft.com/Tasks.Read'));
   });
 
-  test('omits Notes.Read and Tasks.Read when OneNote and Planner are disabled', () => {
+  test('includes Tasks.Read when Microsoft To Do is enabled without Planner', () => {
     configValues.set('adapters.onenote', false);
     configValues.set('adapters.planner', false);
+    configValues.set('adapters.todo', true);
+
+    const provider = new AuthProvider({} as never);
+    const scopes = provider.getRequiredScopes();
+
+    assert.ok(scopes.includes('https://graph.microsoft.com/Tasks.Read'));
+  });
+
+  test('omits Notes.Read and Tasks.Read when OneNote, Planner, and To Do are disabled', () => {
+    configValues.set('adapters.onenote', false);
+    configValues.set('adapters.planner', false);
+    configValues.set('adapters.todo', false);
 
     const provider = new AuthProvider({} as never);
     const scopes = provider.getRequiredScopes();

@@ -5,6 +5,7 @@ export type RouteTarget =
   | 'onedrive'
   | 'onenote'
   | 'planner'
+  | 'task'
   | 'all'
   | 'ask'
   | 'clear';
@@ -21,7 +22,7 @@ const SLASH_COMMANDS: Record<string, RouteTarget> = {
   sharepoint: 'sharepoint',
   onedrive: 'onedrive',
   onenote: 'onenote',
-  task: 'planner',
+  task: 'task',
   all: 'all',
   ask: 'ask',
   clear: 'clear'
@@ -67,6 +68,7 @@ export function getHelpText(command: string): string {
     onedrive: 'Example: /onedrive architecture diagram\nExample: /onedrive Q3 report',
     onenote: 'Example: /onenote architecture decision log\nExample: /onenote section notebook architecture',
     planner: 'Example: /task release checklist\nExample: /task metadata comments onboarding',
+    task: 'Example: /task release checklist\nExample: /task metadata comments onboarding',
     all: 'Example: /all architecture decisions\nOr just type a query without a slash command.',
     ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is opened in a new editor tab.',
     clear: 'Example: /clear\nClears the current chat transcript and discards all pinned snippets.'

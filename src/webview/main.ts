@@ -106,7 +106,7 @@ interface HostMessage {
 }
 
 interface ContextItem {
-  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'connectors';
+  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';
   title: string;
   snippet: string;
   url?: string;
