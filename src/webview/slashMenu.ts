@@ -30,12 +30,13 @@ export class SlashMenu {
   private input: HTMLTextAreaElement;
   private selectedIndex = -1;
   private filteredItems: SlashMenuItem[] = [];
-  private onSelect: (command: string) => void;
+  private onSelect: (nextValue: string) => void;
+  private selectionContext?: SlashSelectionContext;
 
   constructor(
     menuEl: HTMLElement,
     inputEl: HTMLTextAreaElement,
-    onSelect: (command: string) => void
+    onSelect: (nextValue: string) => void
   ) {
     this.menu = menuEl;
     this.input = inputEl;
@@ -49,18 +50,14 @@ export class SlashMenu {
    * Returns true if the menu is visible.
    */
   update(text: string): boolean {
-    const trimmed = text.trim();
-
-    // Show menu only when input starts with "/" and has no space (still typing command)
-    if (!trimmed.startsWith('/') || trimmed.includes(' ')) {
+    const context = this._getSelectionContext(text);
+    if (!context) {
       this.hide();
       return false;
     }
 
-    const partial = trimmed.toLowerCase();
-    this.filteredItems = SLASH_ITEMS.filter((item) =>
-      item.command.startsWith(partial)
-    );
+    this.selectionContext = context;
+    this.filteredItems = SLASH_ITEMS.filter(item => this._matchesContext(item, context));
 
     if (this.filteredItems.length === 0) {
       this.hide();
@@ -103,7 +100,7 @@ export class SlashMenu {
         if (this.selectedIndex >= 0 && this.selectedIndex < this.filteredItems.length) {
           e.preventDefault();
           const selected = this.filteredItems[this.selectedIndex];
-          this.onSelect(selected.command);
+          this._applySelection(selected.command);
           this.hide();
           return true;
         }
@@ -126,6 +123,7 @@ export class SlashMenu {
   hide(): void {
     this.menu.classList.remove('visible');
     this.selectedIndex = -1;
+    this.selectionContext = undefined;
     this.input.removeAttribute('aria-activedescendant');
   }
 
@@ -174,7 +172,7 @@ export class SlashMenu {
       el.addEventListener('click', () => {
         const cmd = el.dataset.command;
         if (cmd) {
-          this.onSelect(cmd);
+          this._applySelection(cmd);
           this.hide();
         }
       });
@@ -232,4 +230,70 @@ export class SlashMenu {
       this.input.removeAttribute('aria-activedescendant');
     }
   }
+
+  private _applySelection(command: string): void {
+    if (!this.selectionContext) {
+      this.onSelect(`${command} `);
+      return;
+    }
+
+    const nextValue = [...this.selectionContext.previousTokens, command].join(' ') + ' ';
+    this.onSelect(nextValue);
+  }
+
+  private _matchesContext(item: SlashMenuItem, context: SlashSelectionContext): boolean {
+    if (!item.command.startsWith(context.partial)) {
+      return false;
+    }
+
+    if (!context.combinableOnly) {
+      return true;
+    }
+
+    if (!COMBINABLE_COMMANDS.has(item.command)) {
+      return false;
+    }
+
+    return !context.selectedCommands.has(item.command);
+  }
+
+  private _getSelectionContext(text: string): SlashSelectionContext | undefined {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('/')) {
+      return undefined;
+    }
+
+    const hasTrailingWhitespace = /\s$/.test(text);
+    const tokens = trimmed.split(/\s+/);
+    const partial = hasTrailingWhitespace ? '/' : tokens[tokens.length - 1].toLowerCase();
+    const previousTokens = (hasTrailingWhitespace ? tokens : tokens.slice(0, -1)).map(token => token.toLowerCase());
+
+    if (!partial.startsWith('/')) {
+      return undefined;
+    }
+
+    const selectedCommands = new Set<string>();
+    for (const token of previousTokens) {
+      if (!COMBINABLE_COMMANDS.has(token)) {
+        return undefined;
+      }
+      selectedCommands.add(token);
+    }
+
+    return {
+      previousTokens,
+      partial,
+      selectedCommands,
+      combinableOnly: previousTokens.length > 0
+    };
+  }
 }
+
+interface SlashSelectionContext {
+  previousTokens: string[];
+  partial: string;
+  selectedCommands: Set<string>;
+  combinableOnly: boolean;
+}
+
+const COMBINABLE_COMMANDS = new Set(['/mail', '/teams', '/sharepoint', '/onedrive', '/onenote', '/task']);

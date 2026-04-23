@@ -23,9 +23,10 @@ suite('Search summary', () => {
         source: 'teams',
         items: [item('teams', 'Teams thread')]
       }
-    ]);
+    ], ['mail', 'teams']);
 
     assert.ok(summary.includes('Latest search query: `architecture review`'));
+    assert.ok(summary.includes('Requested sources: Mail, Teams'));
     assert.ok(summary.includes('Total results: 3'));
     assert.ok(summary.includes('Mail: 2 item(s) (cached). Top items: Mail one; Mail two.'));
     assert.ok(summary.includes('Teams: 1 item(s). Top items: Teams thread.'));

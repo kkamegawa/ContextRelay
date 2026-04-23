@@ -28,8 +28,8 @@ const slashMenuEl = document.getElementById('slashMenu')!;
 // --- Modules ---
 const renderer = new ChatRenderer(chatArea, vscode);
 
-const slashMenu = new SlashMenu(slashMenuEl, promptInput, (command: string) => {
-  promptInput.value = command + ' ';
+const slashMenu = new SlashMenu(slashMenuEl, promptInput, (nextValue: string) => {
+  promptInput.value = nextValue;
   promptInput.focus();
   slashMenu.hide();
 });

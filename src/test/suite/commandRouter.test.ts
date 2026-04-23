@@ -14,6 +14,8 @@ suite('CommandRouter', () => {
     assert.equal(result.target, 'mail');
     assert.equal(result.query, 'incident review');
     assert.equal(result.isEmpty, false);
+    assert.deepEqual(result.targetSources, ['mail']);
+    assert.deepEqual(result.sourceCommands, ['mail']);
   });
 
   test('/teams command routes to teams', () => {
@@ -44,6 +46,7 @@ suite('CommandRouter', () => {
     const result = parseCommand('/task release checklist');
     assert.equal(result.target, 'task');
     assert.equal(result.query, 'release checklist');
+    assert.deepEqual(result.targetSources, ['planner', 'todo']);
   });
 
   test('slash command accepts newline-separated query', () => {
@@ -64,6 +67,51 @@ suite('CommandRouter', () => {
     const result = parseCommand('/all architecture decisions');
     assert.equal(result.target, 'all');
     assert.equal(result.query, 'architecture decisions');
+    assert.equal(result.searchScope, 'all');
+  });
+
+  test('multiple slash commands route to only the requested sources', () => {
+    const result = parseCommand('/onedrive /mail quarterly plan');
+    assert.equal(result.target, 'all');
+    assert.equal(result.query, 'quarterly plan');
+    assert.equal(result.commandText, '/onedrive /mail');
+    assert.equal(result.searchScope, 'scoped');
+    assert.deepEqual(result.sourceCommands, ['onedrive', 'mail']);
+    assert.deepEqual(result.targetSources, ['onedrive', 'mail']);
+  });
+
+  test('deduplicates repeated slash commands', () => {
+    const result = parseCommand('/mail /mail incident review');
+    assert.equal(result.target, 'mail');
+    assert.deepEqual(result.sourceCommands, ['mail']);
+    assert.deepEqual(result.targetSources, ['mail']);
+  });
+
+  test('combines task search with another scoped command', () => {
+    const result = parseCommand('/mail /task release checklist');
+    assert.equal(result.target, 'all');
+    assert.deepEqual(result.targetSources, ['mail', 'planner', 'todo']);
+  });
+
+  test('mixed invalid scoped command falls back to /all query text', () => {
+    const result = parseCommand('/mail /unknown incident review');
+    assert.equal(result.target, 'all');
+    assert.equal(result.query, '/mail /unknown incident review');
+    assert.deepEqual(result.sourceCommands, []);
+  });
+
+  test('mixing /all with scoped commands falls back to /all query text', () => {
+    const result = parseCommand('/all /mail architecture decisions');
+    assert.equal(result.target, 'all');
+    assert.equal(result.query, '/all /mail architecture decisions');
+    assert.deepEqual(result.sourceCommands, []);
+  });
+
+  test('empty multi-command query stays empty and keeps the combined command text', () => {
+    const result = parseCommand('/mail /onedrive');
+    assert.equal(result.isEmpty, true);
+    assert.equal(result.commandText, '/mail /onedrive');
+    assert.deepEqual(result.targetSources, ['mail', 'onedrive']);
   });
 
   test('empty query after /mail sets isEmpty', () => {
@@ -105,6 +153,12 @@ suite('CommandRouter', () => {
   test('getHelpText returns onboarding examples for onenote and task search', () => {
     assert.ok(getHelpText('onenote').includes('/onenote'));
     assert.ok(getHelpText('task').includes('/task'));
+  });
+
+  test('getHelpText returns scoped multi-source examples', () => {
+    const text = getHelpText(['mail', 'onedrive']);
+    assert.ok(text.includes('/mail /onedrive'));
+    assert.ok(text.includes('explicitly requested sources'));
   });
 
   test('getHelpText returns fallback for unknown command', () => {

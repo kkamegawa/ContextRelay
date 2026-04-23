@@ -195,7 +195,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     if (parsed.isEmpty) {
       this.postMessage({
         type: 'help',
-        text: getHelpText(parsed.target)
+        text: getHelpText(parsed.sourceCommands.length > 0 ? parsed.sourceCommands : parsed.target)
       });
       return;
     }
@@ -258,38 +258,38 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       }
     };
 
-    const { target, query: q } = parsed;
-
-    const runAll = target === 'all';
+    const { query: q } = parsed;
+    const selectedSources = new Set(parsed.targetSources);
+    const runAll = parsed.searchScope === 'all';
     const promises: Promise<SearchResult>[] = [];
 
-    if (runAll || target === 'mail') {
+    if (selectedSources.has('mail')) {
       const enabled = config.get<boolean>('adapters.mail', true);
       promises.push(runAdapter('mail', enabled, `mail:${q}`, () => searchMail(token, q)));
     }
-    if (runAll || target === 'teams') {
+    if (selectedSources.has('teams')) {
       const enabled = config.get<boolean>('adapters.teams', true);
       promises.push(runAdapter('teams', enabled, `teams:${q}`, () => searchTeams(token, q)));
     }
-    if (runAll || target === 'sharepoint') {
+    if (selectedSources.has('sharepoint')) {
       const enabled = config.get<boolean>('adapters.sharepoint', true);
       promises.push(runAdapter('sharepoint', enabled, `sharepoint:${q}`, () =>
         searchRetrieval(token, q, 'sharePoint')));
     }
-    if (runAll || target === 'onedrive') {
+    if (selectedSources.has('onedrive')) {
       const enabled = config.get<boolean>('adapters.onedrive', true);
       promises.push(runAdapter('onedrive', enabled, `onedrive:${q}`, () =>
         searchRetrieval(token, q, 'oneDriveBusiness')));
     }
-    if (runAll || target === 'onenote') {
+    if (selectedSources.has('onenote')) {
       const enabled = config.get<boolean>('adapters.onenote', true);
       promises.push(runAdapter('onenote', enabled, `onenote:${q}`, () => searchOneNote(token, q)));
     }
-    if (runAll || target === 'planner' || target === 'task') {
+    if (selectedSources.has('planner')) {
       const enabled = config.get<boolean>('adapters.planner', true);
       promises.push(runAdapter('planner', enabled, `planner:${q}`, () => searchPlanner(token, q)));
     }
-    if (runAll || target === 'task') {
+    if (selectedSources.has('todo')) {
       const enabled = config.get<boolean>('adapters.todo', true);
       promises.push(runAdapter('todo', enabled, `todo:${q}`, () => searchTodo(token, q)));
     }
@@ -305,7 +305,10 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    this.latestSearchSummary = buildSearchSummary(query, results);
+    const summarySources = runAll && config.get<boolean>('adapters.connectors', false)
+      ? [...parsed.targetSources, 'connectors']
+      : parsed.targetSources;
+    this.latestSearchSummary = buildSearchSummary(query, results, summarySources);
 
     this.postMessage({ type: 'searchResults', results });
   }

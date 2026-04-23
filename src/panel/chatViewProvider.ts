@@ -13,7 +13,7 @@ import { AuthProvider } from '../auth/authProvider';
 import { CacheStore } from '../cache/cacheStore';
 import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
 import { type ContextItem, type ContextSource, getContextItemKey } from '../models/contextItem';
-import { type RouteTarget, getHelpText, parseCommand } from '../router/commandRouter';
+import { getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
 import { buildAskPrompt } from './askPrompt';
 import { createFallbackPreview, createMailPreview, getMailMessageId } from './itemPreview';
@@ -23,7 +23,6 @@ import { buildSearchSummary, type SearchSummaryResult } from './searchSummary';
 import { type HostToWebviewMessage, type WebviewToHostMessage } from './types';
 import { CHAT_EDITOR_PANEL_ID, CHAT_VIEW_ID } from './chatViewConstants';
 
-const DEFAULT_SOURCES: ContextSource[] = ['mail', 'teams', 'sharepoint', 'onedrive', 'onenote', 'planner', 'todo'];
 type ChatHostKind = 'sidebar' | 'editor';
 
 interface ChatHostSession {
@@ -313,11 +312,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const parsed = parseCommand(text);
     if (parsed.isEmpty) {
       if (trimmed.startsWith('/')) {
-        const requestedCommand = trimmed.split(/\s+/, 1)[0] || `/${parsed.target}`;
+        const requestedCommand = parsed.commandText ?? (trimmed.split(/\s+/, 1)[0] || `/${parsed.target}`);
         this.postMessage({
           command: 'slashHelp',
           commandName: requestedCommand,
-          examples: getHelpText(parsed.target)
+          examples: getHelpText(parsed.sourceCommands.length > 0 ? parsed.sourceCommands : parsed.target)
             .split('\n')
             .map(example => example.trim())
             .filter(Boolean)
@@ -336,10 +335,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const targetSources = this.getTargetSources(parsed.target);
+    const targetSources = this.getEnabledTargetSources(parsed.targetSources, parsed.searchScope === 'all');
     if (targetSources.length === 0) {
       const message = 'No ContextRelay adapters are enabled.';
-      this.latestSearchSummary = buildSearchSummary(parsed.query, []);
+      this.latestSearchSummary = buildSearchSummary(parsed.query, [], parsed.targetSources);
       this.postMessage({
         command: 'queryError',
         source: 'all',
@@ -361,7 +360,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           items: [],
           error: message
         }
-      ]);
+      ], parsed.targetSources);
       this.postMessage({
         command: 'queryError',
         source: errorSource,
@@ -382,7 +381,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const results = await Promise.all(
       targetSources.map(source => this.querySource(source, parsed.query, token))
     );
-    this.latestSearchSummary = buildSearchSummary(parsed.query, results);
+    this.latestSearchSummary = buildSearchSummary(parsed.query, results, targetSources);
   }
 
   private async querySource(
@@ -505,25 +504,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private getTargetSources(target: RouteTarget): ContextSource[] {
-    if (target === 'task') {
-      const taskSources: ContextSource[] = ['planner', 'todo'];
-      return taskSources.filter(source => this.isSourceEnabled(source));
+  private getEnabledTargetSources(
+    requestedSources: readonly ContextSource[],
+    includeConnectors: boolean
+  ): ContextSource[] {
+    const sources = requestedSources.filter(source => this.isSourceEnabled(source));
+    if (includeConnectors && this.isSourceEnabled('connectors')) {
+      sources.push('connectors');
     }
-
-    if (target === 'ask' || target === 'all') {
-      const sources = DEFAULT_SOURCES.filter(source => this.isSourceEnabled(source));
-      if (this.isSourceEnabled('connectors')) {
-        sources.push('connectors');
-      }
-      return target === 'all' ? sources : [];
-    }
-
-    if (target === 'clear') {
-      return [];
-    }
-
-    return [target];
+    return sources;
   }
 
   private isSourceEnabled(source: ContextSource): boolean {

@@ -309,7 +309,11 @@ export class ChatRenderer {
     const slashCode = document.createElement('code');
     slashCode.textContent = '/';
     commandsHint.appendChild(slashCode);
-    commandsHint.appendChild(document.createTextNode(' for available commands, or enter a keyword to search all sources.'));
+    commandsHint.appendChild(document.createTextNode(' for available commands, combine source commands like '));
+    const comboCode = document.createElement('code');
+    comboCode.textContent = '/mail /onedrive';
+    commandsHint.appendChild(comboCode);
+    commandsHint.appendChild(document.createTextNode(', or enter a keyword to search all sources.'));
     welcome.appendChild(commandsHint);
 
     const askHint = document.createElement('p');
