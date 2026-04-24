@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 import Module from 'module';
-import { buildSearchSnippet, escapeODataString, isOneDriveUrl, stripSearchMarkup } from '../../adapters/retrievalSearchUtils';
+import { buildSearchSnippet, escapeODataString, formatLocationSnippet, isOneDriveUrl, stripSearchMarkup } from '../../adapters/retrievalSearchUtils';
 
 type SearchRetrievalFn = typeof import('../../adapters/retrievalAdapter').searchRetrieval;
 type ModuleLoader = typeof Module & {
@@ -57,6 +57,38 @@ suite('Retrieval adapter', () => {
     assert.equal(
       buildSearchSnippet('<c0>Architecture</c0> review <ddd/> excerpt', undefined, 'https://contoso-my.sharepoint.com/personal/user/Documents/file.docx'),
       'Architecture review … excerpt'
+    );
+  });
+
+  test('formats raw OneDrive URLs as concise location snippets', () => {
+    assert.equal(
+      formatLocationSnippet(
+        undefined,
+        'https://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/%E8%B3%87%E6%96%99/Reference/Notes'
+      ),
+      '資料 / Reference / Notes'
+    );
+  });
+
+  test('does not use raw OneDrive personal location strings as snippets', () => {
+    assert.equal(
+      buildSearchSnippet(
+        undefined,
+        'contoso-my.sharepoint.com/personal/user_contoso_com/Documents/%E8%B3%87%E6%96%99/Reference/Notes',
+        'https://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/%E8%B3%87%E6%96%99/Reference/Notes'
+      ),
+      '資料 / Reference / Notes'
+    );
+  });
+
+  test('does not use raw SharePoint site location strings as snippets', () => {
+    assert.equal(
+      buildSearchSnippet(
+        undefined,
+        'contoso.sharepoint.com/sites/engineering/Shared%20Documents/specs/Architecture',
+        'https://contoso.sharepoint.com/sites/engineering/Shared%20Documents/specs/Architecture'
+      ),
+      'specs / Architecture'
     );
   });
 
