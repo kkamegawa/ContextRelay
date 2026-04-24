@@ -8,12 +8,22 @@ export interface SearchSummaryResult {
   cached?: boolean;
 }
 
-export function buildSearchSummary(query: string, results: SearchSummaryResult[]): string {
+export function buildSearchSummary(
+  query: string,
+  results: SearchSummaryResult[],
+  requestedSources: readonly string[] = []
+): string {
   const trimmedQuery = query.trim();
   const lines: string[] = [
     `Latest search query: \`${trimmedQuery}\``,
     ''
   ];
+
+  const uniqueSources = [...new Set(requestedSources)];
+  if (uniqueSources.length > 0) {
+    lines.push(`Requested sources: ${uniqueSources.map(capitalizeSource).join(', ')}`);
+    lines.push('');
+  }
 
   if (results.length === 0) {
     lines.push('- No sources were queried.');
