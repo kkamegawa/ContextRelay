@@ -44,4 +44,25 @@ suite('Open result', () => {
     assert.ok(html.includes('data:image/jpeg;base64,abc123'));
     assert.ok(html.includes('Executive summary'));
   });
+
+  test('renders only safe metadata links as clickable anchors', () => {
+    const safeHtml = buildPreviewWebviewHtml({
+      source: 'mail',
+      title: 'Safe link',
+      url: 'https://example.com/path?q=1',
+      content: { kind: 'text', text: 'Body' }
+    }, 'vscode-resource:preview');
+    const unsafeHtml = buildPreviewWebviewHtml({
+      source: 'mail',
+      title: 'Unsafe link',
+      url: 'javascript:alert(1)',
+      content: { kind: 'text', text: 'Body' }
+    }, 'vscode-resource:preview');
+
+    assert.ok(safeHtml.includes('target="_blank"'));
+    assert.ok(safeHtml.includes('rel="noreferrer noopener"'));
+    assert.ok(safeHtml.includes('<a href="https://example.com/path?q=1"'));
+    assert.ok(unsafeHtml.includes('javascript:alert(1)'));
+    assert.ok(!unsafeHtml.includes('<a href="javascript:alert(1)"'));
+  });
 });

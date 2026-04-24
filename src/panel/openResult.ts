@@ -24,7 +24,7 @@ export function buildPreviewWebviewHtml(preview: ResolvedPreview, cspSource: str
     `<div class="meta-label">Source</div><div class="meta-value">${escapeHtml(getSourceLabel(preview.source))}</div>`,
     preview.subtitle ? `<div class="meta-label">Context</div><div class="meta-value">${escapeHtml(preview.subtitle)}</div>` : '',
     preview.timestamp ? `<div class="meta-label">Timestamp</div><div class="meta-value">${escapeHtml(preview.timestamp)}</div>` : '',
-    preview.url ? `<div class="meta-label">Link</div><div class="meta-value"><a href="${escapeAttribute(preview.url)}">${escapeHtml(preview.url)}</a></div>` : ''
+    preview.url ? `<div class="meta-label">Link</div><div class="meta-value">${buildPreviewLinkMarkup(preview.url)}</div>` : ''
   ].filter(Boolean);
 
   return `<!DOCTYPE html>
@@ -160,4 +160,27 @@ function escapeHtml(value: string): string {
 
 function escapeAttribute(value: string): string {
   return escapeHtml(value);
+}
+
+function buildPreviewLinkMarkup(url: string): string {
+  const safeUrl = getSafeExternalUrl(url);
+  if (!safeUrl) {
+    return escapeHtml(url);
+  }
+
+  const escaped = escapeAttribute(safeUrl);
+  return `<a href="${escaped}" target="_blank" rel="noreferrer noopener">${escapeHtml(safeUrl)}</a>`;
+}
+
+function getSafeExternalUrl(url: string): string | undefined {
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+      return undefined;
+    }
+
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
 }

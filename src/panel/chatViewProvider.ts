@@ -566,7 +566,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       vscode.ViewColumn.Active,
       {
         enableScripts: false,
-        retainContextWhenHidden: true
+        retainContextWhenHidden: false
       }
     );
 
