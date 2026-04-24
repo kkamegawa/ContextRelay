@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 interface PackageJson {
+  dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   engines?: Record<string, string>;
   scripts?: Record<string, string>;
@@ -146,6 +147,31 @@ suite('Dependency security baselines', () => {
       Boolean(diffVersion) &&
         (compareVersions(diffVersion, '6.0.0') < 0 || compareVersions(diffVersion, '8.0.3') >= 0),
       `installed diff must stay outside the vulnerable range 6.0.0-8.0.2 (found: ${diffVersion ?? 'missing'})`
+    );
+  });
+
+  test('pins preview rendering dependencies at vetted versions', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+
+    assert.ok(
+      compareVersions(packageJson.dependencies?.marked, '18.0.2') >= 0,
+      `marked must stay on a vetted baseline or newer (found: ${packageJson.dependencies?.marked ?? 'missing'})`
+    );
+    assert.ok(
+      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.17.3') >= 0,
+      `sanitize-html must stay on a vetted baseline or newer (found: ${packageJson.dependencies?.['sanitize-html'] ?? 'missing'})`
+    );
+
+    assert.equal(
+      packageLockJson.packages?.['node_modules/marked']?.deprecated,
+      undefined,
+      `installed marked must not be deprecated (found: ${packageLockJson.packages?.['node_modules/marked']?.deprecated ?? 'not deprecated'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/sanitize-html']?.deprecated,
+      undefined,
+      `installed sanitize-html must not be deprecated (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.deprecated ?? 'not deprecated'})`
     );
   });
 });

@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { ContextItem } from '../models/contextItem';
+import { ContextItem, getPreviewText } from '../models/contextItem';
 import { createMailPreview, getMailMessageId, normalizePreviewText } from '../panel/itemPreview';
 import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from './graphClient';
 
@@ -59,7 +59,7 @@ async function hydrateMailItem(token: string, item: ContextItem): Promise<Contex
   const response = await graphFetchWithRetry(url, token, { method: 'GET' });
   const data = await handleGraphResponse(response) as MailBodyResponse;
   const preview = createMailPreview(item, data);
-  return preview.body.trim() ? { ...item, snippet: preview.body } : item;
+  return getPreviewText(preview).trim() ? { ...item, snippet: getPreviewText(preview) } : item;
 }
 
 async function hydrateDriveItem(token: string, item: ContextItem): Promise<ContextItem> {

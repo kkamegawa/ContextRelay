@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import { buildPreviewDocument } from '../../panel/openResult';
+import { buildPreviewDocument, buildPreviewWebviewHtml } from '../../panel/openResult';
 import { canOpenResult } from '../../models/contextItem';
 
 suite('Open result', () => {
@@ -18,7 +18,7 @@ suite('Open result', () => {
       source: 'todo',
       title: 'Buy groceries',
       subtitle: 'Personal · notStarted',
-      body: 'Need milk and fruit',
+      content: { kind: 'text', text: 'Need milk and fruit' },
       timestamp: '2026-04-30T00:00:00Z'
     });
 
@@ -26,5 +26,43 @@ suite('Open result', () => {
     assert.ok(content.includes('- Source: Microsoft To Do'));
     assert.ok(content.includes('- Context: Personal · notStarted'));
     assert.ok(content.includes('Need milk and fruit'));
+  });
+
+  test('builds rich preview webview html for image previews', () => {
+    const html = buildPreviewWebviewHtml({
+      source: 'sharepoint',
+      title: 'Quarterly deck',
+      content: {
+        kind: 'image',
+        src: 'data:image/jpeg;base64,abc123',
+        alt: 'Quarterly deck preview image',
+        text: 'Executive summary'
+      }
+    }, 'vscode-resource:preview');
+
+    assert.ok(html.includes('Quarterly deck'));
+    assert.ok(html.includes('data:image/jpeg;base64,abc123'));
+    assert.ok(html.includes('Executive summary'));
+  });
+
+  test('renders only safe metadata links as clickable anchors', () => {
+    const safeHtml = buildPreviewWebviewHtml({
+      source: 'mail',
+      title: 'Safe link',
+      url: 'https://example.com/path?q=1',
+      content: { kind: 'text', text: 'Body' }
+    }, 'vscode-resource:preview');
+    const unsafeHtml = buildPreviewWebviewHtml({
+      source: 'mail',
+      title: 'Unsafe link',
+      url: 'javascript:alert(1)',
+      content: { kind: 'text', text: 'Body' }
+    }, 'vscode-resource:preview');
+
+    assert.ok(safeHtml.includes('target="_blank"'));
+    assert.ok(safeHtml.includes('rel="noreferrer noopener"'));
+    assert.ok(safeHtml.includes('<a href="https://example.com/path?q=1"'));
+    assert.ok(unsafeHtml.includes('javascript:alert(1)'));
+    assert.ok(!unsafeHtml.includes('<a href="javascript:alert(1)"'));
   });
 });

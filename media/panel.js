@@ -601,7 +601,31 @@
 
     const body = document.createElement('div');
     body.className = 'preview-body';
-    body.textContent = preview.body || 'No preview text is available for this item yet.';
+
+    const previewText = getPreviewText(preview) || 'No preview text is available for this item yet.';
+    const contentKind = getPreviewContentKind(preview);
+    if (contentKind === 'html' && preview.content && typeof preview.content.html === 'string') {
+      body.classList.add('preview-body-html');
+      body.innerHTML = preview.content.html;
+    } else if (contentKind === 'image' && preview.content && typeof preview.content.src === 'string') {
+      body.classList.add('preview-body-image');
+
+      const image = document.createElement('img');
+      image.className = 'preview-image';
+      image.src = preview.content.src;
+      image.alt = preview.content.alt || `${preview.title || 'Preview'} image`;
+      body.appendChild(image);
+
+      if (previewText) {
+        const caption = document.createElement('div');
+        caption.className = 'preview-image-caption';
+        caption.textContent = previewText;
+        body.appendChild(caption);
+      }
+    } else {
+      body.textContent = previewText;
+    }
+
     previewContent.appendChild(body);
 
     if (preview.url) {
@@ -618,7 +642,11 @@
       previewContent.appendChild(actions);
     }
 
-    setPreviewSelectionStatus('本文を選択して Add selection、または Add preview で全文保存できます。');
+    if (contentKind === 'image') {
+      setPreviewSelectionStatus('Add preview で全文保存できます。画像プレビューでは本文選択はできません。');
+    } else {
+      setPreviewSelectionStatus('本文を選択して Add selection、または Add preview で全文保存できます。');
+    }
     updatePreviewActionState();
   }
 
@@ -855,7 +883,8 @@
   }
 
   function savePreviewToHandoff(selectionOnly) {
-    if (!currentPreviewItem || !currentPreview || !currentPreview.body) {
+    const previewBody = getPreviewText(currentPreview);
+    if (!currentPreviewItem || !currentPreview || !previewBody) {
       setPreviewSelectionStatus('保存できる preview がありません。先に検索結果を選択してください。');
       return;
     }
@@ -870,7 +899,7 @@
       type: 'savePreviewSnippet',
       item: currentPreviewItem,
       selectedText,
-      previewBody: currentPreview.body
+      previewBody
     });
   }
 
@@ -891,9 +920,10 @@
   }
 
   function updatePreviewActionState() {
-    const hasPreview = !!(currentPreviewItem && currentPreview && currentPreview.body);
+    const hasPreview = !!(currentPreviewItem && currentPreview && getPreviewText(currentPreview));
+    const hasSelectablePreview = hasPreview && getPreviewContentKind(currentPreview) !== 'image';
     if (previewSaveSelectionBtn) {
-      previewSaveSelectionBtn.disabled = !hasPreview;
+      previewSaveSelectionBtn.disabled = !hasSelectablePreview;
     }
     if (previewSavePreviewBtn) {
       previewSavePreviewBtn.disabled = !hasPreview;
@@ -904,7 +934,7 @@
   }
 
   function updatePreviewSelectionStatus() {
-    if (!currentPreview || !currentPreview.body) {
+    if (!currentPreview || !getPreviewText(currentPreview) || getPreviewContentKind(currentPreview) === 'image') {
       return;
     }
 
@@ -918,6 +948,18 @@
     if (previewSelectionStatus) {
       previewSelectionStatus.textContent = text;
     }
+  }
+
+  function getPreviewText(preview) {
+    return preview && preview.content && typeof preview.content.text === 'string'
+      ? preview.content.text.trim()
+      : '';
+  }
+
+  function getPreviewContentKind(preview) {
+    return preview && preview.content && typeof preview.content.kind === 'string'
+      ? preview.content.kind
+      : 'text';
   }
 
   function updateHandoffCount(count) {

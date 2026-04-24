@@ -1,6 +1,7 @@
 import { strict as assert } from 'assert';
-import { ContextItem } from '../../models/contextItem';
+import { ContextItem, getPreviewText } from '../../models/contextItem';
 import {
+  createMarkdownPreviewContent,
   createFallbackPreview,
   createMailPreview,
   getMailMessageId,
@@ -31,7 +32,7 @@ suite('Item preview', () => {
     }));
 
     assert.equal(preview.source, 'sharepoint');
-    assert.equal(preview.body, 'First paragraph\n\nSecond paragraph');
+    assert.equal(getPreviewText(preview), 'First paragraph\n\nSecond paragraph');
   });
 
   test('creates full mail preview from fetched body', () => {
@@ -52,7 +53,8 @@ suite('Item preview', () => {
     });
 
     assert.equal(preview.subtitle, 'Adele Vance <adele@example.com>');
-    assert.equal(preview.body, 'Hello team,\n\nThis is the full message.');
+    assert.equal(preview.content.kind, 'html');
+    assert.equal(getPreviewText(preview), 'Hello team,\n\nThis is the full message.');
     assert.equal(getMailMessageId(item), 'abc123');
   });
 
@@ -60,7 +62,7 @@ suite('Item preview', () => {
     const item = makeItem({ source: 'teams', snippet: 'Short summary from Teams' });
     const preview = createFallbackPreview(item);
 
-    assert.equal(preview.body, 'Short summary from Teams');
+    assert.equal(getPreviewText(preview), 'Short summary from Teams');
   });
 
   test('includes OneNote hierarchy in preview subtitle when available', () => {
@@ -75,7 +77,7 @@ suite('Item preview', () => {
     }));
 
     assert.equal(preview.subtitle, 'Architecture · Engineering wiki');
-    assert.equal(preview.body, 'Page preview');
+    assert.equal(getPreviewText(preview), 'Page preview');
   });
 
   test('includes Planner metadata in preview subtitle when available', () => {
@@ -90,7 +92,7 @@ suite('Item preview', () => {
     }));
 
     assert.equal(preview.subtitle, 'Release train · Ready');
-    assert.equal(preview.body, 'Task description');
+    assert.equal(getPreviewText(preview), 'Task description');
   });
 
   test('includes To Do metadata in preview subtitle when available', () => {
@@ -105,6 +107,14 @@ suite('Item preview', () => {
     }));
 
     assert.equal(preview.subtitle, 'Personal · notStarted');
-    assert.equal(preview.body, 'Need milk and fruit');
+    assert.equal(getPreviewText(preview), 'Need milk and fruit');
+  });
+
+  test('renders markdown preview content as sanitized html', async () => {
+    const preview = await createMarkdownPreviewContent('# Title\n\n- First\n- Second');
+
+    assert.equal(preview.kind, 'html');
+    assert.ok(preview.html.includes('<h1>Title</h1>'));
+    assert.equal(preview.text, 'Title\n\n• First\n\n• Second');
   });
 });
