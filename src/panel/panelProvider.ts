@@ -16,9 +16,8 @@ import { createConversation, sendMessage } from '../adapters/chatAdapter';
 import { ContextItem } from '../models/contextItem';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
 import { buildSearchSummary } from './searchSummary';
-import { createFallbackPreview, createMailPreview, getMailMessageId } from './itemPreview';
 import { buildHandoffSnippetDraft } from './handoffSelection';
-import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from '../adapters/graphClient';
+import { resolvePreview } from './previewResolver';
 
 interface SearchResult {
   source: string;
@@ -345,29 +344,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     this.postMessage({ type: 'previewStart', item });
 
     try {
-      let preview = createFallbackPreview(item);
-
-      if (item.source === 'mail') {
-        let token: string;
-        try {
-          token = await this.authProvider.getAccessToken();
-        } catch (err) {
-          this.postMessage({
-            type: 'previewError',
-            message: err instanceof Error ? err.message : 'Authentication required for preview.'
-          });
-          return;
-        }
-
-        const messageId = getMailMessageId(item);
-        if (messageId) {
-          const url = `${GRAPH_BASE}/v1.0/me/messages/${encodeURIComponent(messageId)}?$select=body`;
-          const response = await graphFetchWithRetry(url, token, { method: 'GET' });
-          const data = await handleGraphResponse(response) as { body?: { contentType?: string; content?: string } };
-          preview = createMailPreview(item, data);
-        }
-      }
-
+      const preview = await resolvePreview(item, async () => this.authProvider.getAccessToken());
       this.postMessage({ type: 'previewContent', preview });
     } catch (err) {
       this.postMessage({

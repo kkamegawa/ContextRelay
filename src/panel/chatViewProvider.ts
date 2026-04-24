@@ -1,7 +1,6 @@
 import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 import { askCopilot } from '../adapters/chatAdapter';
-import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from '../adapters/graphClient';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
 import { searchMail } from '../adapters/mailAdapter';
 import { searchOneNote } from '../adapters/onenoteAdapter';
@@ -12,13 +11,13 @@ import { searchTodo } from '../adapters/todoAdapter';
 import { AuthProvider } from '../auth/authProvider';
 import { CacheStore } from '../cache/cacheStore';
 import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
-import { type ContextItem, type ContextSource, getContextItemKey } from '../models/contextItem';
+import { type ContextItem, type ContextSource, type ResolvedPreview, getContextItemKey } from '../models/contextItem';
 import { getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
 import { buildAskPrompt } from './askPrompt';
-import { createFallbackPreview, createMailPreview, getMailMessageId } from './itemPreview';
-import { buildPreviewDocument } from './openResult';
+import { buildPreviewWebviewHtml } from './openResult';
 import { detectOutputLanguage } from './outputLanguage';
+import { resolvePreview } from './previewResolver';
 import { buildSearchSummary, type SearchSummaryResult } from './searchSummary';
 import { type HostToWebviewMessage, type WebviewToHostMessage } from './types';
 import { CHAT_EDITOR_PANEL_ID, CHAT_VIEW_ID } from './chatViewConstants';
@@ -49,6 +48,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private static readonly MAX_TRANSCRIPT_LENGTH = 200;
   private transcript: HostToWebviewMessage[] = [];
   private editorPanel?: vscode.WebviewPanel;
+  private previewPanel?: vscode.WebviewPanel;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -547,24 +547,40 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    let preview = createFallbackPreview(item);
+    const preview = await resolvePreview(item, async () => this.authProvider.getAccessToken());
+    this.showPreviewPanel(preview);
+  }
 
-    if (item.source === 'mail') {
-      const token = await this.authProvider.getAccessToken();
-      const messageId = getMailMessageId(item);
-      if (messageId) {
-        const url = `${GRAPH_BASE}/v1.0/me/messages/${encodeURIComponent(messageId)}?$select=body`;
-        const response = await graphFetchWithRetry(url, token, { method: 'GET' });
-        const data = await handleGraphResponse(response) as { body?: { contentType?: string; content?: string } };
-        preview = createMailPreview(item, data);
-      }
+  private showPreviewPanel(preview: ResolvedPreview): void {
+    const existingPanel = this.previewPanel;
+    if (existingPanel) {
+      existingPanel.title = `ContextRelay Preview: ${preview.title}`;
+      existingPanel.webview.html = buildPreviewWebviewHtml(preview, existingPanel.webview.cspSource);
+      existingPanel.reveal(vscode.ViewColumn.Active);
+      return;
     }
 
-    const doc = await vscode.workspace.openTextDocument({
-      language: 'markdown',
-      content: buildPreviewDocument(preview)
-    });
-    await vscode.window.showTextDocument(doc, { preview: false });
+    const panel = vscode.window.createWebviewPanel(
+      'contextRelay.preview',
+      `ContextRelay Preview: ${preview.title}`,
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: false,
+        retainContextWhenHidden: true
+      }
+    );
+
+    this.previewPanel = panel;
+    panel.webview.html = buildPreviewWebviewHtml(preview, panel.webview.cspSource);
+    panel.onDidDispose(
+      () => {
+        if (this.previewPanel === panel) {
+          this.previewPanel = undefined;
+        }
+      },
+      undefined,
+      this.context.subscriptions
+    );
   }
 
   private async fetchResults(

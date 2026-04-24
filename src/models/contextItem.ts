@@ -23,10 +23,15 @@ export interface ContextItem {
   raw?: unknown;
 }
 
+export type PreviewContent =
+  | { kind: 'text'; text: string }
+  | { kind: 'html'; text: string; html: string }
+  | { kind: 'image'; text: string; src: string; alt?: string };
+
 export interface ResolvedPreview {
   source: ContextSource;
   title: string;
-  body: string;
+  content: PreviewContent;
   subtitle?: string;
   timestamp?: string;
   relevance?: number;
@@ -44,6 +49,10 @@ const INTERNAL_PREVIEW_SOURCES = new Set<ContextSource>(['planner', 'todo']);
 
 export function canOpenResult(item: Pick<ContextItem, 'source' | 'url'>): boolean {
   return Boolean(item.url?.trim()) || INTERNAL_PREVIEW_SOURCES.has(item.source);
+}
+
+export function getPreviewText(preview: Pick<ResolvedPreview, 'content'>): string {
+  return preview.content.text;
 }
 
 /**

@@ -1,4 +1,5 @@
-import { ContextItem, ResolvedPreview } from '../models/contextItem';
+import sanitizeHtml from 'sanitize-html';
+import { ContextItem, PreviewContent, ResolvedPreview } from '../models/contextItem';
 
 interface MailItemRaw {
   messageId?: string;
@@ -42,6 +43,25 @@ interface MailBodyResponse {
   };
 }
 
+const EMPTY_PREVIEW_TEXT = 'No preview text is available for this item yet.';
+const SANITIZE_ALLOWED_TAGS = Array.from(new Set([
+  ...sanitizeHtml.defaults.allowedTags,
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'hr',
+  'table',
+  'thead',
+  'tbody',
+  'tfoot',
+  'tr',
+  'th',
+  'td'
+]));
+
 export function createFallbackPreview(item: ContextItem): ResolvedPreview {
   const body = getFallbackBody(item);
 
@@ -56,7 +76,7 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
         source: item.source,
         title: item.title,
         subtitle: senderText || undefined,
-        body,
+        content: createTextPreviewContent(body),
         timestamp: item.timestamp,
         url: item.url
       };
@@ -68,7 +88,7 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
         source: item.source,
         title: item.title,
         subtitle: subtitle || undefined,
-        body,
+        content: createTextPreviewContent(body),
         timestamp: item.timestamp,
         url: item.url
       };
@@ -80,7 +100,7 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
         source: item.source,
         title: item.title,
         subtitle: subtitle || undefined,
-        body,
+        content: createTextPreviewContent(body),
         timestamp: item.timestamp,
         url: item.url
       };
@@ -92,7 +112,7 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
         source: item.source,
         title: item.title,
         subtitle: subtitle || undefined,
-        body,
+        content: createTextPreviewContent(body),
         timestamp: item.timestamp,
         url: item.url
       };
@@ -104,7 +124,7 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
         source: item.source,
         title: item.title,
         subtitle: subtitle || undefined,
-        body,
+        content: createTextPreviewContent(body),
         timestamp: item.timestamp,
         url: item.url
       };
@@ -115,7 +135,7 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
       return {
         source: item.source,
         title: item.title,
-        body,
+        content: createTextPreviewContent(body),
         timestamp: item.timestamp,
         relevance: item.relevance,
         url: item.url
@@ -124,7 +144,7 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
       return {
         source: item.source,
         title: item.title,
-        body,
+        content: createTextPreviewContent(body),
         timestamp: item.timestamp,
         url: item.url
       };
@@ -134,20 +154,82 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
 export function createMailPreview(item: ContextItem, mailBody?: MailBodyResponse): ResolvedPreview {
   const fallback = createFallbackPreview(item);
   const raw = asMailItemRaw(item.raw);
-  const body = extractMailBody(mailBody) || fallback.body;
   const subtitle = [raw?.senderName, raw?.senderAddress ? `<${raw.senderAddress}>` : undefined]
     .filter(Boolean)
     .join(' ');
+  const body = mailBody?.body?.content ?? '';
+  const content = body
+    ? (mailBody?.body?.contentType === 'html'
+        ? createHtmlPreviewContent(body, fallback.content.text)
+        : createTextPreviewContent(body))
+    : fallback.content;
 
   return {
     ...fallback,
     subtitle: subtitle || fallback.subtitle,
-    body
+    content
   };
 }
 
 export function getMailMessageId(item: ContextItem): string | undefined {
   return asMailItemRaw(item.raw)?.messageId?.trim() || undefined;
+}
+
+export function createTextPreviewContent(value: string): PreviewContent {
+  const text = normalizePreviewText(value) || EMPTY_PREVIEW_TEXT;
+  return { kind: 'text', text };
+}
+
+export function createHtmlPreviewContent(value: string, fallbackText = ''): PreviewContent {
+  const html = sanitizePreviewHtml(value);
+  const text = normalizePreviewText(html, true) || normalizePreviewText(fallbackText) || EMPTY_PREVIEW_TEXT;
+
+  if (!html) {
+    return { kind: 'text', text };
+  }
+
+  return { kind: 'html', text, html };
+}
+
+export async function createMarkdownPreviewContent(value: string): Promise<PreviewContent> {
+  const markdown = normalizeDownloadedText(value);
+  if (!markdown) {
+    return createTextPreviewContent('');
+  }
+
+  const { marked } = await import('marked');
+  const rendered = marked.parse(markdown, { breaks: true, gfm: true });
+  return createHtmlPreviewContent(typeof rendered === 'string' ? rendered : String(rendered), markdown);
+}
+
+export function createStructuredTextPreviewContent(value: string): PreviewContent {
+  const text = normalizeDownloadedText(value);
+  if (!text) {
+    return createTextPreviewContent('');
+  }
+
+  return createHtmlPreviewContent(renderTextPreviewHtml(text), text);
+}
+
+export function createImagePreviewContent(src: string, options?: { text?: string; alt?: string }): PreviewContent {
+  return {
+    kind: 'image',
+    src,
+    alt: options?.alt,
+    text: normalizePreviewText(options?.text ?? '') || EMPTY_PREVIEW_TEXT
+  };
+}
+
+export function renderTextPreviewHtml(value: string): string {
+  const normalized = normalizeDownloadedText(value);
+  if (!normalized) {
+    return '';
+  }
+
+  return normalized
+    .split(/\n{2,}/)
+    .map(block => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
 }
 
 function getFallbackBody(item: ContextItem): string {
@@ -194,14 +276,6 @@ function getFallbackBody(item: ContextItem): string {
   return normalizePreviewText(item.snippet) || 'No preview text is available for this item yet.';
 }
 
-function extractMailBody(mailBody?: MailBodyResponse): string {
-  if (!mailBody?.body?.content) {
-    return '';
-  }
-
-  return normalizePreviewText(mailBody.body.content, mailBody.body.contentType === 'html');
-}
-
 export function normalizePreviewText(value: string, isHtml = false): string {
   if (!value?.trim()) {
     return '';
@@ -230,6 +304,41 @@ export function normalizePreviewText(value: string, isHtml = false): string {
     .trim();
 
   return normalized;
+}
+
+export function normalizeDownloadedText(value: string): string {
+  return value
+    .replace(/\uFEFF/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+export function sanitizePreviewHtml(value: string): string {
+  if (!value?.trim()) {
+    return '';
+  }
+
+  return sanitizeHtml(value, {
+    allowedTags: SANITIZE_ALLOWED_TAGS,
+    allowedAttributes: {
+      a: ['href', 'target', 'rel'],
+      td: ['colspan', 'rowspan'],
+      th: ['colspan', 'rowspan']
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    transformTags: {
+      a: (_tagName: string, attribs: Record<string, string>) => ({
+        tagName: 'a',
+        attribs: {
+          href: attribs.href,
+          target: '_blank',
+          rel: 'noreferrer noopener'
+        }
+      })
+    }
+  }).trim();
 }
 
 function decodeHtmlEntities(value: string): string {
@@ -266,4 +375,13 @@ function asTodoItemRaw(raw: unknown): TodoItemRaw | undefined {
 
 function asRetrievalItemRaw(raw: unknown): RetrievalItemRaw | undefined {
   return raw && typeof raw === 'object' ? raw as RetrievalItemRaw : undefined;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

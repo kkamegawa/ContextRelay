@@ -778,8 +778,6 @@ body {
 }
 
 .preview-body {
-  white-space: pre-wrap;
-  word-break: break-word;
   line-height: 1.55;
   font-size: 13px;
   color: var(--vscode-foreground);
@@ -787,6 +785,58 @@ body {
   border: 1px solid var(--cr-panel-border);
   border-radius: 16px;
   padding: var(--cr-spacing-lg);
+  overflow-x: auto;
+}
+
+.preview-body:not(.preview-body-html):not(.preview-body-image) {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-body-html :first-child {
+  margin-top: 0;
+}
+
+.preview-body-html :last-child {
+  margin-bottom: 0;
+}
+
+.preview-body-html table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.preview-body-html th,
+.preview-body-html td {
+  border: 1px solid var(--cr-panel-border);
+  padding: 6px 8px;
+  vertical-align: top;
+}
+
+.preview-body-html pre,
+.preview-body-html code {
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.preview-body-image {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cr-spacing-md);
+}
+
+.preview-image {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--cr-panel-border);
+  background: var(--vscode-editor-background);
+}
+
+.preview-image-caption {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .preview-empty {
