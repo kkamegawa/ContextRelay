@@ -100,6 +100,20 @@ suite('CommandRouter', () => {
     assert.deepEqual(result.sourceCommands, []);
   });
 
+  test('prototype-like operation command falls back to a normal search query', () => {
+    const result = parseCommand('/__proto__ incident review');
+    assert.equal(result.target, 'all');
+    assert.equal(result.query, '/__proto__ incident review');
+    assert.deepEqual(result.sourceCommands, []);
+  });
+
+  test('prototype-like scoped command does not route through inherited metadata keys', () => {
+    const result = parseCommand('/mail /constructor incident review');
+    assert.equal(result.target, 'all');
+    assert.equal(result.query, '/mail /constructor incident review');
+    assert.deepEqual(result.sourceCommands, []);
+  });
+
   test('mixing /all with scoped commands falls back to /all query text', () => {
     const result = parseCommand('/all /mail architecture decisions');
     assert.equal(result.target, 'all');

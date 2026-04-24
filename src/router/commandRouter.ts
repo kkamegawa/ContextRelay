@@ -42,6 +42,10 @@ const OPERATION_COMMANDS: Record<string, RouteTarget> = {
   clear: 'clear'
 };
 
+function hasOwnKey<T extends object>(record: T, key: PropertyKey): key is keyof T {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
 function normalizeQuery(input: string): string {
   return input.replace(/\s+/g, ' ').trim();
 }
@@ -63,7 +67,7 @@ export function parseCommand(input: string): ParsedCommand {
 
   const commandMatch = trimmed.match(/^\/(\S+)(?:\s+([\s\S]*))?$/);
   const firstCommand = commandMatch?.[1]?.toLowerCase() ?? trimmed.slice(1).toLowerCase();
-  if (firstCommand in OPERATION_COMMANDS) {
+  if (hasOwnKey(OPERATION_COMMANDS, firstCommand)) {
     const rawQuery = commandMatch?.[2] ?? '';
     const target = OPERATION_COMMANDS[firstCommand];
     const query = target === 'ask' ? rawQuery.trim() : '';
@@ -96,10 +100,11 @@ export function parseCommand(input: string): ParsedCommand {
       continue;
     }
 
-    const commandName = token.slice(1).toLowerCase() as SearchCommandName;
-    if (!(commandName in SEARCH_COMMAND_METADATA)) {
+    const rawCommandName = token.slice(1).toLowerCase();
+    if (!hasOwnKey(SEARCH_COMMAND_METADATA, rawCommandName)) {
       return buildFallbackQuery(normalized);
     }
+    const commandName = rawCommandName;
 
     if (commandName === 'all') {
       if (commandNames.length > 0) {

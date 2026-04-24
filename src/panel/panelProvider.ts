@@ -308,7 +308,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     const summarySources = runAll && config.get<boolean>('adapters.connectors', false)
       ? [...parsed.targetSources, 'connectors']
       : parsed.targetSources;
-    this.latestSearchSummary = buildSearchSummary(query, results, summarySources);
+    this.latestSearchSummary = buildSearchSummary(parsed.query, results, summarySources);
 
     this.postMessage({ type: 'searchResults', results });
   }
