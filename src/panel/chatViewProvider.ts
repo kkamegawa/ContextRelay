@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import * as vscode from 'vscode';
-import { askCopilot } from '../adapters/chatAdapter';
+import { createConversation, sendMessage } from '../adapters/chatAdapter';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
 import { searchMail } from '../adapters/mailAdapter';
 import { searchOneNote } from '../adapters/onenoteAdapter';
@@ -14,7 +14,7 @@ import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
 import { type ContextItem, type ContextSource, type ResolvedPreview, getContextItemKey } from '../models/contextItem';
 import { getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
-import { buildAskPrompt } from './askPrompt';
+import { buildChatContextPayload } from './chatContext';
 import { buildPreviewWebviewHtml } from './openResult';
 import { detectOutputLanguage } from './outputLanguage';
 import { resolvePreview } from './previewResolver';
@@ -47,6 +47,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private readonly hosts = new Map<ChatHostKind, ChatHostSession>();
   private static readonly MAX_TRANSCRIPT_LENGTH = 200;
   private transcript: HostToWebviewMessage[] = [];
+  private currentConversationId?: string;
   private editorPanel?: vscode.WebviewPanel;
   private previewPanel?: vscode.WebviewPanel;
 
@@ -122,7 +123,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   public clearChat(): void {
+    this.resetChatState();
+  }
+
+  private resetChatState(): void {
+    this.snippetStore.clear();
+    this.latestSearchSummary = undefined;
+    this.currentConversationId = undefined;
     this.postMessage({ command: 'clearChat' });
+    this.sendPinnedItems();
   }
 
   public clearCache(): void {
@@ -212,6 +221,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'copySnippet':
         await this.handleCopySnippet(message.text);
         break;
+      case 'applyAssistantResult':
+        await this.handleApplyAssistantResult(message.action, message.text);
+        break;
       case 'pinSnippet':
         await this.handlePinSnippet(message.item);
         break;
@@ -236,6 +248,53 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     await vscode.env.clipboard.writeText(text);
     vscode.window.showInformationMessage('ContextRelay: Text copied to clipboard.');
+  }
+
+  private async handleApplyAssistantResult(action: 'copy' | 'append' | 'replace', text: string): Promise<void> {
+    if (!text?.trim()) {
+      vscode.window.showWarningMessage('ContextRelay: There is no assistant result to apply.');
+      return;
+    }
+
+    if (action === 'copy') {
+      await vscode.env.clipboard.writeText(text);
+      vscode.window.showInformationMessage('ContextRelay: Copilot response copied to clipboard.');
+      return;
+    }
+
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      vscode.window.showErrorMessage('ContextRelay: Open an editor before appending or replacing content.');
+      return;
+    }
+
+    const editApplied = await editor.edit(editBuilder => {
+      if (action === 'append') {
+        editBuilder.insert(editor.selection.active, text);
+        return;
+      }
+
+      const range = editor.selection.isEmpty
+        ? this.getWholeDocumentRange(editor.document)
+        : editor.selection;
+      editBuilder.replace(range, text);
+    });
+
+    if (!editApplied) {
+      vscode.window.showErrorMessage('ContextRelay: Failed to update the active editor.');
+      return;
+    }
+
+    vscode.window.showInformationMessage(
+      action === 'append'
+        ? 'ContextRelay: Copilot response appended to the active editor.'
+        : 'ContextRelay: Copilot response replaced the active editor content.'
+    );
+  }
+
+  private getWholeDocumentRange(document: vscode.TextDocument): vscode.Range {
+    const lastLine = document.lineAt(Math.max(0, document.lineCount - 1));
+    return new vscode.Range(new vscode.Position(0, 0), lastLine.range.end);
   }
 
   private async handlePinSnippet(item: ContextItem): Promise<void> {
@@ -327,6 +386,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     if (parsed.target === 'ask') {
       await this.handleAskCommand(parsed.query);
+      return;
+    }
+
+    if (parsed.target === 'chat') {
+      await this.handlePlainChat(parsed.query);
       return;
     }
 
@@ -431,10 +495,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private handleClearCommand(): void {
     const hadSnippets = this.snippetStore.getAll().length > 0;
-    this.snippetStore.clear();
-    this.latestSearchSummary = undefined;
-    this.postMessage({ command: 'clearChat' });
-    this.sendPinnedItems();
+    this.resetChatState();
     const text = hadSnippets
       ? 'Chat cleared. All pinned snippets discarded.'
       : 'Chat cleared.';
@@ -460,6 +521,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    await this.handleCopilotChat(prompt, 'ask', true);
+  }
+
+  private async handlePlainChat(prompt: string): Promise<void> {
+    await this.handleCopilotChat(prompt, 'chat', false);
+  }
+
+  private async handleCopilotChat(
+    prompt: string,
+    kind: 'chat' | 'ask',
+    requirePinnedContext: boolean
+  ): Promise<void> {
+    const snippets = this.snippetStore.getAll();
+    if (requirePinnedContext && snippets.length === 0) {
+      const message = 'Pin one or more snippets first to use /ask. The pinned content is sent to Microsoft 365 Copilot as context.';
+      vscode.window.showWarningMessage(`ContextRelay: ${message}`);
+      this.postMessage({
+        command: 'queryError',
+        source: 'all',
+        message,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
     let token: string;
     try {
       token = await this.authProvider.getAccessToken();
@@ -474,25 +560,43 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    this.postMessage({ command: 'loading', source: 'all', isLoading: true });
+    this.postMessage({
+      command: 'loading',
+      source: 'all',
+      isLoading: true,
+      text: 'Thinking...',
+      icon: '🧠'
+    });
 
     try {
-      const fullPrompt = buildAskPrompt(prompt, snippets);
-      const reply = await askCopilot(token, fullPrompt);
-      const { language, content } = detectOutputLanguage(prompt, reply);
+      if (!this.currentConversationId) {
+        this.currentConversationId = await createConversation(token);
+      }
 
-      const doc = await vscode.workspace.openTextDocument({ language, content });
-      await vscode.window.showTextDocument(doc, { preview: false });
+      // Conversation history is preserved by the Copilot Chat API via the
+      // conversation id, so we do not re-send the previous Copilot reply as
+      // additional context. Only explicit user-added context (pinned snippets
+      // and the latest search summary) is forwarded.
+      const contextPayload = buildChatContextPayload({
+        snippets,
+        searchSummary: this.latestSearchSummary
+      });
+      const reply = await sendMessage(token, this.currentConversationId, prompt, contextPayload);
+      if (!reply.trim()) {
+        throw new Error('Microsoft 365 Copilot returned an empty response.');
+      }
 
+      const { content } = detectOutputLanguage(prompt, reply);
       this.postMessage({
         command: 'assistantMessage',
-        kind: 'ask',
-        text: `Microsoft 365 Copilot response opened in a new editor (${language}). ${snippets.length} pinned snippet(s) used as context.`,
+        kind,
+        text: content,
+        contextLabels: contextPayload.labels,
         timestamp: new Date().toISOString()
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`ContextRelay: /ask failed — ${message}`);
+      vscode.window.showErrorMessage(`ContextRelay: Copilot chat failed — ${message}`);
       this.postMessage({
         command: 'queryError',
         source: 'all',
@@ -785,10 +889,41 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       border-bottom-left-radius: 2px;
     }
 
+    .message-text {
+      white-space: pre-wrap;
+    }
+
+    .context-used {
+      margin-top: var(--cr-spacing-xs);
+      font-size: 0.75em;
+      color: var(--vscode-descriptionForeground);
+    }
+
     .message .timestamp {
       font-size: 0.75em;
       opacity: 0.6;
       margin-top: var(--cr-spacing-xs);
+    }
+
+    .assistant-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--cr-spacing-xs);
+      margin-top: var(--cr-spacing-sm);
+    }
+
+    .assistant-actions button {
+      background: none;
+      border: 1px solid var(--vscode-button-secondaryBackground, var(--vscode-input-border, #555));
+      color: var(--vscode-foreground);
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 0.8em;
+      cursor: pointer;
+    }
+
+    .assistant-actions button:hover {
+      background: var(--vscode-list-hoverBackground);
     }
 
     .result-card {
@@ -940,6 +1075,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       color: var(--vscode-input-placeholderForeground);
     }
 
+    #promptInput:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      background: var(--vscode-input-background);
+      color: var(--vscode-disabledForeground, var(--vscode-input-placeholderForeground));
+    }
+
     #sendButton {
       width: 32px;
       height: 32px;
@@ -959,8 +1101,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     #sendButton:disabled {
-      opacity: 0.5;
+      background: var(--vscode-button-secondaryBackground, var(--vscode-input-background));
+      color: var(--vscode-disabledForeground, var(--vscode-button-secondaryForeground));
+      border: 1px solid var(--vscode-button-border, var(--vscode-input-border, transparent));
+      opacity: 0.65;
       cursor: not-allowed;
+    }
+
+    #sendButton:disabled:hover {
+      background: var(--vscode-button-secondaryBackground, var(--vscode-input-background));
     }
 
     #inputHint {
@@ -1023,9 +1172,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     <div id="chatArea" role="log" aria-live="polite" aria-label="Chat messages">
       <div class="welcome" id="welcome">
         <h2>ContextRelay</h2>
-        <p>Search Microsoft 365 context with slash commands.</p>
-        <p style="font-size: 0.8em;">Type <code>/</code> for available commands, or enter a keyword to search all sources.</p>
-        <p style="font-size: 0.8em;">Pin snippets and run <code>/ask</code> to process them with Microsoft 365 Copilot and open the result in a new editor.</p>
+        <p>Chat with Microsoft 365 Copilot, or search Microsoft 365 context with slash commands.</p>
+        <p style="font-size: 0.8em;">Type <code>/</code> for source search commands. Plain text starts or continues chat.</p>
+        <p style="font-size: 0.8em;">Pin snippets and run <code>/ask</code> to process them with Microsoft 365 Copilot in the panel.</p>
       </div>
     </div>
 
@@ -1036,19 +1185,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         <textarea
           id="promptInput"
           rows="1"
-          placeholder="Search M365 context... (type / for commands)"
-          aria-label="Search query input"
+          placeholder="Ask Copilot, or type / for source search"
+          aria-label="Copilot chat or source search input"
           aria-haspopup="listbox"
           aria-controls="slashMenu"
         ></textarea>
-        <button id="sendButton" aria-label="Send query" title="Send">
+        <button id="sendButton" aria-label="Send message" title="Send">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M1 1.91L7.2 8 1 14.09 1.91 15 9 8 1.91 1z"/>
             <path d="M7 1.91L13.2 8 7 14.09 7.91 15 15 8 7.91 1z"/>
           </svg>
         </button>
       </div>
-      <div id="inputHint">Press Enter to send • Shift+Enter for new line • Type / for commands</div>
+      <div id="inputHint">Press Enter to send • Shift+Enter for new line • Type / for source search commands</div>
     </div>
   </div>
 

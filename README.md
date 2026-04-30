@@ -1,12 +1,13 @@
 # ContextRelay
 
-ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. It provides keyword-first search across Exchange mail, Teams messages, SharePoint sites, OneDrive, OneNote, and Planner tasks — with optional source targeting via slash commands. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
+ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. Plain text starts a Microsoft 365 Copilot chat without automatically attaching ContextRelay search context, while slash commands search Exchange mail, Teams messages, SharePoint sites, OneDrive, OneNote, and Planner tasks. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
 
 ---
 
 ## Features
 
-- **Keyword-first search** -- Search across all connected Microsoft 365 sources with a single query.
+- **Plain Copilot chat** -- Type without a slash command to chat directly with Microsoft 365 Copilot in the panel.
+- **Explicit source search** -- Search across connected Microsoft 365 sources with slash commands.
 - **Source targeting via slash commands** -- Narrow results to a specific source instantly.
 
 | Command | Source |
@@ -17,8 +18,8 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/onedrive <query>` | OneDrive files |
 | `/onenote <query>` | OneNote pages |
 | `/task <query>` | Planner and Microsoft To Do tasks |
-| `/all <query>` | All enabled sources (same as no prefix) |
-| `/ask <instruction>` | Send pinned snippets to Microsoft 365 Copilot and open the reply in a new editor |
+| `/all <query>` | All enabled sources |
+| `/ask <instruction>` | Send pinned snippets to Microsoft 365 Copilot and show the reply in the panel |
 | `/clear` | Clear the chat transcript and discard all pinned snippets |
 
 - **Snippet pinning** -- Save any search result as a named snippet, visible across sessions.
@@ -299,7 +300,7 @@ If you want the smallest possible setup, use one of these patterns.
 - Suitable for:
   - `/mail ...`
   - `/teams ...`
-  - bare query across Mail + Teams
+  - `/all ...` across Mail + Teams
 
 **Pattern 3 — SharePoint / OneDrive search**
 
@@ -501,19 +502,21 @@ from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
 
 On first use, VS Code prompts you to sign in using the built-in Microsoft authentication provider.
 
-### Searching
+### Chatting and Searching
 
-Type a keyword in the search box and press **Enter** to search all enabled sources simultaneously. Results are grouped by source section (Mail / Teams / SharePoint / OneDrive).
+Type a normal message without a slash command and press **Enter** to start or continue a Microsoft 365 Copilot chat. ContextRelay does not automatically search or attach source results for plain chat messages. The response stays in the panel and offers explicit actions to **Copy**, **Append** to the active editor, or **Replace** the active selection/document.
 
-To target a specific source, prefix your query with a slash command:
+To search Microsoft 365 sources, prefix your query with a slash command:
 
 ```
+/all architecture decisions
 /mail project kickoff notes
 /teams sprint review decisions
 /sharepoint API design document
 /onedrive architecture diagram
-/ask Translate the pinned documents into Japanese as markdown
 ```
+
+After you pin snippets or run a search, later chat turns can continue in the same Copilot conversation with that explicit ContextRelay context. The latest visible generated result is also treated as panel context for follow-up turns unless you clear the chat.
 
 ### Building a Handoff from Search Results
 
@@ -554,7 +557,7 @@ Attach `HANDOFF.md` in Copilot Chat using VS Code's context mechanisms (#-mentio
 
 ### `/ask` — Process pinned snippets with Microsoft 365 Copilot
 
-Use `/ask` to let **Microsoft 365 Copilot** (not GitHub Copilot) process your currently pinned snippets and write the answer into a brand-new editor tab.
+Use `/ask` to let **Microsoft 365 Copilot** (not GitHub Copilot) process your currently pinned snippets and show the answer in the ContextRelay panel.
 
 1. Pin one or more documents (`.docx`, SharePoint / OneDrive files, mail, Teams messages). ContextRelay hydrates full document text where possible.
 2. In the chat input, type `/ask` followed by your instruction, for example:
@@ -565,7 +568,7 @@ Use `/ask` to let **Microsoft 365 Copilot** (not GitHub Copilot) process your cu
   /ask Extract every action item as JSON with fields owner, due, task.
   ```
 
-3. ContextRelay sends the pinned content plus your instruction to Microsoft 365 Copilot and opens the response in a new untitled editor. The editor language is auto-detected from the response format (markdown, JSON, HTML, YAML, TypeScript, etc.), so you can save the file with the right extension.
+3. ContextRelay sends the pinned content plus your instruction to Microsoft 365 Copilot and renders the response in the panel. Use the response actions to copy it, append it at the active editor cursor, or replace the active selection/document.
 
 If no snippets are pinned, `/ask` is aborted with a warning. Because this feature relies on the Microsoft 365 Copilot API (preview), you must have a Microsoft 365 Copilot license on the signed-in account and `contextRelay.enableChatPreview` enabled.
 

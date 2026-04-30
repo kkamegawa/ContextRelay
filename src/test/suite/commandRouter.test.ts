@@ -2,11 +2,13 @@ import { strict as assert } from 'assert';
 import { parseCommand, getHelpText } from '../../router/commandRouter';
 
 suite('CommandRouter', () => {
-  test('bare query routes to all', () => {
+  test('bare query routes to chat without source context', () => {
     const result = parseCommand('architecture decisions');
-    assert.equal(result.target, 'all');
+    assert.equal(result.target, 'chat');
     assert.equal(result.query, 'architecture decisions');
     assert.equal(result.isEmpty, false);
+    assert.deepEqual(result.targetSources, []);
+    assert.equal(result.searchScope, 'operation');
   });
 
   test('/mail command routes to mail', () => {
@@ -58,7 +60,7 @@ suite('CommandRouter', () => {
 
   test('bare multiline query is normalized', () => {
     const result = parseCommand('LendHub_Requirements\nDocument\tFictional.docx');
-    assert.equal(result.target, 'all');
+    assert.equal(result.target, 'chat');
     assert.equal(result.query, 'LendHub_Requirements Document Fictional.docx');
     assert.equal(result.isEmpty, false);
   });
@@ -150,7 +152,7 @@ suite('CommandRouter', () => {
   test('empty input is isEmpty', () => {
     const result = parseCommand('');
     assert.equal(result.isEmpty, true);
-    assert.equal(result.target, 'all');
+    assert.equal(result.target, 'chat');
   });
 
   test('whitespace-only input is isEmpty', () => {
@@ -196,6 +198,12 @@ suite('CommandRouter', () => {
   test('getHelpText for ask mentions Microsoft 365 Copilot', () => {
     const text = getHelpText('ask');
     assert.ok(text.toLowerCase().includes('microsoft 365 copilot'));
+  });
+
+  test('getHelpText for all explains plain text is chat', () => {
+    const text = getHelpText('all');
+    assert.ok(text.toLowerCase().includes('plain text'));
+    assert.ok(text.toLowerCase().includes('chat'));
   });
 
   test('/clear command routes to clear with empty query but is not isEmpty', () => {

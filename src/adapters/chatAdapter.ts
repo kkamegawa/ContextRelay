@@ -10,6 +10,21 @@ export interface ChatConversation {
   messages: ChatMessage[];
 }
 
+export interface CopilotContextMessage {
+  text: string;
+  description?: string;
+}
+
+export interface CopilotContextualResources {
+  files?: { uri: string }[];
+  webContext?: { isWebEnabled: boolean };
+}
+
+export interface SendMessageOptions {
+  additionalContext?: CopilotContextMessage[];
+  contextualResources?: CopilotContextualResources;
+}
+
 interface CreateConversationResponse {
   id?: string;
 }
@@ -55,16 +70,36 @@ export async function createConversation(token: string): Promise<string> {
 export async function sendMessage(
   token: string,
   conversationId: string,
-  message: string
+  message: string,
+  options: SendMessageOptions = {}
 ): Promise<string> {
   // Microsoft 365 Copilot Chat API (preview):
   // POST /beta/copilot/conversations/{conversationId}/chat
   // See: https://learn.microsoft.com/microsoft-365/copilot/extensibility/api/ai-services/chat/copilotconversation-chat
   const url = `${GRAPH_BASE}/beta/copilot/conversations/${conversationId}/chat`;
-  const body = JSON.stringify({
+  const requestBody: {
+    message: { text: string };
+    locationHint: { timeZone: string };
+    additionalContext?: CopilotContextMessage[];
+    contextualResources?: CopilotContextualResources;
+  } = {
     message: { text: message },
     locationHint: { timeZone: resolveTimeZone() }
-  });
+  };
+
+  if (options.additionalContext && options.additionalContext.length > 0) {
+    requestBody.additionalContext = options.additionalContext;
+  }
+
+  const contextualResources = options.contextualResources;
+  if (
+    contextualResources &&
+    ((contextualResources.files && contextualResources.files.length > 0) || contextualResources.webContext)
+  ) {
+    requestBody.contextualResources = contextualResources;
+  }
+
+  const body = JSON.stringify(requestBody);
 
   const response = await graphFetchWithRetry(url, token, { method: 'POST', body });
   const data = await handleGraphResponse(response) as ChatResponse;

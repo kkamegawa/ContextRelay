@@ -40,13 +40,20 @@ export interface CopySnippetMessage {
   text: string;
 }
 
+export interface ApplyAssistantResultMessage {
+  command: 'applyAssistantResult';
+  action: 'copy' | 'append' | 'replace';
+  text: string;
+}
+
 export type WebviewToHostMessage =
   | SubmitQueryMessage
   | WebviewReadyMessage
   | PinSnippetMessage
   | OpenLinkMessage
   | OpenItemMessage
-  | CopySnippetMessage;
+  | CopySnippetMessage
+  | ApplyAssistantResultMessage;
 
 // --- Messages: Extension host → Webview ---
 
@@ -75,6 +82,8 @@ export interface LoadingMessage {
   command: 'loading';
   source: ContextSource | 'all';
   isLoading: boolean;
+  text?: string;
+  icon?: string;
 }
 
 export interface SlashHelpMessage {
@@ -91,7 +100,8 @@ export interface AssistantMessage {
   command: 'assistantMessage';
   text: string;
   timestamp: string;
-  kind?: 'info' | 'ask';
+  kind?: 'info' | 'ask' | 'chat';
+  contextLabels?: string[];
 }
 
 export interface PinnedItemsMessage {
