@@ -13,6 +13,10 @@ export interface ChatContextOptions {
   visibleResult?: string;
 }
 
+function buildTruncationSuffix(omittedChars: number): string {
+  return `\n[truncated ${omittedChars} chars]`;
+}
+
 function truncateToBudget(value: string, budget: number): string {
   if (budget <= 0) {
     return '';
@@ -22,12 +26,17 @@ function truncateToBudget(value: string, budget: number): string {
     return value;
   }
 
-  const suffix = `\n[truncated ${value.length - budget} chars]`;
-  if (suffix.length >= budget) {
-    return suffix.slice(0, budget);
+  let suffix = buildTruncationSuffix(value.length);
+  while (suffix.length < budget) {
+    const prefixLength = budget - suffix.length;
+    const nextSuffix = buildTruncationSuffix(value.length - prefixLength);
+    if (nextSuffix === suffix) {
+      return `${value.slice(0, prefixLength)}${suffix}`;
+    }
+    suffix = nextSuffix;
   }
 
-  return `${value.slice(0, budget - suffix.length)}${suffix}`;
+  return suffix.slice(0, budget);
 }
 
 function isFileContextSnippet(snippet: SavedSnippet): boolean {

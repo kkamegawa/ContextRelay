@@ -61,4 +61,20 @@ suite('chatContext', () => {
     assert.ok(length <= MAX_CHAT_CONTEXT_CHARS);
     assert.ok(payload.additionalContext?.[0].text.includes('truncated'));
   });
+
+  test('reports the number of omitted characters after accounting for the suffix length', () => {
+    const oversizedBody = 'x'.repeat(MAX_CHAT_CONTEXT_CHARS * 2);
+    const payload = buildChatContextPayload({
+      snippets: [snippet('teams', 'huge', oversizedBody)]
+    });
+
+    const text = payload.additionalContext?.[0].text ?? '';
+    const suffixIndex = text.indexOf('\n[truncated ');
+    const match = text.match(/\[truncated (\d+) chars\]$/);
+    assert.ok(suffixIndex > 0);
+    assert.ok(match);
+
+    const original = `Title: huge\nSource: teams\n\n${oversizedBody}`;
+    assert.equal(Number(match?.[1]), original.length - suffixIndex);
+  });
 });

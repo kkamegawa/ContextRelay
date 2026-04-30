@@ -41,6 +41,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = CHAT_VIEW_ID;
 
   private latestSearchSummary?: string;
+  private latestVisibleResult?: string;
   private readonly cache: CacheStore<ContextItem[]>;
   private readonly snippetStore: SnippetStore;
   private readonly docGenerator: DocGenerator;
@@ -129,6 +130,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private resetChatState(): void {
     this.snippetStore.clear();
     this.latestSearchSummary = undefined;
+    this.latestVisibleResult = undefined;
     this.currentConversationId = undefined;
     this.postMessage({ command: 'clearChat' });
     this.sendPinnedItems();
@@ -508,19 +510,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleAskCommand(prompt: string): Promise<void> {
-    const snippets = this.snippetStore.getAll();
-    if (snippets.length === 0) {
-      const message = 'Pin one or more snippets first to use /ask. The pinned content is sent to Microsoft 365 Copilot as context.';
-      vscode.window.showWarningMessage(`ContextRelay: ${message}`);
-      this.postMessage({
-        command: 'queryError',
-        source: 'all',
-        message,
-        timestamp: new Date().toISOString()
-      });
-      return;
-    }
-
     await this.handleCopilotChat(prompt, 'ask', true);
   }
 
@@ -574,12 +563,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       // Conversation history is preserved by the Copilot Chat API via the
-      // conversation id, so we do not re-send the previous Copilot reply as
-      // additional context. Only explicit user-added context (pinned snippets
-      // and the latest search summary) is forwarded.
+      // conversation id, so we only forward explicit ContextRelay context:
+      // pinned snippets, the latest visible generated result, and the latest
+      // search summary.
       const contextPayload = buildChatContextPayload({
         snippets,
-        searchSummary: this.latestSearchSummary
+        searchSummary: this.latestSearchSummary,
+        visibleResult: this.latestVisibleResult
       });
       const reply = await sendMessage(token, this.currentConversationId, prompt, contextPayload);
       if (!reply.trim()) {
@@ -587,6 +577,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       const { content } = detectOutputLanguage(prompt, reply);
+      this.latestVisibleResult = content;
       this.postMessage({
         command: 'assistantMessage',
         kind,
