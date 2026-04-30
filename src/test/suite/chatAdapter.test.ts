@@ -91,6 +91,39 @@ suite('Chat adapter', () => {
     }
   });
 
+  test('sendMessage includes additional context and contextual resources when provided', async () => {
+    const stub = installFetchStub(() => ({
+      status: 200,
+      body: {
+        messages: [
+          { text: 'question' },
+          { text: 'answer' }
+        ]
+      }
+    }));
+    try {
+      const reply = await sendMessage('token-abc', 'conv-123', 'question', {
+        additionalContext: [
+          { description: 'Pinned note', text: 'Important context' }
+        ],
+        contextualResources: {
+          files: [{ uri: 'https://contoso.sharepoint.com/sites/docs/a.docx' }]
+        }
+      });
+
+      assert.equal(reply, 'answer');
+      const body = JSON.parse(String(stub.captured[0].init.body));
+      assert.deepEqual(body.additionalContext, [
+        { description: 'Pinned note', text: 'Important context' }
+      ]);
+      assert.deepEqual(body.contextualResources.files, [
+        { uri: 'https://contoso.sharepoint.com/sites/docs/a.docx' }
+      ]);
+    } finally {
+      stub.restore();
+    }
+  });
+
   test('sendMessage skips echoed prompt when selecting assistant reply', async () => {
     const stub = installFetchStub(() => ({
       status: 200,

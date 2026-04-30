@@ -1,6 +1,7 @@
 import type { ContextSource } from '../models/contextItem';
 
 export type RouteTarget =
+  | 'chat'
   | 'mail'
   | 'teams'
   | 'sharepoint'
@@ -56,12 +57,12 @@ export function parseCommand(input: string): ParsedCommand {
 
   if (!trimmed.startsWith('/')) {
     return {
-      target: 'all',
+      target: 'chat',
       query: normalized,
       isEmpty: normalized.length === 0,
-      targetSources: ALL_SOURCES,
+      targetSources: [],
       sourceCommands: [],
-      searchScope: 'all'
+      searchScope: 'operation'
     };
   }
 
@@ -183,8 +184,8 @@ export function getHelpText(command: string | readonly SearchCommandName[]): str
     onenote: 'Example: /onenote architecture decision log\nExample: /onenote section notebook architecture',
     planner: 'Example: /task release checklist\nExample: /task metadata comments onboarding',
     task: 'Example: /task release checklist\nExample: /task metadata comments onboarding',
-    all: 'Example: /all architecture decisions\nExample: /mail /onedrive architecture decisions\nOr just type a query without a slash command.',
-    ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is opened in a new editor tab.',
+    all: 'Example: /all architecture decisions\nExample: /mail /onedrive architecture decisions\nPlain text without a slash command starts or continues a Microsoft 365 Copilot chat.',
+    ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is shown in the panel.',
     clear: 'Example: /clear\nClears the current chat transcript and discards all pinned snippets.'
   };
   return examples[commandName] ?? 'Type a query to search Microsoft 365 content.';

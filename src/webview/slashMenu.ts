@@ -20,8 +20,8 @@ const SLASH_ITEMS: SlashMenuItem[] = [
   { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: getSourceTextIcon('onedrive'), sourceIcon: 'onedrive' },
   { command: '/onenote', label: '/onenote', description: 'Search OneNote pages', icon: getSourceTextIcon('onenote'), sourceIcon: 'onenote' },
   { command: '/task', label: '/task', description: 'Search Planner and Microsoft To Do tasks', icon: getSourceTextIcon('todo'), sourceIcon: 'todo' },
-  { command: '/all', label: '/all', description: 'Search all sources', icon: getSourceTextIcon('all'), sourceIcon: 'all' },
-  { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets', icon: '🤖' },
+  { command: '/all', label: '/all', description: 'Search all sources explicitly', icon: getSourceTextIcon('all'), sourceIcon: 'all' },
+  { command: '/ask', label: '/ask', description: 'Ask Microsoft 365 Copilot using pinned snippets in the panel', icon: '🤖' },
   { command: '/clear', label: '/clear', description: 'Clear chat and discard pinned snippets', icon: '🧹' },
 ];
 

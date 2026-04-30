@@ -130,7 +130,12 @@ export class ChatRenderer {
   /**
    * Render a plain assistant text message (used by /ask for status updates).
    */
-  renderAssistantMessage(text: string, timestamp: string): void {
+  renderAssistantMessage(
+    text: string,
+    timestamp: string,
+    kind?: 'info' | 'ask' | 'chat',
+    contextLabels: string[] = []
+  ): void {
     this.hideWelcome();
 
     const el = document.createElement('div');
@@ -138,8 +143,20 @@ export class ChatRenderer {
     el.setAttribute('role', 'article');
 
     const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
     textDiv.textContent = text;
     el.appendChild(textDiv);
+
+    if (contextLabels.length > 0) {
+      const contextDiv = document.createElement('div');
+      contextDiv.className = 'context-used';
+      contextDiv.textContent = `Context: ${contextLabels.join(', ')}`;
+      el.appendChild(contextDiv);
+    }
+
+    if (kind === 'chat' || kind === 'ask') {
+      el.appendChild(this.buildAssistantActions(text));
+    }
 
     const timeStr = this.formatTime(timestamp);
     if (timeStr) {
@@ -151,6 +168,37 @@ export class ChatRenderer {
 
     this.chatArea.appendChild(el);
     this.scrollToBottom();
+  }
+
+  private buildAssistantActions(text: string): HTMLElement {
+    const actions = document.createElement('div');
+    actions.className = 'assistant-actions';
+
+    const copyBtn = this.buildAssistantActionButton('Copy', 'Copy response', () => {
+      this.vscode.postMessage({ command: 'applyAssistantResult', action: 'copy', text });
+    });
+    actions.appendChild(copyBtn);
+
+    const appendBtn = this.buildAssistantActionButton('Append', 'Append response to the active editor', () => {
+      this.vscode.postMessage({ command: 'applyAssistantResult', action: 'append', text });
+    });
+    actions.appendChild(appendBtn);
+
+    const replaceBtn = this.buildAssistantActionButton('Replace', 'Replace the active selection, or the whole active document if nothing is selected', () => {
+      this.vscode.postMessage({ command: 'applyAssistantResult', action: 'replace', text });
+    });
+    actions.appendChild(replaceBtn);
+
+    return actions;
+  }
+
+  private buildAssistantActionButton(label: string, title: string, onClick: () => void): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.title = title;
+    button.addEventListener('click', onClick);
+    return button;
   }
 
   /**
@@ -226,23 +274,24 @@ export class ChatRenderer {
   /**
    * Show or hide a loading indicator for a source.
    */
-  setLoading(source: string, isLoading: boolean): void {
+  setLoading(source: string, isLoading: boolean, message?: string, icon?: string): void {
     if (isLoading) {
       this.hideWelcome();
 
       const el = document.createElement('div');
       el.className = 'loading';
-      el.setAttribute('aria-label', `Loading ${getSourceLabel(source)} results`);
+      const label = getSourceLabel(source);
+      const loadingText = message ?? `Searching ${label}...`;
+      el.setAttribute('aria-label', loadingText);
 
       const spinner = document.createElement('div');
       spinner.className = 'spinner';
       spinner.setAttribute('aria-hidden', 'true');
       el.appendChild(spinner);
 
-      const label = getSourceLabel(source);
       const text = document.createElement('span');
-      text.appendChild(this.createSourceIcon(source, '🔍'));
-      text.appendChild(document.createTextNode(` Searching ${label}...`));
+      text.appendChild(icon ? this.createTextIcon(icon) : this.createSourceIcon(source, '🔍'));
+      text.appendChild(document.createTextNode(` ${loadingText}`));
       el.appendChild(text);
 
       this.loadingElements.set(source, el);
@@ -300,7 +349,7 @@ export class ChatRenderer {
     welcome.appendChild(heading);
 
     const intro = document.createElement('p');
-    intro.textContent = 'Search Microsoft 365 context with slash commands.';
+    intro.textContent = 'Chat with Microsoft 365 Copilot, or search Microsoft 365 context with slash commands.';
     welcome.appendChild(intro);
 
     const commandsHint = document.createElement('p');
@@ -313,7 +362,7 @@ export class ChatRenderer {
     const comboCode = document.createElement('code');
     comboCode.textContent = '/mail /onedrive';
     commandsHint.appendChild(comboCode);
-    commandsHint.appendChild(document.createTextNode(', or enter a keyword to search all sources.'));
+    commandsHint.appendChild(document.createTextNode(' for source search. Plain text starts or continues chat.'));
     welcome.appendChild(commandsHint);
 
     const askHint = document.createElement('p');
@@ -322,7 +371,7 @@ export class ChatRenderer {
     const askCode = document.createElement('code');
     askCode.textContent = '/ask';
     askHint.appendChild(askCode);
-    askHint.appendChild(document.createTextNode(' to process them with Microsoft 365 Copilot.'));
+    askHint.appendChild(document.createTextNode(' to process pinned context with Microsoft 365 Copilot.'));
     welcome.appendChild(askHint);
 
     this.chatArea.appendChild(welcome);
@@ -437,6 +486,18 @@ export class ChatRenderer {
   }
 
   private createSourceIcon(source: string, fallback: string): HTMLElement {
+    const iconSpan = this.createTextIcon('');
+    const svg = getSourceInlineSvg(source);
+    if (svg) {
+      iconSpan.appendChild(this.buildSvgIcon(svg));
+      return iconSpan;
+    }
+
+    iconSpan.textContent = getSourceTextIcon(source) || fallback;
+    return iconSpan;
+  }
+
+  private createTextIcon(icon: string): HTMLElement {
     const iconSpan = document.createElement('span');
     iconSpan.className = 'source-icon';
     iconSpan.setAttribute('aria-hidden', 'true');
@@ -447,14 +508,7 @@ export class ChatRenderer {
     iconSpan.style.height = '1em';
     iconSpan.style.marginRight = '6px';
     iconSpan.style.verticalAlign = 'text-bottom';
-
-    const svg = getSourceInlineSvg(source);
-    if (svg) {
-      iconSpan.appendChild(this.buildSvgIcon(svg));
-      return iconSpan;
-    }
-
-    iconSpan.textContent = getSourceTextIcon(source) || fallback;
+    iconSpan.textContent = icon;
     return iconSpan;
   }
 

@@ -27,6 +27,8 @@ const slashMenuEl = document.getElementById('slashMenu')!;
 
 // --- Modules ---
 const renderer = new ChatRenderer(chatArea, vscode);
+const activeLoadingKeys = new Set<string>();
+let hasPendingSubmission = false;
 
 const slashMenu = new SlashMenu(slashMenuEl, promptInput, (nextValue: string) => {
   promptInput.value = nextValue;
@@ -37,11 +39,17 @@ const slashMenu = new SlashMenu(slashMenuEl, promptInput, (nextValue: string) =>
 // --- Input handling ---
 
 function submitQuery(): void {
+  if (sendButton.disabled || promptInput.disabled) {
+    return;
+  }
+
   const text = promptInput.value.trim();
   if (!text) {
     return;
   }
 
+  hasPendingSubmission = true;
+  syncPromptBusy();
   vscode.postMessage({ command: 'submitQuery', text });
   promptInput.value = '';
   autoResizeInput();
@@ -51,6 +59,22 @@ function submitQuery(): void {
 function autoResizeInput(): void {
   promptInput.style.height = 'auto';
   promptInput.style.height = Math.min(promptInput.scrollHeight, 120) + 'px';
+}
+
+function setPromptBusy(isBusy: boolean): void {
+  promptInput.disabled = isBusy;
+  sendButton.disabled = isBusy;
+  promptInput.setAttribute('aria-disabled', String(isBusy));
+  sendButton.setAttribute('aria-disabled', String(isBusy));
+}
+
+function syncPromptBusy(): void {
+  setPromptBusy(hasPendingSubmission || activeLoadingKeys.size > 0);
+}
+
+function clearPendingSubmission(): void {
+  hasPendingSubmission = false;
+  syncPromptBusy();
 }
 
 // --- Event listeners ---
@@ -137,6 +161,7 @@ window.addEventListener('message', (event) => {
       break;
 
     case 'queryError':
+      clearPendingSubmission();
       renderer.renderError(
         message.source as string,
         message.message as string,
@@ -145,13 +170,23 @@ window.addEventListener('message', (event) => {
       break;
 
     case 'loading':
+      if (message.isLoading) {
+        hasPendingSubmission = false;
+        activeLoadingKeys.add(message.source as string);
+      } else {
+        activeLoadingKeys.delete(message.source as string);
+      }
+      syncPromptBusy();
       renderer.setLoading(
         message.source as string,
-        message.isLoading as boolean
+        message.isLoading as boolean,
+        message.text as string | undefined,
+        message.icon as string | undefined
       );
       break;
 
     case 'slashHelp':
+      clearPendingSubmission();
       renderer.renderSlashHelp(
         message.commandName as string,
         message.examples as string[]
@@ -159,13 +194,17 @@ window.addEventListener('message', (event) => {
       break;
 
     case 'clearChat':
+      clearPendingSubmission();
       renderer.clear();
       break;
 
     case 'assistantMessage':
+      clearPendingSubmission();
       renderer.renderAssistantMessage(
         message.text as string,
-        message.timestamp as string
+        message.timestamp as string,
+        message.kind as 'info' | 'ask' | 'chat' | undefined,
+        message.contextLabels as string[] | undefined
       );
       break;
 
