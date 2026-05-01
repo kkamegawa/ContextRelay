@@ -254,7 +254,7 @@ suite('WorkIqAdapter', () => {
   });
 
   suite('sendWorkIqMessage', () => {
-    test('logs Work IQ request and response status without logging body text', async () => {
+    test('logs Work IQ request, response status, and response body', async () => {
       const originalFetch = globalThis.fetch;
       const messages: string[] = [];
       setWorkIqLogger({ log: (message: string) => messages.push(message) });
@@ -279,11 +279,45 @@ suite('WorkIqAdapter', () => {
       try {
         await sendWorkIqMessage('token', 'admin status');
 
-        assert.deepEqual(messages, [
-          '→ POST https://workiq.svc.cloud.microsoft/a2a/',
-          '← 200 OK https://workiq.svc.cloud.microsoft/a2a/'
-        ]);
-        assert.ok(messages.every(message => !message.includes('secret admin answer')));
+        assert.equal(messages[0], '→ POST https://workiq.svc.cloud.microsoft/a2a/');
+        assert.equal(messages[1], '← 200 OK https://workiq.svc.cloud.microsoft/a2a/');
+        assert.equal(messages[2], '↳ Work IQ response body:');
+        assert.ok(messages.some(message => message.includes('"jsonrpc": "2.0"')));
+        assert.ok(messages.some(message => message.includes('secret admin answer')));
+      } finally {
+        globalThis.fetch = originalFetch;
+        setWorkIqLogger(undefined);
+      }
+    });
+
+    test('logs HTTP error response bodies before throwing', async () => {
+      const originalFetch = globalThis.fetch;
+      const messages: string[] = [];
+      setWorkIqLogger({ log: (message: string) => messages.push(message) });
+      globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> =>
+        new Response(JSON.stringify({
+          error: {
+            code: 'Forbidden',
+            message: 'detailed workiq error'
+          }
+        }), {
+          status: 403,
+          statusText: 'Forbidden',
+          headers: { 'Content-Type': 'application/json' }
+        })
+      ) as typeof fetch;
+
+      try {
+        await assert.rejects(
+          () => sendWorkIqMessage('token', 'admin status'),
+          /Missing WorkIQAgent\.Ask permission or Microsoft 365 Copilot license/
+        );
+
+        assert.equal(messages[0], '→ POST https://workiq.svc.cloud.microsoft/a2a/');
+        assert.equal(messages[1], '← 403 Forbidden https://workiq.svc.cloud.microsoft/a2a/');
+        assert.equal(messages[2], '↳ Work IQ response body:');
+        assert.ok(messages.some(message => message.includes('"Forbidden"')));
+        assert.ok(messages.some(message => message.includes('detailed workiq error')));
       } finally {
         globalThis.fetch = originalFetch;
         setWorkIqLogger(undefined);

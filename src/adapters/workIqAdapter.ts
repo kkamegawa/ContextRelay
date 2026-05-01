@@ -204,6 +204,7 @@ export async function sendWorkIqMessage(
       let errorBody = '';
       try {
         errorBody = await response.text();
+        logWorkIqResponseBody(errorBody);
       } catch {
         // ignore
       }
@@ -228,6 +229,7 @@ export async function sendWorkIqMessage(
     }
 
     const responseText = await response.text();
+    logWorkIqResponseBody(responseText);
     if (!responseText.trim()) {
       throw new Error('Work IQ returned an empty response body.');
     }
@@ -296,6 +298,26 @@ export function resolveRetryDelayMs(retryAfterHeader: string | null, fallbackMs:
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function logWorkIqResponseBody(body: string): void {
+  if (!_logger || !body) {
+    return;
+  }
+
+  const formattedBody = formatWorkIqBodyForLogging(body);
+  _logger.log('↳ Work IQ response body:');
+  for (const line of formattedBody.split('\n')) {
+    _logger.log(`  ${line}`);
+  }
+}
+
+function formatWorkIqBodyForLogging(body: string): string {
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2);
+  } catch {
+    return body;
+  }
 }
 
 export { WORKIQ_ENDPOINT, A2A_VERSION };
