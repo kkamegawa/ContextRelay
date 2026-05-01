@@ -30,7 +30,7 @@ jobs:
       - name: Ensure tag commit is on main branch
         shell: bash
         run: |
-          git fetch origin main --depth=1
+          git fetch origin main
           if git merge-base --is-ancestor "${GITHUB_SHA}" "origin/main"; then
             echo "Tag commit belongs to main history."
           else
@@ -43,6 +43,9 @@ jobs:
 
       - name: Build extension package
         run: npm run package
+
+      - name: Package VSIX
+        run: npm run vsce:package
 
       - name: Locate VSIX artifact
         id: package

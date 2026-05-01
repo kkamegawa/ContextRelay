@@ -1,4 +1,8 @@
 name: Push Protection
+# NOTE: This workflow enforces owner-only changes to main and tags.
+# To actually block non-owner pushes/PRs, configure this workflow as a
+# required status check in a branch protection rule or repository ruleset
+# (Settings → Branches / Rules → require "Enforce owner-only changes").
 
 on:
   push:
