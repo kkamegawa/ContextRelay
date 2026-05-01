@@ -1,0 +1,39 @@
+name: Lightweight report
+description: Quick issue form for ContextRelay
+labels:
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your report. Please fill in the required fields below.
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: e.g. Windows 11, macOS 15, Ubuntu 24.04
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code version
+      description: e.g. 1.101.0 (or Insiders build)
+      placeholder: 1.101.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Describe the issue, expected behavior, and what happened.
+      placeholder: |
+        - What did you do?
+        - What did you expect?
+        - What happened instead?
+    validations:
+      required: true

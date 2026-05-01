@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest a new feature for ContextRelay
+labels:
+  - enhancement
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your idea. Please fill in the required fields.
+
+  - type: input
+    id: title-summary
+    attributes:
+      label: Summary
+      description: One-line summary of the requested feature
+      placeholder: Add quick filter for pinned snippets
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Describe what you want, why it is useful, and expected behavior.
+      placeholder: |
+        - What problem does this solve?
+        - What behavior do you want?
+        - Any constraints or notes?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives (optional)
+      description: Any workaround or alternative you considered
+      placeholder: Current workaround is...
+    validations:
+      required: false
