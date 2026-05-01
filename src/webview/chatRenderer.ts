@@ -1,12 +1,13 @@
 /**
  * Chat renderer for the ContextRelay webview.
  * Renders messages, results, loading indicators, and errors.
- * Dynamic result content is built with DOM APIs so untrusted data never flows
- * through HTML injection paths.
+ * Dynamic result content is built with DOM APIs, except for assistant messages
+ * where limited HTML is generated from escaped markdown-like text.
  */
 
 import { getSourceInlineSvg, getSourceLabel, getSourceTextIcon } from '../sourcePresentation';
 import { canOpenResult } from '../models/contextItem';
+import { formatAssistantMessageAsHtml, hasRichTextFormatting } from './assistantMessageFormatting';
 
 interface ContextItem {
   source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';
@@ -144,7 +145,12 @@ export class ChatRenderer {
 
     const textDiv = document.createElement('div');
     textDiv.className = 'message-text';
-    textDiv.textContent = text;
+    if (hasRichTextFormatting(text)) {
+      textDiv.classList.add('message-text-rich');
+      textDiv.innerHTML = formatAssistantMessageAsHtml(text);
+    } else {
+      textDiv.textContent = text;
+    }
     el.appendChild(textDiv);
 
     if (contextLabels.length > 0) {

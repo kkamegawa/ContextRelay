@@ -225,4 +225,42 @@ suite('CommandRouter', () => {
     assert.ok(text.toLowerCase().includes('clear'));
     assert.ok(text.toLowerCase().includes('pinned'));
   });
+
+  test('/workiq command routes to workiq with query', () => {
+    const result = parseCommand('/workiq Summarize my recent emails');
+    assert.equal(result.target, 'workiq');
+    assert.equal(result.query, 'Summarize my recent emails');
+    assert.equal(result.isEmpty, false);
+    assert.deepEqual(result.targetSources, []);
+    assert.deepEqual(result.sourceCommands, []);
+    assert.equal(result.commandText, '/workiq');
+    assert.equal(result.searchScope, 'operation');
+  });
+
+  test('empty /workiq triggers isEmpty for slash help', () => {
+    const result = parseCommand('/workiq');
+    assert.equal(result.target, 'workiq');
+    assert.equal(result.isEmpty, true);
+    assert.equal(result.query, '');
+  });
+
+  test('/workiq ignores subsequent slash commands and treats them as query text', () => {
+    const result = parseCommand('/workiq /mail admin meeting notes');
+    assert.equal(result.target, 'workiq');
+    assert.equal(result.query, '/mail admin meeting notes');
+    assert.equal(result.isEmpty, false);
+  });
+
+  test('/workiq preserves Japanese query text', () => {
+    const result = parseCommand('/workiq 品川のミーティングについて教えて');
+    assert.equal(result.target, 'workiq');
+    assert.equal(result.query, '品川のミーティングについて教えて');
+    assert.equal(result.isEmpty, false);
+  });
+
+  test('getHelpText for workiq mentions Work IQ', () => {
+    const text = getHelpText('workiq');
+    assert.ok(text.toLowerCase().includes('work iq'));
+    assert.ok(text.includes('Example'));
+  });
 });

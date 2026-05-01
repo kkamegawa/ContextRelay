@@ -78,6 +78,24 @@ suite('Extension manifest consistency', () => {
     );
   });
 
+  test('wires Work IQ logging to the ContextRelay debug channel', () => {
+    const extensionSourcePath = path.resolve(__dirname, '../../../../src/extension.ts');
+    const extensionSource = fs.readFileSync(extensionSourcePath, 'utf8');
+
+    assert.ok(
+      extensionSource.includes("import { setWorkIqLogger } from './adapters/workIqAdapter';"),
+      'extension activation must import the Work IQ logger hook'
+    );
+    assert.ok(
+      extensionSource.includes('setWorkIqLogger(logger);'),
+      'debug logging must enable Work IQ request/response status logs'
+    );
+    assert.ok(
+      extensionSource.includes('setWorkIqLogger(undefined);') || extensionSource.includes('setWorkIqLogger(logger);'),
+      'debug logging must be able to disable Work IQ logs with the shared logger state'
+    );
+  });
+
   test('contributes move-to-sidebar commands with icons for view/title menu', () => {
     const commands = packageJson.contributes?.commands ?? [];
 

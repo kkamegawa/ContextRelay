@@ -16,7 +16,9 @@ const warningMessages: string[] = [];
 const errorMessages: string[] = [];
 const infoMessages: string[] = [];
 const capturedPayloads: Array<unknown> = [];
+const workIqRequests: Array<{ token: string; query: string; contextId?: string }> = [];
 let replies: string[] = [];
+let workIqReplies: Array<{ text: string; contextId?: string }> = [];
 
 class InMemoryMemento implements vscode.Memento {
   private readonly store = new Map<string, unknown>();
@@ -103,6 +105,15 @@ suite('ChatViewProvider', () => {
         };
       }
 
+      if (request === '../adapters/workIqAdapter') {
+        return {
+          sendWorkIqMessage: async (token: string, query: string, contextId?: string) => {
+            workIqRequests.push({ token, query, contextId });
+            return workIqReplies.shift() ?? { text: 'Work IQ answer', contextId: 'ctx-workiq-1' };
+          }
+        };
+      }
+
       if (request === '../adapters/handoffContentAdapter') {
         return {
           hydrateItemForHandoff: async (_token: string, item: unknown) => item
@@ -173,7 +184,12 @@ suite('ChatViewProvider', () => {
     errorMessages.length = 0;
     infoMessages.length = 0;
     capturedPayloads.length = 0;
+    workIqRequests.length = 0;
     replies = ['First answer', 'Second answer'];
+    workIqReplies = [
+      { text: 'Work IQ first answer', contextId: 'ctx-workiq-1' },
+      { text: 'Work IQ second answer', contextId: 'ctx-workiq-2' }
+    ];
   });
 
   test('includes the latest visible result in follow-up Copilot chat context', async () => {
@@ -231,5 +247,53 @@ suite('ChatViewProvider', () => {
     assert.equal(capturedPayloads.length, 0);
     assert.equal(errorMessages.length, 0);
     assert.equal(infoMessages.length, 0);
+  });
+
+  test('/workiq sends query, shows loading, and renders the Work IQ response', async () => {
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getWorkIqAccessToken: async () => 'workiq-token' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; [key: string]: unknown }> = [];
+    (provider as unknown as { postMessage(message: { command: string; [key: string]: unknown }): void }).postMessage = (message) => {
+      messages.push(message);
+    };
+
+    await provider.submitQuery('/workiq admin status');
+
+    assert.deepEqual(workIqRequests, [
+      { token: 'workiq-token', query: 'admin status', contextId: undefined }
+    ]);
+    assert.deepEqual(messages.map(message => message.command), [
+      'userMessage',
+      'loading',
+      'assistantMessage',
+      'loading'
+    ]);
+    assert.equal(messages[1].isLoading, true);
+    assert.equal(messages[1].text, 'Asking Work IQ...');
+    assert.equal(messages[2].text, 'Work IQ first answer');
+    assert.equal(messages[3].isLoading, false);
+  });
+
+  test('/workiq reuses contextId for follow-up queries and clearChat resets it', async () => {
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getWorkIqAccessToken: async () => 'workiq-token' } as never,
+      {} as never
+    );
+    (provider as unknown as { postMessage(message: unknown): void }).postMessage = () => {};
+
+    await provider.submitQuery('/workiq Microsoft 365 admin status');
+    await provider.submitQuery('/workiq follow up');
+    provider.clearChat();
+    await provider.submitQuery('/workiq after clear');
+
+    assert.deepEqual(workIqRequests, [
+      { token: 'workiq-token', query: 'Microsoft 365 admin status', contextId: undefined },
+      { token: 'workiq-token', query: 'follow up', contextId: 'ctx-workiq-1' },
+      { token: 'workiq-token', query: 'after clear', contextId: undefined }
+    ]);
   });
 });

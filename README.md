@@ -20,6 +20,7 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/task <query>` | Planner and Microsoft To Do tasks |
 | `/all <query>` | All enabled sources |
 | `/ask <instruction>` | Send pinned snippets to Microsoft 365 Copilot and show the reply in the panel |
+| `/workiq <query>` | Send a natural language query to Work IQ (A2A protocol) for Microsoft 365 work intelligence |
 | `/clear` | Clear the chat transcript and discard all pinned snippets |
 
 - **Snippet pinning** -- Save any search result as a named snippet, visible across sessions.
@@ -83,6 +84,16 @@ The following delegated Microsoft Graph permissions are required by feature:
 >
 > - Some permissions (for example `ChannelMessage.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ExternalItem.Read.All`) require **tenant admin consent**.
 > - This extension still uses the built-in VS Code auth provider; it just avoids VS Code's default first-party client ID for Graph consent.
+
+#### Work IQ (non-Graph) permissions
+
+`WorkIQAgent.Ask` is **not** a Microsoft Graph permission. It is a delegated permission on a separate resource endpoint used only by the `/workiq` command:
+
+| Permission | Resource endpoint | Used by |
+|---|---|---|
+| `WorkIQAgent.Ask` | `api://workiq.svc.cloud.microsoft` | `/workiq` command — Work IQ API (optional, requires Microsoft 365 Copilot license) |
+
+> **Important**: This permission requires **tenant admin consent** and is only useful for users with a **Microsoft 365 Copilot license**. See [docs/work_iq.md](docs/work_iq.md) for setup instructions.
 
 ---
 
@@ -573,6 +584,26 @@ Use `/ask` to let **Microsoft 365 Copilot** (not GitHub Copilot) process your cu
 If no snippets are pinned, `/ask` is aborted with a warning. Because this feature relies on the Microsoft 365 Copilot API (preview), you must have a Microsoft 365 Copilot license on the signed-in account and `contextRelay.enableChatPreview` enabled.
 
 To sign out, use the **Accounts** menu in VS Code.
+
+### `/workiq` — Query Work IQ for Microsoft 365 work intelligence
+
+Use `/workiq` to send natural language queries to the [Work IQ Gateway](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq-api-quickstart) via the A2A (Agent-to-Agent) v1.0 protocol. Work IQ provides AI-powered access to emails, meetings, files, and organizational knowledge.
+
+1. In the chat input, type `/workiq` followed by your question:
+
+   ```
+   /workiq Summarize my recent emails from Alice
+   /workiq What meetings do I have today?
+   /workiq Find documents about the Q3 budget review
+   ```
+
+2. ContextRelay sends the query to the Work IQ Gateway and displays the response in the panel.
+
+3. Consecutive `/workiq` queries maintain conversation context, so follow-up questions ("Tell me more about the 2 PM call") work naturally.
+
+> **Prerequisites**: The `/workiq` command requires a Microsoft 365 Copilot license and the `WorkIQAgent.Ask` delegated permission on your Entra app registration. See [docs/work_iq.md](docs/work_iq.md) for setup instructions.
+
+> **Note**: When `/workiq` is specified, all other slash commands in the input are ignored and treated as part of the query text.
 
 ---
 

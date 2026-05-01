@@ -11,7 +11,8 @@ export type RouteTarget =
   | 'task'
   | 'all'
   | 'ask'
-  | 'clear';
+  | 'clear'
+  | 'workiq';
 
 export type SearchCommandName = 'mail' | 'teams' | 'sharepoint' | 'onedrive' | 'onenote' | 'task' | 'all';
 export type SearchScope = 'all' | 'scoped' | 'operation';
@@ -40,7 +41,8 @@ const SEARCH_COMMAND_METADATA: Record<SearchCommandName, { target: RouteTarget; 
 
 const OPERATION_COMMANDS: Record<string, RouteTarget> = {
   ask: 'ask',
-  clear: 'clear'
+  clear: 'clear',
+  workiq: 'workiq'
 };
 
 function hasOwnKey<T extends object>(record: T, key: PropertyKey): key is keyof T {
@@ -71,7 +73,7 @@ export function parseCommand(input: string): ParsedCommand {
   if (hasOwnKey(OPERATION_COMMANDS, firstCommand)) {
     const rawQuery = commandMatch?.[2] ?? '';
     const target = OPERATION_COMMANDS[firstCommand];
-    const query = target === 'ask' ? rawQuery.trim() : '';
+    const query = target === 'ask' || target === 'workiq' ? rawQuery.trim() : '';
     const isEmpty = target === 'clear' ? false : query.length === 0;
 
     return {
@@ -186,7 +188,8 @@ export function getHelpText(command: string | readonly SearchCommandName[]): str
     task: 'Example: /task release checklist\nExample: /task metadata comments onboarding',
     all: 'Example: /all architecture decisions\nExample: /mail /onedrive architecture decisions\nPlain text without a slash command starts or continues a Microsoft 365 Copilot chat.',
     ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is shown in the panel.',
-    clear: 'Example: /clear\nClears the current chat transcript and discards all pinned snippets.'
+    clear: 'Example: /clear\nClears the current chat transcript and discards all pinned snippets.',
+    workiq: 'Example: /workiq Summarize my recent emails from Alice\nExample: /workiq What meetings do I have today?\nSends a natural language query to the Work IQ Gateway (A2A protocol). Requires Microsoft 365 Copilot license.'
   };
   return examples[commandName] ?? 'Type a query to search Microsoft 365 content.';
 }
