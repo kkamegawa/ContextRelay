@@ -948,6 +948,49 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       white-space: pre-wrap;
     }
 
+    .message-text-rich {
+      white-space: normal;
+    }
+
+    .message-text-rich :first-child {
+      margin-top: 0;
+    }
+
+    .message-text-rich :last-child {
+      margin-bottom: 0;
+    }
+
+    .message-text-rich h1,
+    .message-text-rich h2,
+    .message-text-rich h3 {
+      line-height: 1.35;
+      margin: 0.9em 0 0.45em;
+    }
+
+    .message-text-rich p {
+      margin: 0.6em 0;
+    }
+
+    .message-text-rich ul,
+    .message-text-rich ol {
+      margin: 0.6em 0;
+      padding-left: 1.4em;
+    }
+
+    .message-text-rich li + li {
+      margin-top: 0.25em;
+    }
+
+    .message-text-rich a {
+      color: var(--vscode-textLink-foreground);
+    }
+
+    .message-text-rich hr {
+      border: 0;
+      border-top: 1px solid var(--vscode-panel-border);
+      margin: 0.9em 0;
+    }
+
     .context-used {
       margin-top: var(--cr-spacing-xs);
       font-size: 0.75em;

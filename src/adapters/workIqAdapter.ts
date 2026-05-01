@@ -79,8 +79,14 @@ export function buildSendMessageRequest(
  * `{ "result": { "message": { "parts": [{ "text": "..." }] } } }`.
  */
 export function extractResponseText(result: Record<string, unknown>): string {
+  const candidates: string[] = [];
   const task = result.task as Record<string, unknown> | undefined;
   if (task) {
+    const statusMessage = extractTaskStatusMessageText(task);
+    if (statusMessage) {
+      candidates.push(statusMessage);
+    }
+
     const artifacts = task.artifacts as Array<Record<string, unknown>> | undefined;
     if (Array.isArray(artifacts) && artifacts.length > 0) {
       const artifactTexts = artifacts
@@ -88,17 +94,20 @@ export function extractResponseText(result: Record<string, unknown>): string {
         .filter(text => text.trim().length > 0);
 
       if (artifactTexts.length > 0) {
-        return artifactTexts.join('\n\n');
+        candidates.push(artifactTexts.join('\n\n'));
       }
     }
   }
 
   const message = result.message as Record<string, unknown> | undefined;
   if (message) {
-    return extractPartsText(message);
+    const messageText = extractPartsText(message);
+    if (messageText) {
+      candidates.push(messageText);
+    }
   }
 
-  return '';
+  return selectBestResponseText(candidates);
 }
 
 function extractPartsText(container: Record<string, unknown>): string {
@@ -111,6 +120,52 @@ function extractPartsText(container: Record<string, unknown>): string {
     .map(part => typeof part.text === 'string' ? part.text : '')
     .filter(text => text.trim().length > 0)
     .join('');
+}
+
+function extractTaskStatusMessageText(task: Record<string, unknown>): string {
+  const status = task.status as Record<string, unknown> | undefined;
+  const statusMessage = status?.message as Record<string, unknown> | undefined;
+  if (!statusMessage) {
+    return '';
+  }
+
+  return extractPartsText(statusMessage);
+}
+
+function selectBestResponseText(candidates: readonly string[]): string {
+  const meaningfulCandidates = candidates
+    .map(candidate => candidate.trim())
+    .filter(candidate => candidate.length > 0);
+
+  if (meaningfulCandidates.length === 0) {
+    return '';
+  }
+
+  meaningfulCandidates.sort((left, right) => scoreResponseText(right) - scoreResponseText(left));
+  return meaningfulCandidates[0];
+}
+
+function scoreResponseText(text: string): number {
+  const plainText = text.replace(/\s+/g, '');
+  if (plainText.length === 0) {
+    return 0;
+  }
+
+  let score = text.length;
+  if (/^[?？!！.。]+$/.test(plainText)) {
+    score -= 10_000;
+  }
+  if (/^#{1,3}\s/m.test(text)) {
+    score += 500;
+  }
+  if (/\[[^\]]+\]\(https?:\/\/[^)]+\)/.test(text)) {
+    score += 500;
+  }
+  if (/^[-*]\s/m.test(text) || /^\d+\.\s/m.test(text)) {
+    score += 250;
+  }
+
+  return score;
 }
 
 /**

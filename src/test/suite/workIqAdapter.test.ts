@@ -174,6 +174,33 @@ suite('WorkIqAdapter', () => {
 
       assert.equal(text, 'Microsoft 365 admin summary: 品川 office update.');
     });
+
+    test('prefers task status message over placeholder artifact text', () => {
+      const text = extractResponseText({
+        task: {
+          contextId: 'ctx-1',
+          status: {
+            state: 'TASK_STATE_COMPLETED',
+            message: {
+              parts: [
+                {
+                  text: '## Microsoft 365\n\n- admin updates are available\n- 品川 schedule changes are included'
+                }
+              ]
+            }
+          },
+          artifacts: [
+            {
+              parts: [{ text: '？' }]
+            }
+          ]
+        }
+      });
+
+      assert.ok(text.includes('Microsoft 365'));
+      assert.ok(text.includes('品川'));
+      assert.notEqual(text, '？');
+    });
   });
 
   suite('extractContextId', () => {
