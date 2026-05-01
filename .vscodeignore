@@ -1,21 +1,33 @@
+# Repo / CI / dev-only
 .git/**
 .github/**
 .vscode/**
 .vscode-test/**
+docs/**
+coverage/**
+README-assets/**
+AGENTS.md
+
+# Source / test source
 src/**
 out-test/**
-docs/**
-node_modules/.cache/**
-**/*.ts
-**/*.map
+
+# Build/test configs not needed at runtime
+esbuild.mjs
+webpack.config.js
 eslint.config.cjs
 tsconfig.json
 tsconfig.test.json
 tsconfig.webview.json
-webpack.config.js
-esbuild.mjs
-AGENTS.md
-SECURITY.md
-SECURITY_ja.md
-README-assets/**
-coverage/**
+
+# Local env / metadata
+.gitignore
+.nvmrc
+
+# Artifacts not required in VSIX runtime
+out/**
+**/*.ts
+**/*.map
+
+# If packaging with --no-dependencies, keep node_modules out of VSIX
+node_modules/**
