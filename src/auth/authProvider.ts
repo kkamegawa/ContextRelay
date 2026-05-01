@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { buildProviderScopes, getBuiltInAuthConfigurationMessage } from './authScopes';
+import { buildProviderScopes, buildWorkIqProviderScopes, getBuiltInAuthConfigurationMessage } from './authScopes';
 
 const MAIL_SCOPES = ['Mail.Read'];
 const TEAMS_SCOPES = ['Chat.Read', 'ChannelMessage.Read.All'];
@@ -19,6 +19,7 @@ const CHAT_SCOPES = [
 
 export class AuthProvider {
   private session: vscode.AuthenticationSession | undefined;
+  private workIqSession: vscode.AuthenticationSession | undefined;
 
   constructor(_context: vscode.ExtensionContext) {}
 
@@ -102,6 +103,52 @@ export class AuthProvider {
     return session.accessToken;
   }
 
+  async getWorkIqSession(silent = false): Promise<vscode.AuthenticationSession | undefined> {
+    const config = vscode.workspace.getConfiguration('contextRelay');
+    const clientId = config.get<string>('auth.clientId')?.trim();
+    if (!clientId) {
+      if (silent) {
+        return undefined;
+      }
+      throw new Error(getBuiltInAuthConfigurationMessage());
+    }
+
+    const scopes = buildWorkIqProviderScopes({
+      clientId,
+      tenantId: config.get<string>('auth.tenantId', 'organizations')?.trim()
+    });
+
+    try {
+      this.workIqSession = await vscode.authentication.getSession('microsoft', scopes, {
+        createIfNone: !silent,
+        silent
+      });
+      return this.workIqSession;
+    } catch (err) {
+      this.workIqSession = undefined;
+
+      if (!silent) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('AADSTS65001')) {
+          throw new Error(
+            'Admin consent for WorkIQAgent.Ask has not been granted. ' +
+            'Ask your tenant admin to grant consent for the Work IQ permission on your app registration.'
+          );
+        }
+      }
+
+      return undefined;
+    }
+  }
+
+  async getWorkIqAccessToken(): Promise<string> {
+    const session = await this.getWorkIqSession();
+    if (!session) {
+      throw new Error('Not authenticated for Work IQ. Please sign in to use the /workiq command.');
+    }
+    return session.accessToken;
+  }
+
   async getAccountLabel(): Promise<string | undefined> {
     const session = await this.getSession(true);
     return session?.account?.label;
@@ -109,6 +156,7 @@ export class AuthProvider {
 
   clearSession(): void {
     this.session = undefined;
+    this.workIqSession = undefined;
   }
 
   onSessionChange(handler: () => void): vscode.Disposable {

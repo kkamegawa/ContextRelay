@@ -8,6 +8,7 @@ import { searchPlanner } from '../adapters/plannerAdapter';
 import { searchRetrieval } from '../adapters/retrievalAdapter';
 import { searchTeams } from '../adapters/teamsAdapter';
 import { searchTodo } from '../adapters/todoAdapter';
+import { sendWorkIqMessage } from '../adapters/workIqAdapter';
 import { AuthProvider } from '../auth/authProvider';
 import { CacheStore } from '../cache/cacheStore';
 import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
@@ -49,6 +50,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private static readonly MAX_TRANSCRIPT_LENGTH = 200;
   private transcript: HostToWebviewMessage[] = [];
   private currentConversationId?: string;
+  private currentWorkIqContextId?: string;
   private editorPanel?: vscode.WebviewPanel;
   private previewPanel?: vscode.WebviewPanel;
 
@@ -132,6 +134,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.latestSearchSummary = undefined;
     this.latestVisibleResult = undefined;
     this.currentConversationId = undefined;
+    this.currentWorkIqContextId = undefined;
     this.postMessage({ command: 'clearChat' });
     this.sendPinnedItems();
   }
@@ -391,6 +394,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (parsed.target === 'workiq') {
+      await this.handleWorkIqCommand(parsed.query);
+      return;
+    }
+
     if (parsed.target === 'chat') {
       await this.handlePlainChat(parsed.query);
       return;
@@ -515,6 +523,62 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async handlePlainChat(prompt: string): Promise<void> {
     await this.handleCopilotChat(prompt, 'chat', false);
+  }
+
+  private async handleWorkIqCommand(query: string): Promise<void> {
+    this.postMessage({
+      command: 'loading',
+      source: 'all',
+      isLoading: true,
+      text: 'Asking Work IQ...',
+      icon: '🤖'
+    });
+
+    let token: string;
+    try {
+      token = await this.authProvider.getWorkIqAccessToken();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Work IQ authentication required.';
+      this.postMessage({
+        command: 'queryError',
+        source: 'all',
+        message,
+        timestamp: new Date().toISOString()
+      });
+      this.postMessage({ command: 'loading', source: 'all', isLoading: false });
+      return;
+    }
+
+    try {
+      const response = await sendWorkIqMessage(token, query, this.currentWorkIqContextId);
+
+      if (response.contextId) {
+        this.currentWorkIqContextId = response.contextId;
+      }
+
+      const text = response.text.trim();
+      if (!text) {
+        throw new Error('Work IQ returned an empty response.');
+      }
+
+      this.postMessage({
+        command: 'assistantMessage',
+        kind: 'chat',
+        text,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`ContextRelay: Work IQ failed — ${message}`);
+      this.postMessage({
+        command: 'queryError',
+        source: 'all',
+        message,
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      this.postMessage({ command: 'loading', source: 'all', isLoading: false });
+    }
   }
 
   private async handleCopilotChat(

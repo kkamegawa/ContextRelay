@@ -1,4 +1,6 @@
 const GRAPH_RESOURCE = 'https://graph.microsoft.com';
+const WORKIQ_RESOURCE = 'api://workiq.svc.cloud.microsoft';
+const WORKIQ_SCOPE = `${WORKIQ_RESOURCE}/WorkIQAgent.Ask`;
 const OIDC_SCOPES = ['offline_access', 'openid', 'profile'] as const;
 const DEFAULT_GRAPH_SCOPES = ['User.Read'];
 
@@ -44,4 +46,28 @@ export function getBuiltInAuthConfigurationMessage(): string {
   ].join(' ');
 }
 
-export { GRAPH_RESOURCE, OIDC_SCOPES };
+/**
+ * Build the scope array for Work IQ token acquisition.
+ * Work IQ uses a different resource (`api://workiq.svc.cloud.microsoft`) than
+ * Microsoft Graph, so it needs its own token request with only OIDC + Work IQ scopes.
+ */
+export function buildWorkIqProviderScopes(
+  options?: { clientId?: string; tenantId?: string }
+): string[] {
+  const scopes = new Set<string>();
+
+  OIDC_SCOPES.forEach(scope => scopes.add(scope));
+  scopes.add(WORKIQ_SCOPE);
+
+  if (options?.clientId?.trim()) {
+    scopes.add(`VSCODE_CLIENT_ID:${options.clientId.trim()}`);
+  }
+
+  if (options?.tenantId?.trim()) {
+    scopes.add(`VSCODE_TENANT:${options.tenantId.trim()}`);
+  }
+
+  return Array.from(scopes);
+}
+
+export { GRAPH_RESOURCE, OIDC_SCOPES, WORKIQ_RESOURCE, WORKIQ_SCOPE };
