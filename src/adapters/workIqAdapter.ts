@@ -75,32 +75,42 @@ export function buildSendMessageRequest(
  * ```json
  * { "result": { "task": { "artifacts": [{ "parts": [{ "text": "..." }] }] } } }
  * ```
+ * Some A2A implementations can also return a direct message payload:
+ * `{ "result": { "message": { "parts": [{ "text": "..." }] } } }`.
  */
 export function extractResponseText(result: Record<string, unknown>): string {
   const task = result.task as Record<string, unknown> | undefined;
-  if (!task) {
-    return '';
-  }
+  if (task) {
+    const artifacts = task.artifacts as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(artifacts) && artifacts.length > 0) {
+      const artifactTexts = artifacts
+        .map(artifact => extractPartsText(artifact))
+        .filter(text => text.trim().length > 0);
 
-  const artifacts = task.artifacts as Array<Record<string, unknown>> | undefined;
-  if (!Array.isArray(artifacts) || artifacts.length === 0) {
-    return '';
-  }
-
-  const textParts: string[] = [];
-  for (const artifact of artifacts) {
-    const parts = artifact.parts as Array<Record<string, unknown>> | undefined;
-    if (!Array.isArray(parts)) {
-      continue;
-    }
-    for (const part of parts) {
-      if (typeof part.text === 'string' && part.text.trim().length > 0) {
-        textParts.push(part.text);
+      if (artifactTexts.length > 0) {
+        return artifactTexts.join('\n\n');
       }
     }
   }
 
-  return textParts.join('\n\n');
+  const message = result.message as Record<string, unknown> | undefined;
+  if (message) {
+    return extractPartsText(message);
+  }
+
+  return '';
+}
+
+function extractPartsText(container: Record<string, unknown>): string {
+  const parts = container.parts as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(parts)) {
+    return '';
+  }
+
+  return parts
+    .map(part => typeof part.text === 'string' ? part.text : '')
+    .filter(text => text.trim().length > 0)
+    .join('');
 }
 
 /**
@@ -168,30 +178,15 @@ export async function sendWorkIqMessage(
   maxRetries = 2
 ): Promise<WorkIqResponse> {
   const { body } = buildSendMessageRequest(text, contextId);
-  let lastError: Error | undefined;
   let delay = 1000;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    let response: Response;
-    try {
-      response = await workIqFetch(token, body);
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < maxRetries) {
-        _logger?.log(`⚠ Network error, retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
-        await sleep(delay);
-        delay = Math.min(delay * 2, 30000);
-        continue;
-      }
-      throw lastError;
-    }
+    const response = await workIqFetch(token, body);
 
     if (response.status === 429 || response.status === 503) {
       if (attempt < maxRetries) {
         const retryAfterHeader = response.headers.get('Retry-After');
-        const retryDelay = retryAfterHeader
-          ? parseInt(retryAfterHeader, 10) * 1000
-          : delay;
+        const retryDelay = resolveRetryDelayMs(retryAfterHeader, delay);
         _logger?.log(`⚠ Throttled (${response.status}), retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms`);
         await sleep(Math.min(retryDelay, 30000));
         delay = Math.min(delay * 2, 30000);
@@ -232,7 +227,12 @@ export async function sendWorkIqMessage(
       throw new Error('Work IQ returned an empty response body.');
     }
 
-    const parsed = JSON.parse(responseText) as Record<string, unknown>;
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(responseText) as Record<string, unknown>;
+    } catch {
+      throw new Error('Work IQ returned an invalid JSON response.');
+    }
 
     // Check for JSON-RPC error (can come in a 200 response)
     if (parsed.error) {
@@ -252,19 +252,41 @@ export async function sendWorkIqMessage(
       throw new Error('Work IQ task failed. The agent could not process the request.');
     }
 
-    const text_response = extractResponseText(result);
+    const textResponse = extractResponseText(result);
+    if (taskState && taskState !== 'TASK_STATE_COMPLETED' && !textResponse.trim()) {
+      throw new Error(`Work IQ task did not complete (state: ${taskState}).`);
+    }
+
     const newContextId = extractContextId(result);
     const task = result.task as Record<string, unknown> | undefined;
 
     return {
-      text: text_response,
+      text: textResponse,
       contextId: newContextId,
       taskId: typeof task?.id === 'string' ? task.id : undefined,
       state: taskState
     };
   }
 
-  throw lastError ?? new Error('Work IQ: max retries exceeded.');
+  throw new Error('Work IQ: max retries exceeded.');
+}
+
+export function resolveRetryDelayMs(retryAfterHeader: string | null, fallbackMs: number): number {
+  if (!retryAfterHeader?.trim()) {
+    return fallbackMs;
+  }
+
+  const retryAfterSeconds = Number.parseInt(retryAfterHeader, 10);
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+    return retryAfterSeconds * 1000;
+  }
+
+  const retryAfterDate = Date.parse(retryAfterHeader);
+  if (Number.isFinite(retryAfterDate)) {
+    return Math.max(retryAfterDate - Date.now(), 0);
+  }
+
+  return fallbackMs;
 }
 
 function sleep(ms: number): Promise<void> {

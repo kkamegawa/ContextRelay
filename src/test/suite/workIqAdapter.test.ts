@@ -4,7 +4,9 @@ import {
   extractResponseText,
   extractContextId,
   extractTaskState,
+  resolveRetryDelayMs,
   resolveLocationMetadata,
+  sendWorkIqMessage,
   WORKIQ_ENDPOINT,
   A2A_VERSION
 } from '../../adapters/workIqAdapter';
@@ -157,6 +159,20 @@ suite('WorkIqAdapter', () => {
       assert.ok(text.includes('廃止'));
       assert.ok(!text.startsWith('\n'));
     });
+
+    test('extracts text from direct message payload', () => {
+      const text = extractResponseText({
+        message: {
+          contextId: 'ctx-message-1',
+          parts: [
+            { text: 'Microsoft 365 admin summary: ' },
+            { text: '品川 office update.' }
+          ]
+        }
+      });
+
+      assert.equal(text, 'Microsoft 365 admin summary: 品川 office update.');
+    });
   });
 
   suite('extractContextId', () => {
@@ -233,6 +249,97 @@ suite('WorkIqAdapter', () => {
 
     test('A2A_VERSION is 1.0', () => {
       assert.equal(A2A_VERSION, '1.0');
+    });
+  });
+
+  suite('sendWorkIqMessage', () => {
+    test('does not retry network errors to avoid duplicate prompts', async () => {
+      const originalFetch = globalThis.fetch;
+      let calls = 0;
+      globalThis.fetch = (async () => {
+        calls++;
+        throw new Error('connection reset');
+      }) as typeof fetch;
+
+      try {
+        await assert.rejects(
+          () => sendWorkIqMessage('token', 'admin status', undefined, 2),
+          /connection reset/
+        );
+        assert.equal(calls, 1);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    test('rejects invalid JSON responses without exposing response body', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> =>
+        new Response('not json', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      ) as typeof fetch;
+
+      try {
+        await assert.rejects(
+          () => sendWorkIqMessage('token', 'Microsoft 365 admin status'),
+          /invalid JSON response/
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    test('rejects non-complete task states without text', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> =>
+        new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'request-1',
+          result: {
+            task: {
+              id: 'task-1',
+              contextId: 'ctx-1',
+              status: { state: 'TASK_STATE_WORKING' },
+              artifacts: []
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      ) as typeof fetch;
+
+      try {
+        await assert.rejects(
+          () => sendWorkIqMessage('token', '廃止されたサービスについて'),
+          /did not complete/
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+  });
+
+  suite('resolveRetryDelayMs', () => {
+    test('uses fallback when Retry-After is missing', () => {
+      assert.equal(resolveRetryDelayMs(null, 1000), 1000);
+    });
+
+    test('parses Retry-After seconds', () => {
+      assert.equal(resolveRetryDelayMs('3', 1000), 3000);
+    });
+
+    test('uses fallback for malformed Retry-After headers', () => {
+      assert.equal(resolveRetryDelayMs('not-a-delay', 1000), 1000);
+    });
+
+    test('supports Retry-After HTTP-date values', () => {
+      const future = new Date(Date.now() + 5000).toUTCString();
+      const delay = resolveRetryDelayMs(future, 1000);
+      assert.ok(delay > 0);
+      assert.ok(delay <= 5000);
     });
   });
 
