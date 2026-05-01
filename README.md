@@ -611,6 +611,8 @@ Use `/workiq` to send natural language queries to the [Work IQ Gateway](https://
 
 Contributions are welcome! Please review the guidelines below before submitting a pull request.
 
+Please also read [CONTRIBUTING.md](./CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feature/my-feature`.
 3. Commit your changes: `git commit -m "feat: add my feature"`.
