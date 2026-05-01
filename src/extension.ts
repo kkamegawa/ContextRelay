@@ -18,6 +18,7 @@ import { setWorkIqLogger } from './adapters/workIqAdapter';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const GRAPH_DEBUG_LOGGING_CONFIG_KEY = 'enableGraphDebugLogging';
+  const WORKIQ_DEBUG_LOGGING_CONFIG_KEY = 'enableWorkIqDebugLogging';
   let debugChannel: vscode.OutputChannel | undefined;
 
   const ensureDebugChannel = (): vscode.OutputChannel => {
@@ -35,7 +36,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       log: (msg: string) => channel.appendLine(`[${new Date().toISOString()}] ${msg}`)
     };
     setGraphLogger(logger);
-    setWorkIqLogger(logger);
     return channel;
   };
 
@@ -49,14 +49,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     } : undefined;
 
     setGraphLogger(logger);
+  };
+
+  const syncWorkIqDebugLogging = (): void => {
+    const isEnabled = vscode.workspace
+      .getConfiguration('contextRelay')
+      .get<boolean>(WORKIQ_DEBUG_LOGGING_CONFIG_KEY, false);
+
+    const logger = isEnabled ? {
+      log: (msg: string) => ensureDebugChannel().appendLine(`[${new Date().toISOString()}] ${msg}`)
+    } : undefined;
+
     setWorkIqLogger(logger);
   };
 
   syncGraphDebugLogging();
+  syncWorkIqDebugLogging();
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(`contextRelay.${GRAPH_DEBUG_LOGGING_CONFIG_KEY}`)) {
         syncGraphDebugLogging();
+      }
+      if (event.affectsConfiguration(`contextRelay.${WORKIQ_DEBUG_LOGGING_CONFIG_KEY}`)) {
+        syncWorkIqDebugLogging();
       }
     })
   );

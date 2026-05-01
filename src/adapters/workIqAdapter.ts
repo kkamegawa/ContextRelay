@@ -256,10 +256,9 @@ export async function sendWorkIqMessage(
 
     if (!response.ok) {
       const status = response.status;
-      let errorBody = '';
       try {
-        errorBody = await response.text();
-        logWorkIqResponseBody(errorBody);
+        // Discard the body without reading it to avoid logging sensitive content.
+        await response.body?.cancel();
       } catch {
         // ignore
       }
@@ -280,11 +279,15 @@ export async function sendWorkIqMessage(
         );
       }
 
-      throw new Error(`Work IQ API error ${status}: ${errorBody}`);
+      const requestId = response.headers.get('x-ms-request-id')
+        ?? response.headers.get('request-id')
+        ?? response.headers.get('x-request-id')
+        ?? response.headers.get('traceparent');
+      const requestIdSuffix = requestId ? ` (Request ID: ${requestId})` : '';
+      throw new Error(`Work IQ API error ${status}${requestIdSuffix}`);
     }
 
     const responseText = await response.text();
-    logWorkIqResponseBody(responseText);
     if (!responseText.trim()) {
       throw new Error('Work IQ returned an empty response body.');
     }
@@ -321,11 +324,21 @@ export async function sendWorkIqMessage(
 
     const newContextId = extractContextId(result);
     const task = result.task as Record<string, unknown> | undefined;
+    const taskId = typeof task?.id === 'string' ? task.id : undefined;
+
+    // Log only structural metadata — no body content to avoid leaking M365 data.
+    if (_logger) {
+      const metaParts = ['↳ Work IQ response:'];
+      if (taskState) { metaParts.push(`state=${taskState}`); }
+      if (taskId) { metaParts.push(`taskId=${taskId}`); }
+      if (newContextId) { metaParts.push(`contextId=${newContextId}`); }
+      _logger.log(metaParts.join(' '));
+    }
 
     return {
       text: textResponse,
       contextId: newContextId,
-      taskId: typeof task?.id === 'string' ? task.id : undefined,
+      taskId,
       state: taskState
     };
   }
@@ -353,26 +366,6 @@ export function resolveRetryDelayMs(retryAfterHeader: string | null, fallbackMs:
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function logWorkIqResponseBody(body: string): void {
-  if (!_logger || !body) {
-    return;
-  }
-
-  const formattedBody = formatWorkIqBodyForLogging(body);
-  _logger.log('↳ Work IQ response body:');
-  for (const line of formattedBody.split('\n')) {
-    _logger.log(`  ${line}`);
-  }
-}
-
-function formatWorkIqBodyForLogging(body: string): string {
-  try {
-    return JSON.stringify(JSON.parse(body), null, 2);
-  } catch {
-    return body;
-  }
 }
 
 export { WORKIQ_ENDPOINT, A2A_VERSION };

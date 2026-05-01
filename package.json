@@ -219,6 +219,11 @@
           "default": false,
           "description": "Enable Graph API debug logging in the ContextRelay Debug output channel"
         },
+        "contextRelay.enableWorkIqDebugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Work IQ API debug logging in the ContextRelay Debug output channel"
+        },
         "contextRelay.adapters.mail": {
           "type": "boolean",
           "default": true,

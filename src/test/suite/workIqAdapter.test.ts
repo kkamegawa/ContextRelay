@@ -281,7 +281,7 @@ suite('WorkIqAdapter', () => {
   });
 
   suite('sendWorkIqMessage', () => {
-    test('logs Work IQ request, response status, and response body', async () => {
+    test('logs Work IQ request, response status, and structural metadata', async () => {
       const originalFetch = globalThis.fetch;
       const messages: string[] = [];
       setWorkIqLogger({ log: (message: string) => messages.push(message) });
@@ -308,16 +308,17 @@ suite('WorkIqAdapter', () => {
 
         assert.equal(messages[0], '→ POST https://workiq.svc.cloud.microsoft/a2a/');
         assert.equal(messages[1], '← 200 OK https://workiq.svc.cloud.microsoft/a2a/');
-        assert.equal(messages[2], '↳ Work IQ response body:');
-        assert.ok(messages.some(message => message.includes('"jsonrpc": "2.0"')));
-        assert.ok(messages.some(message => message.includes('secret admin answer')));
+        assert.ok(messages.some(message => message.startsWith('↳ Work IQ response:')));
+        assert.ok(messages.some(message => message.includes('state=TASK_STATE_COMPLETED')));
+        assert.ok(messages.some(message => message.includes('taskId=task-1')));
+        assert.ok(!messages.some(message => message.includes('secret admin answer')), 'response body content must not appear in logs');
       } finally {
         globalThis.fetch = originalFetch;
         setWorkIqLogger(undefined);
       }
     });
 
-    test('logs HTTP error response bodies before throwing', async () => {
+    test('logs HTTP error status before throwing without logging response body', async () => {
       const originalFetch = globalThis.fetch;
       const messages: string[] = [];
       setWorkIqLogger({ log: (message: string) => messages.push(message) });
@@ -342,9 +343,8 @@ suite('WorkIqAdapter', () => {
 
         assert.equal(messages[0], '→ POST https://workiq.svc.cloud.microsoft/a2a/');
         assert.equal(messages[1], '← 403 Forbidden https://workiq.svc.cloud.microsoft/a2a/');
-        assert.equal(messages[2], '↳ Work IQ response body:');
-        assert.ok(messages.some(message => message.includes('"Forbidden"')));
-        assert.ok(messages.some(message => message.includes('detailed workiq error')));
+        assert.ok(!messages.some(message => message.includes('detailed workiq error')), 'error body must not appear in logs');
+        assert.ok(!messages.some(message => message.includes('↳ Work IQ response body:')), 'body log header must not appear');
       } finally {
         globalThis.fetch = originalFetch;
         setWorkIqLogger(undefined);

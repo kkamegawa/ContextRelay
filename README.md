@@ -79,12 +79,21 @@ The following delegated Microsoft Graph permissions are required by feature:
 | `People.Read.All` | Chat |
 | `OnlineMeetingTranscript.Read.All` | Chat |
 | `ExternalItem.Read.All` | Connectors search, Chat (optional) |
-| `WorkIQAgent.Ask` (on `api://workiq.svc.cloud.microsoft`) | `/workiq` command — Work IQ API (optional, requires Microsoft 365 Copilot license) |
 
 > **Important**:
 >
 > - Some permissions (for example `ChannelMessage.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ExternalItem.Read.All`) require **tenant admin consent**.
 > - This extension still uses the built-in VS Code auth provider; it just avoids VS Code's default first-party client ID for Graph consent.
+
+#### Work IQ (non-Graph) permissions
+
+`WorkIQAgent.Ask` is **not** a Microsoft Graph permission. It is a delegated permission on a separate resource endpoint used only by the `/workiq` command:
+
+| Permission | Resource endpoint | Used by |
+|---|---|---|
+| `WorkIQAgent.Ask` | `api://workiq.svc.cloud.microsoft` | `/workiq` command — Work IQ API (optional, requires Microsoft 365 Copilot license) |
+
+> **Important**: This permission requires **tenant admin consent** and is only useful for users with a **Microsoft 365 Copilot license**. See [docs/work_iq.md](docs/work_iq.md) for setup instructions.
 
 ---
 
