@@ -253,6 +253,145 @@ suite('WorkIqAdapter', () => {
   });
 
   suite('sendWorkIqMessage', () => {
+    test('parses successful JSON-RPC task response', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> =>
+        new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'request-1',
+          result: {
+            task: {
+              id: 'task-1',
+              contextId: 'ctx-1',
+              status: { state: 'TASK_STATE_COMPLETED' },
+              artifacts: [
+                { parts: [{ text: 'admin summary for Microsoft 365' }] }
+              ]
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      ) as typeof fetch;
+
+      try {
+        const response = await sendWorkIqMessage('token', 'admin summary');
+        assert.equal(response.text, 'admin summary for Microsoft 365');
+        assert.equal(response.contextId, 'ctx-1');
+        assert.equal(response.taskId, 'task-1');
+        assert.equal(response.state, 'TASK_STATE_COMPLETED');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    test('surfaces JSON-RPC errors from 200 responses', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> =>
+        new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'request-1',
+          error: {
+            code: -32601,
+            message: 'Method not found'
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      ) as typeof fetch;
+
+      try {
+        await assert.rejects(
+          () => sendWorkIqMessage('token', 'admin status'),
+          /JSON-RPC error \(-32601\): Method not found/
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    test('maps 401 and 403 responses to actionable errors', async () => {
+      const originalFetch = globalThis.fetch;
+      let status = 401;
+      globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> =>
+        new Response('forbidden', {
+          status,
+          headers: { 'Content-Type': 'text/plain' }
+        })
+      ) as typeof fetch;
+
+      try {
+        await assert.rejects(
+          () => sendWorkIqMessage('token', 'admin status'),
+          /session expired/
+        );
+
+        status = 403;
+
+        await assert.rejects(
+          () => sendWorkIqMessage('token', 'admin status'),
+          /Missing WorkIQAgent\.Ask permission or Microsoft 365 Copilot license/
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    test('retries 429 responses and cancels the throttled response body', async () => {
+      const originalFetch = globalThis.fetch;
+      let calls = 0;
+      let cancelled = false;
+
+      const throttledBody = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('throttled'));
+        },
+        cancel() {
+          cancelled = true;
+        }
+      });
+
+      globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> => {
+        calls++;
+
+        if (calls === 1) {
+          return new Response(throttledBody, {
+            status: 429,
+            headers: {
+              'Content-Type': 'text/plain',
+              'Retry-After': '0'
+            }
+          });
+        }
+
+        return new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'request-2',
+          result: {
+            task: {
+              id: 'task-2',
+              status: { state: 'TASK_STATE_COMPLETED' },
+              artifacts: [{ parts: [{ text: '品川 meeting summary' }] }]
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }) as typeof fetch;
+
+      try {
+        const response = await sendWorkIqMessage('token', '品川', undefined, 1);
+        assert.equal(response.text, '品川 meeting summary');
+        assert.equal(calls, 2);
+        assert.equal(cancelled, true);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
     test('does not retry network errors to avoid duplicate prompts', async () => {
       const originalFetch = globalThis.fetch;
       let calls = 0;
