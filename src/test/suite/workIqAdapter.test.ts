@@ -7,6 +7,7 @@ import {
   resolveRetryDelayMs,
   resolveLocationMetadata,
   sendWorkIqMessage,
+  setWorkIqLogger,
   WORKIQ_ENDPOINT,
   A2A_VERSION
 } from '../../adapters/workIqAdapter';
@@ -253,6 +254,42 @@ suite('WorkIqAdapter', () => {
   });
 
   suite('sendWorkIqMessage', () => {
+    test('logs Work IQ request and response status without logging body text', async () => {
+      const originalFetch = globalThis.fetch;
+      const messages: string[] = [];
+      setWorkIqLogger({ log: (message: string) => messages.push(message) });
+      globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> =>
+        new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'request-1',
+          result: {
+            task: {
+              id: 'task-1',
+              status: { state: 'TASK_STATE_COMPLETED' },
+              artifacts: [{ parts: [{ text: 'secret admin answer' }] }]
+            }
+          }
+        }), {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'application/json' }
+        })
+      ) as typeof fetch;
+
+      try {
+        await sendWorkIqMessage('token', 'admin status');
+
+        assert.deepEqual(messages, [
+          '→ POST https://workiq.svc.cloud.microsoft/a2a/',
+          '← 200 OK https://workiq.svc.cloud.microsoft/a2a/'
+        ]);
+        assert.ok(messages.every(message => !message.includes('secret admin answer')));
+      } finally {
+        globalThis.fetch = originalFetch;
+        setWorkIqLogger(undefined);
+      }
+    });
+
     test('parses successful JSON-RPC task response', async () => {
       const originalFetch = globalThis.fetch;
       globalThis.fetch = (async (_input: Parameters<typeof fetch>[0], _init?: RequestInit): Promise<Response> =>

@@ -188,7 +188,11 @@ export async function sendWorkIqMessage(
         const retryAfterHeader = response.headers.get('Retry-After');
         const retryDelay = resolveRetryDelayMs(retryAfterHeader, delay);
         _logger?.log(`⚠ Throttled (${response.status}), retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms`);
-        await response.body?.cancel();
+        try {
+          await response.body?.cancel();
+        } catch {
+          // Ignore cleanup failures and keep the retry flow moving.
+        }
         await sleep(Math.min(retryDelay, 30000));
         delay = Math.min(delay * 2, 30000);
         continue;

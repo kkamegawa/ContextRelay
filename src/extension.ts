@@ -14,6 +14,7 @@ import {
 import { persistViewLocation, readStoredViewLocation } from './panel/viewLocationState';
 import { AuthProvider } from './auth/authProvider';
 import { setGraphLogger } from './adapters/graphClient';
+import { setWorkIqLogger } from './adapters/workIqAdapter';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const GRAPH_DEBUG_LOGGING_CONFIG_KEY = 'enableGraphDebugLogging';
@@ -30,9 +31,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const enableGraphDebugLogging = (): vscode.OutputChannel => {
     const channel = ensureDebugChannel();
-    setGraphLogger({
+    const logger = {
       log: (msg: string) => channel.appendLine(`[${new Date().toISOString()}] ${msg}`)
-    });
+    };
+    setGraphLogger(logger);
+    setWorkIqLogger(logger);
     return channel;
   };
 
@@ -41,9 +44,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       .getConfiguration('contextRelay')
       .get<boolean>(GRAPH_DEBUG_LOGGING_CONFIG_KEY, false);
 
-    setGraphLogger(isEnabled ? {
+    const logger = isEnabled ? {
       log: (msg: string) => ensureDebugChannel().appendLine(`[${new Date().toISOString()}] ${msg}`)
-    } : undefined);
+    } : undefined;
+
+    setGraphLogger(logger);
+    setWorkIqLogger(logger);
   };
 
   syncGraphDebugLogging();
