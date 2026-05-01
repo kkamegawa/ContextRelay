@@ -1,7 +1,7 @@
 {
   "name": "context-relay",
   "displayName": "ContextRelay for Microsoft 365",
-  "description": "Surface Microsoft 365 context (SharePoint, OneDrive, Teams, Mail) in a VS Code side panel",
+  "description": "Surface Microsoft 365 context (SharePoint, OneDrive, Teams, Mail, WorkIQ) in a VS Code side panel",
   "version": "0.1.0",
   "publisher": "kkamegawa",
   "categories": [
@@ -39,9 +39,6 @@
     "node": ">=22.0.0",
     "vscode": "^1.85.0"
   },
-  "activationEvents": [
-    "onView:contextRelay.chatView"
-  ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -49,14 +46,14 @@
         {
           "id": "contextRelay",
           "title": "ContextRelay",
-          "icon": "media/icon.svg"
+          "icon": "media/contextRelay-icon.svg"
         }
       ],
       "secondarySidebar": [
         {
           "id": "contextRelaySecondary",
           "title": "ContextRelay",
-          "icon": "media/icon.svg"
+          "icon": "media/contextRelay-icon.svg"
         }
       ]
     },
