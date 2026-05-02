@@ -24,6 +24,7 @@
     "search",
     "productivity"
   ],
+  "icon": "media/icon.png",
   "preview": true,
   "pricing": "Free",
   "license": "MIT",
