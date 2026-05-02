@@ -9,7 +9,7 @@ const webviewConfig = {
   entryPoints: ['src/webview/main.ts'],
   bundle: true,
   outfile: 'dist/webview/main.js',
-  format: 'esm',
+  format: 'iife',
   platform: 'browser',
   target: 'es2022',
   sourcemap: !production,

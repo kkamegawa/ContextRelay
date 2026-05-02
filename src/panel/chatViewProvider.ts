@@ -1299,7 +1299,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     </div>
   </div>
 
-  <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
   }
