@@ -198,7 +198,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Register the WebviewView provider
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatViewProvider, {
-      webviewOptions: { retainContextWhenHidden: true }
+      webviewOptions: { retainContextWhenHidden: false }
     })
   );
 

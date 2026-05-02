@@ -1,5 +1,8 @@
 import { strict as assert } from 'assert';
+import * as fs from 'fs';
 import Module from 'module';
+import * as os from 'os';
+import * as path from 'path';
 import type * as vscode from 'vscode';
 
 type ChatViewProviderClass = typeof import('../../panel/chatViewProvider').ChatViewProvider;
@@ -83,7 +86,10 @@ function createVscodeStub(): typeof vscode {
       }
     },
     Uri: {
-      parse: (value: string) => ({ scheme: value.split(':', 1)[0] })
+      parse: (value: string) => ({ scheme: value.split(':', 1)[0] }),
+      joinPath: (base: { fsPath: string }, ...segments: string[]) => ({
+        fsPath: path.join(base.fsPath, ...segments)
+      })
     }
   } as unknown as typeof vscode;
 }
@@ -190,6 +196,44 @@ suite('ChatViewProvider', () => {
       { text: 'Work IQ first answer', contextId: 'ctx-workiq-1' },
       { text: 'Work IQ second answer', contextId: 'ctx-workiq-2' }
     ];
+  });
+
+  test('inlines the webview script without local resource URIs', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-webview-'));
+    const scriptDir = path.join(root, 'dist', 'webview');
+    fs.mkdirSync(scriptDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(scriptDir, 'main.js'),
+      '(() => { window.__contextRelayTest = "</script><!--"; })();\n//# sourceMappingURL=main.js.map',
+      'utf8'
+    );
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        {} as never,
+        { fsPath: root } as never
+      );
+      const webview = {
+        cspSource: 'vscode-webview://context-relay-test',
+        asWebviewUri: () => {
+          throw new Error('webview local resources should not be used');
+        }
+      } as unknown as vscode.Webview;
+
+      const html = (provider as unknown as {
+        getHtmlForWebview(webview: vscode.Webview): string;
+      }).getHtmlForWebview(webview);
+
+      assert.ok(html.includes('window.__contextRelayTest'));
+      assert.ok(!html.includes('src="'));
+      assert.ok(!html.includes('type="module"'));
+      assert.ok(!html.includes('sourceMappingURL'));
+      assert.ok(html.includes('<\\/script><\\!--'));
+      assert.equal(html.indexOf('</script>'), html.lastIndexOf('</script>'));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test('includes the latest visible result in follow-up Copilot chat context', async () => {

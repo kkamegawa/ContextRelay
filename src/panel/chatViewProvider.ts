@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { createConversation, sendMessage } from '../adapters/chatAdapter';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
@@ -89,8 +90,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       vscode.ViewColumn.Active,
       {
         enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [this.extensionUri]
+        retainContextWhenHidden: false,
+        localResourceRoots: []
       }
     );
 
@@ -167,7 +168,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.hosts.set(kind, { webview, ready: false });
     webview.options = {
       enableScripts: true,
-      localResourceRoots: [this.extensionUri]
+      localResourceRoots: []
     };
     webview.html = this.getHtmlForWebview(webview);
     subscriptions.push(
@@ -836,10 +837,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private getHtmlForWebview(webview: vscode.Webview): string {
     const nonce = crypto.randomBytes(16).toString('hex');
-
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'main.js')
-    );
+    const script = readWebviewScript(this.extensionUri);
 
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -1299,8 +1297,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     </div>
   </div>
 
-  <script nonce="${nonce}" src="${scriptUri}"></script>
+  <script nonce="${nonce}">${script}</script>
 </body>
 </html>`;
   }
+}
+
+function readWebviewScript(extensionUri: vscode.Uri): string {
+  const scriptPath = vscode.Uri.joinPath(extensionUri, 'dist', 'webview', 'main.js').fsPath;
+  const script = fs.readFileSync(scriptPath, 'utf8');
+
+  return script
+    .replace(/^\/\/# sourceMappingURL=.*$/gm, '')
+    .replace(/<\/script/gi, '<\\/script')
+    .replace(/<!--/g, '<\\!--');
 }
