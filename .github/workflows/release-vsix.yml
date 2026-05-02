@@ -17,12 +17,12 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -59,7 +59,7 @@ jobs:
           echo "vsix_path=${VSIX_PATH}" >> "${GITHUB_OUTPUT}"
 
       - name: Publish VSIX to GitHub Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vsix-${{ github.ref_name }}
           path: ${{ steps.package.outputs.vsix_path }}
@@ -67,7 +67,7 @@ jobs:
 
       - name: Build release context (diff/issues since previous release)
         id: release_notes
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const owner = context.repo.owner;
@@ -139,7 +139,7 @@ jobs:
             core.setOutput('body', body);
 
       - name: Create GitHub Release (standard style with generated notes)
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
