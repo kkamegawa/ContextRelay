@@ -79,11 +79,20 @@ function clearPendingSubmission(): void {
 
 // --- Event listeners ---
 
-// Notify extension that webview is ready
-window.addEventListener('DOMContentLoaded', () => {
+// Notify extension that webview is ready.
+// The script is loaded with `defer`, so the DOM is fully parsed by the time
+// this code runs. We post `webviewReady` directly instead of waiting for
+// the DOMContentLoaded event (which has already fired).
+function initWebview(): void {
   vscode.postMessage({ command: 'webviewReady' });
   promptInput.focus();
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', initWebview);
+} else {
+  initWebview();
+}
 
 // Send button click
 sendButton.addEventListener('click', submitQuery);
