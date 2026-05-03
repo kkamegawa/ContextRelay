@@ -1,4 +1,5 @@
 import { strict as assert } from 'assert';
+import * as fs from 'fs';
 import Module from 'module';
 import * as os from 'os';
 import * as path from 'path';
@@ -198,29 +199,33 @@ suite('ChatViewProvider', () => {
   });
 
   test('loads the webview script via external URI (no blocking file read)', () => {
-    const root = path.join(os.tmpdir(), 'context-relay-webview-test');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-webview-'));
 
-    const provider = new ChatViewProvider(
-      createContext(),
-      {} as never,
-      { fsPath: root, joinPath: (...segments: string[]) => ({ fsPath: path.join(root, ...segments) }) } as never
-    );
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        {} as never,
+        { fsPath: root, joinPath: (...segments: string[]) => ({ fsPath: path.join(root, ...segments) }) } as never
+      );
 
-    const scriptWebviewUri = 'vscode-webview-resource://dist/webview/main.js';
-    const webview = {
-      cspSource: 'vscode-webview://context-relay-test',
-      asWebviewUri: () => ({ toString: () => scriptWebviewUri })
-    } as unknown as vscode.Webview;
+      const scriptWebviewUri = 'vscode-webview-resource://dist/webview/main.js';
+      const webview = {
+        cspSource: 'vscode-webview://context-relay-test',
+        asWebviewUri: () => ({ toString: () => scriptWebviewUri })
+      } as unknown as vscode.Webview;
 
-    const html = (provider as unknown as {
-      getHtmlForWebview(webview: vscode.Webview): string;
-    }).getHtmlForWebview(webview);
+      const html = (provider as unknown as {
+        getHtmlForWebview(webview: vscode.Webview): string;
+      }).getHtmlForWebview(webview);
 
-    // Script is loaded via src= attribute, not inlined
-    assert.ok(html.includes(`src="${scriptWebviewUri}"`), 'HTML should reference the external script URI');
-    assert.ok(html.includes('defer'), 'script tag should have defer so the panel HTML renders first');
-    // CSP must allow the webview cspSource for the external script to load
-    assert.ok(html.includes(webview.cspSource), 'CSP should include webview.cspSource');
+      // Script is loaded via src= attribute, not inlined
+      assert.ok(html.includes(`src="${scriptWebviewUri}"`), 'HTML should reference the external script URI');
+      assert.ok(html.includes('defer'), 'script tag should have defer so the panel HTML renders first');
+      // CSP must allow the webview cspSource for the external script to load
+      assert.ok(html.includes(webview.cspSource), 'CSP should include webview.cspSource');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test('includes the latest visible result in follow-up Copilot chat context', async () => {

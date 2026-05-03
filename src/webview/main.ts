@@ -209,6 +209,7 @@ window.addEventListener('message', (event) => {
 });
 
 // Notify the extension only after all webview handlers are registered.
+// With `defer` the DOM is already parsed when this runs; the readyState guard is a fallback for non-defer execution.
 function initWebview(): void {
   vscode.postMessage({ command: 'webviewReady' });
   promptInput.focus();
