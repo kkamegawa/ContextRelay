@@ -121,7 +121,7 @@ suite('Dependency security baselines', () => {
     );
   });
 
-  test('locks installed glob and diff versions outside known vulnerable ranges', () => {
+  test('locks installed glob, diff, and fast-uri versions outside known vulnerable ranges', () => {
     const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
 
     // The glob override applies to mocha's transitive dependency, so the installed
@@ -131,6 +131,8 @@ suite('Dependency security baselines', () => {
       packageLockJson.packages?.['node_modules/glob'];
     const globVersion = globPackage?.version;
     const diffVersion = packageLockJson.packages?.['node_modules/diff']?.version;
+    const fastUriPackage = packageLockJson.packages?.['node_modules/fast-uri'];
+    const fastUriVersion = fastUriPackage?.version;
 
     assert.ok(
       compareVersions(globVersion, '12.0.0') >= 0,
@@ -147,6 +149,17 @@ suite('Dependency security baselines', () => {
       Boolean(diffVersion) &&
         (compareVersions(diffVersion, '6.0.0') < 0 || compareVersions(diffVersion, '8.0.3') >= 0),
       `installed diff must stay outside the vulnerable range 6.0.0-8.0.2 (found: ${diffVersion ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(fastUriVersion, '3.1.2') >= 0,
+      `installed fast-uri must stay on a non-vulnerable release (found: ${fastUriVersion ?? 'missing'})`
+    );
+
+    assert.equal(
+      fastUriPackage?.deprecated,
+      undefined,
+      `installed fast-uri must not be deprecated (found: ${fastUriPackage?.deprecated ?? 'not deprecated'})`
     );
   });
 
