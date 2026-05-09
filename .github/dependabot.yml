@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: daily
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    cooldown:
+      default-days: 6
+      semver-major-days: 20
+      semver-minor-days: 10
+      semver-patch-days: 5
+    target-branch: main
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
