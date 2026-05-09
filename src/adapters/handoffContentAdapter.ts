@@ -4,7 +4,7 @@ import { createMailPreview, getMailMessageId, normalizePreviewText } from '../pa
 import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from './graphClient';
 import { extractWordprocessingText } from '../textExtraction';
 
-export { extractWordprocessingText } from '../textExtraction';
+export { extractWordprocessingText };
 
 interface MailBodyResponse {
   body?: {
