@@ -606,13 +606,15 @@
     const contentKind = getPreviewContentKind(preview);
     if (contentKind === 'html' && preview.content && typeof preview.content.html === 'string') {
       body.classList.add('preview-body-html');
-      body.innerHTML = preview.content.html;
+      body.innerHTML = sanitizeHtmlContent(preview.content.html);
     } else if (contentKind === 'image' && preview.content && typeof preview.content.src === 'string') {
       body.classList.add('preview-body-image');
 
       const image = document.createElement('img');
       image.className = 'preview-image';
-      image.src = preview.content.src;
+      if (isValidImageUrl(preview.content.src)) {
+        image.src = preview.content.src;
+      }
       image.alt = preview.content.alt || `${preview.title || 'Preview'} image`;
       body.appendChild(image);
 
@@ -880,6 +882,62 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  /**
+   * Sanitize HTML by removing script tags and dangerous attributes.
+   * @param {string} html
+   * @returns {string}
+   */
+  function sanitizeHtmlContent(html) {
+    if (!html || typeof html !== 'string') {
+      return '';
+    }
+
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+
+    const dangerous = ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'];
+    dangerous.forEach(tag => {
+      const elements = temp.querySelectorAll(tag);
+      elements.forEach(el => el.remove());
+    });
+
+    const allElements = temp.querySelectorAll('*');
+    allElements.forEach(el => {
+      const dangerousAttrs = Array.from(el.attributes || [])
+        .filter(attr => attr.name.toLowerCase().startsWith('on'));
+      dangerousAttrs.forEach(attr => el.removeAttribute(attr.name));
+    });
+
+    return temp.innerHTML;
+  }
+
+  /**
+   * Validate that an image URL is safe to use.
+   * @param {string} url
+   * @returns {boolean}
+   */
+  function isValidImageUrl(url) {
+    if (!url || typeof url !== 'string') {
+      return false;
+    }
+
+    try {
+      const parsed = new URL(url, window.location.href);
+      const protocol = parsed.protocol;
+      if (protocol === 'http:' || protocol === 'https:') {
+        return true;
+      }
+
+      if (protocol === 'data:') {
+        return url.startsWith('data:image/');
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   function savePreviewToHandoff(selectionOnly) {
