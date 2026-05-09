@@ -284,7 +284,7 @@
     "watch": "concurrently -k \"npm:watch:extension\" \"npm:watch:webview\"",
     "prepackage": "npm run security:check",
     "package": "npm run compile:types && npm run compile:webview && webpack --mode production --devtool hidden-source-map && npm run bundle:webview:prod",
-    "vsce:package": "npx @vscode/vsce package --no-dependencies",
+    "vsce:package": "npx --yes @vscode/vsce@3.2.2 package --no-dependencies",
     "compile-tests": "tsc -p ./tsconfig.test.json",
     "pretest": "npm run compile-tests",
     "test": "mocha --ui tdd --timeout 10000 \"out-test/src/test/suite/**/*.test.js\"",
