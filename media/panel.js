@@ -46,6 +46,7 @@
   let latestSearchQuery = '';
   let currentPreviewItem = null;
   let currentPreview = null;
+  let currentPreviewImageObjectUrl = null;
 
   function activateTab(target) {
     tabs.forEach(t => {
@@ -547,6 +548,7 @@
    * @param {any} item
    */
   function renderPreviewLoading(item) {
+    clearPreviewImageObjectUrl();
     currentPreviewItem = item || null;
     currentPreview = null;
     showPreviewView(item && item.source ? capitalizeSource(item.source) : 'Preview');
@@ -561,6 +563,7 @@
    * @param {any} preview
    */
   function renderPreview(preview) {
+    clearPreviewImageObjectUrl();
     currentPreview = preview || null;
     showPreviewView(preview && preview.source ? capitalizeSource(preview.source) : 'Preview');
     if (!previewContent) { return; }
@@ -606,15 +609,22 @@
     const contentKind = getPreviewContentKind(preview);
     if (contentKind === 'html' && preview.content && typeof preview.content.html === 'string') {
       body.classList.add('preview-body-html');
-      body.innerHTML = sanitizeHtmlContent(preview.content.html); // lgtm [js/xss]
+      const safeHtml = buildSanitizedHtmlFragment(preview.content.html);
+      if (safeHtml.childNodes.length > 0) {
+        body.appendChild(safeHtml);
+      } else {
+        body.textContent = previewText;
+      }
     } else if (contentKind === 'image' && preview.content && typeof preview.content.src === 'string') {
-      if (isValidImageUrl(preview.content.src)) {
+      const safeImageUrl = createSafePreviewImageObjectUrl(preview.content.src);
+      if (safeImageUrl) {
         body.classList.add('preview-body-image');
         const image = document.createElement('img');
         image.className = 'preview-image';
-        image.src = preview.content.src; // lgtm [js/client-side-unvalidated-url-redirection, js/xss]
+        image.src = safeImageUrl;
         image.alt = preview.content.alt || `${preview.title || 'Preview'} image`;
         body.appendChild(image);
+        currentPreviewImageObjectUrl = safeImageUrl;
 
         if (previewText) {
           const caption = document.createElement('div');
@@ -657,6 +667,7 @@
    * @param {string} message
    */
   function renderPreviewError(message) {
+    clearPreviewImageObjectUrl();
     currentPreview = null;
     showPreviewView('Preview');
     if (!previewContent) { return; }
@@ -676,6 +687,7 @@
   }
 
   function clearPreviewSelection(showPlaceholder = false) {
+    clearPreviewImageObjectUrl();
     selectedItemKey = null;
     currentPreviewItem = null;
     currentPreview = null;
@@ -686,6 +698,7 @@
   }
 
   function renderPreviewPlaceholder() {
+    clearPreviewImageObjectUrl();
     showPreviewView('Preview');
     if (!previewContent) { return; }
     previewContent.innerHTML = '<div class="preview-empty">検索結果を選ぶと、ここに本文・メタデータ・リンクを表示します。</div>';
@@ -885,112 +898,198 @@
       .replace(/'/g, '&#039;');
   }
 
+  const SANITIZED_PREVIEW_TAGS = new Set([
+    'a',
+    'b',
+    'blockquote',
+    'br',
+    'code',
+    'dd',
+    'del',
+    'div',
+    'dl',
+    'dt',
+    'em',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'hr',
+    'i',
+    'li',
+    'ol',
+    'p',
+    'pre',
+    's',
+    'small',
+    'span',
+    'strong',
+    'sub',
+    'sup',
+    'table',
+    'tbody',
+    'td',
+    'tfoot',
+    'th',
+    'thead',
+    'tr',
+    'u',
+    'ul'
+  ]);
+  const SAFE_IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:png|jpeg|gif|webp));base64,([a-z0-9+/=\s]+)$/i;
+
   /**
-   * Sanitize HTML by removing script tags and dangerous attributes.
-   * Aligns with extension-host sanitization for defense-in-depth.
+   * Build a safe fragment from preview HTML using an allowlist copy.
    * @param {string} html
-   * @returns {string}
+   * @returns {DocumentFragment}
    */
-  function sanitizeHtmlContent(html) {
+  function buildSanitizedHtmlFragment(html) {
+    const fragment = document.createDocumentFragment();
     if (!html || typeof html !== 'string') {
-      return '';
+      return fragment;
     }
 
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
+    const parsed = new DOMParser().parseFromString(html, 'text/html');
+    Array.from(parsed.body.childNodes).forEach(node => {
+      fragment.appendChild(sanitizePreviewNode(node));
+    });
+    return fragment;
+  }
 
-    const dangerous = ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'];
-    dangerous.forEach(tag => {
-      const elements = temp.querySelectorAll(tag);
-      elements.forEach(el => el.remove());
+  /**
+   * @param {Node} node
+   * @returns {Node}
+   */
+  function sanitizePreviewNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.textContent || '');
+    }
+
+    if (!(node instanceof Element)) {
+      return document.createDocumentFragment();
+    }
+
+    const tagName = node.tagName.toLowerCase();
+    const safeChildren = document.createDocumentFragment();
+    Array.from(node.childNodes).forEach(child => {
+      safeChildren.appendChild(sanitizePreviewNode(child));
     });
 
-    const allElements = temp.querySelectorAll('*');
-    allElements.forEach(el => {
-      const dangerousAttrs = Array.from(el.attributes || [])
-        .filter(attr => attr.name.toLowerCase().startsWith('on'));
-      dangerousAttrs.forEach(attr => el.removeAttribute(attr.name));
+    if (!SANITIZED_PREVIEW_TAGS.has(tagName)) {
+      return safeChildren;
+    }
 
-      const hrefAttr = el.getAttribute('href');
-      if (hrefAttr && !isValidHrefScheme(hrefAttr)) {
-        el.removeAttribute('href');
-      }
-
-      const srcAttr = el.getAttribute('src');
-      if (srcAttr && !isValidSrcScheme(srcAttr)) {
-        el.removeAttribute('src');
-      }
-
-      const xlinkHrefAttr = el.getAttribute('xlink:href');
-      if (xlinkHrefAttr && !isValidSrcScheme(xlinkHrefAttr)) {
-        el.removeAttribute('xlink:href');
-      }
-    });
-
-    return temp.innerHTML;
+    const sanitized = document.createElement(tagName);
+    applySafePreviewAttributes(node, sanitized, tagName);
+    sanitized.appendChild(safeChildren);
+    return sanitized;
   }
 
   /**
-   * Check if href URL scheme is safe (http, https, mailto only).
-   * @param {string} url
-   * @returns {boolean}
+   * @param {Element} source
+   * @param {Element} target
+   * @param {string} tagName
    */
-  function isValidHrefScheme(url) {
-    try {
-      const parsed = new URL(url, window.location.href);
-      return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
-    } catch {
-      return false;
+  function applySafePreviewAttributes(source, target, tagName) {
+    if (tagName === 'a') {
+      const safeHref = getSafePreviewHref(source.getAttribute('href'));
+      if (safeHref) {
+        target.setAttribute('href', safeHref);
+        target.setAttribute('target', '_blank');
+        target.setAttribute('rel', 'noreferrer noopener');
+      }
+      return;
+    }
+
+    if (tagName === 'td' || tagName === 'th') {
+      copyPositiveIntegerAttribute(source, target, 'colspan');
+      copyPositiveIntegerAttribute(source, target, 'rowspan');
     }
   }
 
   /**
-   * Check if src/xlink:href URL scheme is safe (http, https, data:image/* with base64 only).
-   * @param {string} url
-   * @returns {boolean}
+   * @param {Element} source
+   * @param {Element} target
+   * @param {string} attributeName
    */
-  function isValidSrcScheme(url) {
-    try {
-      const parsed = new URL(url, window.location.href);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        return true;
-      }
-      return false;
-    } catch {
-      if (typeof url === 'string' && url.startsWith('data:image/')) {
-        return url.includes(';base64,');
-      }
-      return false;
+  function copyPositiveIntegerAttribute(source, target, attributeName) {
+    const value = source.getAttribute(attributeName);
+    if (!value || !/^\d+$/.test(value)) {
+      return;
     }
+    target.setAttribute(attributeName, value);
   }
 
   /**
-   * Validate that an image URL is safe to use.
-   * Restricts to http/https or raster data:image URLs with base64 encoding.
-   * @param {string} url
-   * @returns {boolean}
+   * @param {string | null} url
+   * @returns {string | null}
    */
-  function isValidImageUrl(url) {
+  function getSafePreviewHref(url) {
     if (!url || typeof url !== 'string') {
-      return false;
+      return null;
     }
 
     try {
       const parsed = new URL(url, window.location.href);
-      const protocol = parsed.protocol;
-      if (protocol === 'http:' || protocol === 'https:') {
-        return true;
+      if (['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+        return parsed.href;
       }
-      return false;
     } catch {
-      if (typeof url === 'string' && url.startsWith('data:image/')) {
-        const mimeAndData = url.substring('data:'.length);
-        const mime = mimeAndData.split(';')[0];
-        const allowedMimes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-        return allowedMimes.includes(mime) && mimeAndData.includes(';base64,');
-      }
-      return false;
+      return null;
     }
+
+    return null;
+  }
+
+  /**
+   * Convert a vetted raster data URL into a blob URL before rendering.
+   * @param {string} url
+   * @returns {string | null}
+   */
+  function createSafePreviewImageObjectUrl(url) {
+    if (!url || typeof url !== 'string') {
+      return null;
+    }
+
+    const match = SAFE_IMAGE_DATA_URL_PATTERN.exec(url.trim());
+    if (!match) {
+      return null;
+    }
+
+    const mimeType = match[1].toLowerCase();
+    const base64Payload = match[2].replace(/\s+/g, '');
+    if (!isValidBase64Payload(base64Payload)) {
+      return null;
+    }
+
+    try {
+      const binary = window.atob(base64Payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * @param {string} value
+   * @returns {boolean}
+   */
+  function isValidBase64Payload(value) {
+    return value.length > 0 && value.length % 4 === 0 && /^[a-z0-9+/]+=*$/i.test(value);
+  }
+
+  function clearPreviewImageObjectUrl() {
+    if (!currentPreviewImageObjectUrl) {
+      return;
+    }
+    URL.revokeObjectURL(currentPreviewImageObjectUrl);
+    currentPreviewImageObjectUrl = null;
   }
 
   function savePreviewToHandoff(selectionOnly) {
