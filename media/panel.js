@@ -608,21 +608,22 @@
       body.classList.add('preview-body-html');
       body.innerHTML = sanitizeHtmlContent(preview.content.html);
     } else if (contentKind === 'image' && preview.content && typeof preview.content.src === 'string') {
-      body.classList.add('preview-body-image');
-
-      const image = document.createElement('img');
-      image.className = 'preview-image';
       if (isValidImageUrl(preview.content.src)) {
+        body.classList.add('preview-body-image');
+        const image = document.createElement('img');
+        image.className = 'preview-image';
         image.src = preview.content.src;
-      }
-      image.alt = preview.content.alt || `${preview.title || 'Preview'} image`;
-      body.appendChild(image);
+        image.alt = preview.content.alt || `${preview.title || 'Preview'} image`;
+        body.appendChild(image);
 
-      if (previewText) {
-        const caption = document.createElement('div');
-        caption.className = 'preview-image-caption';
-        caption.textContent = previewText;
-        body.appendChild(caption);
+        if (previewText) {
+          const caption = document.createElement('div');
+          caption.className = 'preview-image-caption';
+          caption.textContent = previewText;
+          body.appendChild(caption);
+        }
+      } else {
+        body.textContent = previewText;
       }
     } else {
       body.textContent = previewText;
@@ -886,6 +887,7 @@
 
   /**
    * Sanitize HTML by removing script tags and dangerous attributes.
+   * Aligns with extension-host sanitization for defense-in-depth.
    * @param {string} html
    * @returns {string}
    */
@@ -908,13 +910,63 @@
       const dangerousAttrs = Array.from(el.attributes || [])
         .filter(attr => attr.name.toLowerCase().startsWith('on'));
       dangerousAttrs.forEach(attr => el.removeAttribute(attr.name));
+
+      const hrefAttr = el.getAttribute('href');
+      if (hrefAttr && !isValidHrefScheme(hrefAttr)) {
+        el.removeAttribute('href');
+      }
+
+      const srcAttr = el.getAttribute('src');
+      if (srcAttr && !isValidSrcScheme(srcAttr)) {
+        el.removeAttribute('src');
+      }
+
+      const xlinkHrefAttr = el.getAttribute('xlink:href');
+      if (xlinkHrefAttr && !isValidSrcScheme(xlinkHrefAttr)) {
+        el.removeAttribute('xlink:href');
+      }
     });
 
     return temp.innerHTML;
   }
 
   /**
+   * Check if href URL scheme is safe (http, https, mailto only).
+   * @param {string} url
+   * @returns {boolean}
+   */
+  function isValidHrefScheme(url) {
+    try {
+      const parsed = new URL(url, window.location.href);
+      return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if src/xlink:href URL scheme is safe (http, https, data:image/* with base64 only).
+   * @param {string} url
+   * @returns {boolean}
+   */
+  function isValidSrcScheme(url) {
+    try {
+      const parsed = new URL(url, window.location.href);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return true;
+      }
+      return false;
+    } catch {
+      if (typeof url === 'string' && url.startsWith('data:image/')) {
+        return url.includes(';base64,');
+      }
+      return false;
+    }
+  }
+
+  /**
    * Validate that an image URL is safe to use.
+   * Restricts to http/https or raster data:image URLs with base64 encoding.
    * @param {string} url
    * @returns {boolean}
    */
@@ -929,13 +981,14 @@
       if (protocol === 'http:' || protocol === 'https:') {
         return true;
       }
-
-      if (protocol === 'data:') {
-        return url.startsWith('data:image/');
-      }
-
       return false;
     } catch {
+      if (typeof url === 'string' && url.startsWith('data:image/')) {
+        const mimeAndData = url.substring('data:'.length);
+        const mime = mimeAndData.split(';')[0];
+        const allowedMimes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        return allowedMimes.includes(mime) && mimeAndData.includes(';base64,');
+      }
       return false;
     }
   }
