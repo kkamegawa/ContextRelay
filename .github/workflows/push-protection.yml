@@ -39,11 +39,19 @@ jobs:
             MODE="pusher"
           fi
 
-          echo "Validating ${MODE}: ${SUBJECT} (allowed: ${OWNER}, ${DEPENDABOT})"
+          if [ "${EVENT_NAME}" = "pull_request" ]; then
+            ALLOWED="${OWNER}, ${DEPENDABOT}"
+          else
+            ALLOWED="${OWNER}"
+          fi
 
-          if [ "${SUBJECT}" != "${OWNER}" ] && [ "${SUBJECT}" != "${DEPENDABOT}" ]; then
-            echo "Only repository owner (${OWNER}) or ${DEPENDABOT} can push or propose changes to main/tags."
-            exit 1
+          echo "Validating ${MODE}: ${SUBJECT} (allowed: ${ALLOWED})"
+
+          if [ "${SUBJECT}" != "${OWNER}" ]; then
+            if [ "${EVENT_NAME}" != "pull_request" ] || [ "${SUBJECT}" != "${DEPENDABOT}" ]; then
+              echo "Only repository owner (${OWNER}) can push to main/tags. Pull requests to main may also be authored by ${DEPENDABOT}."
+              exit 1
+            fi
           fi
 
           echo "Validation passed."
