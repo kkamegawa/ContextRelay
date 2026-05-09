@@ -46,6 +46,7 @@
   let latestSearchQuery = '';
   let currentPreviewItem = null;
   let currentPreview = null;
+  let currentPreviewImageObjectUrl = null;
 
   function activateTab(target) {
     tabs.forEach(t => {
@@ -547,6 +548,7 @@
    * @param {any} item
    */
   function renderPreviewLoading(item) {
+    clearPreviewImageObjectUrl();
     currentPreviewItem = item || null;
     currentPreview = null;
     showPreviewView(item && item.source ? capitalizeSource(item.source) : 'Preview');
@@ -561,6 +563,7 @@
    * @param {any} preview
    */
   function renderPreview(preview) {
+    clearPreviewImageObjectUrl();
     currentPreview = preview || null;
     showPreviewView(preview && preview.source ? capitalizeSource(preview.source) : 'Preview');
     if (!previewContent) { return; }
@@ -605,22 +608,26 @@
     const previewText = getPreviewText(preview) || 'No preview text is available for this item yet.';
     const contentKind = getPreviewContentKind(preview);
     if (contentKind === 'html' && preview.content && typeof preview.content.html === 'string') {
-      body.classList.add('preview-body-html');
-      body.innerHTML = preview.content.html;
+      body.textContent = previewText;
     } else if (contentKind === 'image' && preview.content && typeof preview.content.src === 'string') {
-      body.classList.add('preview-body-image');
+      const safeImageUrl = createSafePreviewImageObjectUrl(preview.content.src);
+      if (safeImageUrl) {
+        body.classList.add('preview-body-image');
+        const image = document.createElement('img');
+        image.className = 'preview-image';
+        image.src = safeImageUrl;
+        image.alt = preview.content.alt || `${preview.title || 'Preview'} image`;
+        body.appendChild(image);
+        currentPreviewImageObjectUrl = safeImageUrl;
 
-      const image = document.createElement('img');
-      image.className = 'preview-image';
-      image.src = preview.content.src;
-      image.alt = preview.content.alt || `${preview.title || 'Preview'} image`;
-      body.appendChild(image);
-
-      if (previewText) {
-        const caption = document.createElement('div');
-        caption.className = 'preview-image-caption';
-        caption.textContent = previewText;
-        body.appendChild(caption);
+        if (previewText) {
+          const caption = document.createElement('div');
+          caption.className = 'preview-image-caption';
+          caption.textContent = previewText;
+          body.appendChild(caption);
+        }
+      } else {
+        body.textContent = previewText;
       }
     } else {
       body.textContent = previewText;
@@ -654,6 +661,7 @@
    * @param {string} message
    */
   function renderPreviewError(message) {
+    clearPreviewImageObjectUrl();
     currentPreview = null;
     showPreviewView('Preview');
     if (!previewContent) { return; }
@@ -673,6 +681,7 @@
   }
 
   function clearPreviewSelection(showPlaceholder = false) {
+    clearPreviewImageObjectUrl();
     selectedItemKey = null;
     currentPreviewItem = null;
     currentPreview = null;
@@ -683,6 +692,7 @@
   }
 
   function renderPreviewPlaceholder() {
+    clearPreviewImageObjectUrl();
     showPreviewView('Preview');
     if (!previewContent) { return; }
     previewContent.innerHTML = '<div class="preview-empty">検索結果を選ぶと、ここに本文・メタデータ・リンクを表示します。</div>';
@@ -880,6 +890,57 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  const SAFE_IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:png|jpeg|gif|webp));base64,([a-z0-9+/=\s]+)$/i;
+
+  /**
+   * Convert a vetted raster data URL into a blob URL before rendering.
+   * @param {string} url
+   * @returns {string | null}
+   */
+  function createSafePreviewImageObjectUrl(url) {
+    if (!url || typeof url !== 'string') {
+      return null;
+    }
+
+    const match = SAFE_IMAGE_DATA_URL_PATTERN.exec(url.trim());
+    if (!match) {
+      return null;
+    }
+
+    const mimeType = match[1].toLowerCase();
+    const base64Payload = match[2].replace(/\s+/g, '');
+    if (!isValidBase64Payload(base64Payload)) {
+      return null;
+    }
+
+    try {
+      const binary = window.atob(base64Payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * @param {string} value
+   * @returns {boolean}
+   */
+  function isValidBase64Payload(value) {
+    return value.length > 0 && value.length % 4 === 0 && /^[a-z0-9+/]+=*$/i.test(value);
+  }
+
+  function clearPreviewImageObjectUrl() {
+    if (!currentPreviewImageObjectUrl) {
+      return;
+    }
+    URL.revokeObjectURL(currentPreviewImageObjectUrl);
+    currentPreviewImageObjectUrl = null;
   }
 
   function savePreviewToHandoff(selectionOnly) {
