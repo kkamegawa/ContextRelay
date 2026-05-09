@@ -268,7 +268,8 @@
   "overrides": {
     "flatted": "3.4.2",
     "serialize-javascript": "7.0.5",
-    "glob": "12.0.0"
+    "glob": "12.0.0",
+    "diff": "8.0.4"
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -294,23 +295,23 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "^25.6.0",
-    "@types/sanitize-html": "^2.16.0",
-    "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^8.58.2",
-    "@typescript-eslint/parser": "^8.58.2",
+    "@types/sanitize-html": "^2.16.1",
+    "@types/vscode": "^1.116.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
     "@vscode/test-electron": "^2.5.2",
     "concurrently": "^9.2.1",
     "esbuild": "^0.28.0",
-    "eslint": "^10.2.0",
-    "mocha": "11.3.0",
+    "eslint": "^10.2.1",
+    "mocha": "11.7.5",
     "ts-loader": "^9.5.7",
-    "typescript": "^6.0.2",
-    "webpack": "^5.106.1",
+    "typescript": "^6.0.3",
+    "webpack": "^5.106.2",
     "webpack-cli": "^7.0.2"
   },
   "dependencies": {
     "jszip": "^3.10.1",
-    "marked": "^18.0.2",
+    "marked": "^18.0.3",
     "sanitize-html": "^2.17.3"
   }
 }
