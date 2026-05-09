@@ -119,6 +119,11 @@ suite('Dependency security baselines', () => {
       compareVersions(packageJson.overrides?.glob, '12.0.0') >= 0,
       `glob override must stay on a supported, non-deprecated release (found: ${packageJson.overrides?.glob ?? 'missing'})`
     );
+
+    assert.ok(
+      compareVersions(packageJson.overrides?.diff, '8.0.3') >= 0,
+      `diff override must stay outside the vulnerable range 6.0.0-8.0.2 (found: ${packageJson.overrides?.diff ?? 'missing'})`
+    );
   });
 
   test('locks installed glob, diff, and fast-uri versions outside known vulnerable ranges', () => {
