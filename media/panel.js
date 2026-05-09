@@ -606,15 +606,13 @@
     const contentKind = getPreviewContentKind(preview);
     if (contentKind === 'html' && preview.content && typeof preview.content.html === 'string') {
       body.classList.add('preview-body-html');
-      // lgtm [js/xss]
-      body.innerHTML = sanitizeHtmlContent(preview.content.html);
+      body.innerHTML = sanitizeHtmlContent(preview.content.html); // lgtm [js/xss]
     } else if (contentKind === 'image' && preview.content && typeof preview.content.src === 'string') {
       if (isValidImageUrl(preview.content.src)) {
         body.classList.add('preview-body-image');
         const image = document.createElement('img');
         image.className = 'preview-image';
-        // lgtm [js/client-side-unvalidated-url-redirection, js/xss]
-        image.src = preview.content.src;
+        image.src = preview.content.src; // lgtm [js/client-side-unvalidated-url-redirection, js/xss]
         image.alt = preview.content.alt || `${preview.title || 'Preview'} image`;
         body.appendChild(image);
 
