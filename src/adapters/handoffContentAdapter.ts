@@ -2,6 +2,9 @@ import JSZip from 'jszip';
 import { ContextItem, getPreviewText } from '../models/contextItem';
 import { createMailPreview, getMailMessageId, normalizePreviewText } from '../panel/itemPreview';
 import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from './graphClient';
+import { extractWordprocessingText } from '../textExtraction';
+
+export { extractWordprocessingText } from '../textExtraction';
 
 interface MailBodyResponse {
   body?: {
@@ -198,22 +201,6 @@ export function inferDriveContentMode(name: string, mimeType?: string): DriveCon
   return 'unsupported';
 }
 
-export function extractWordprocessingText(xml: string): string {
-  return decodeXmlEntities(
-    xml
-      .replace(/<w:tab\s*\/?>/gi, '\t')
-      .replace(/<w:(?:br|cr)\s*\/?>/gi, '\n')
-      .replace(/<\/w:p>/gi, '\n\n')
-      .replace(/<[^>]+>/g, '')
-  )
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n[ \t]+/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
-}
-
 export function normalizeDownloadedText(value: string): string {
   return value
     .replace(/\uFEFF/g, '')
@@ -226,18 +213,6 @@ export function normalizeDownloadedText(value: string): string {
 function getExtension(name: string): string {
   const index = name.lastIndexOf('.');
   return index === -1 ? '' : name.slice(index + 1).toLowerCase();
-}
-
-function decodeXmlEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, decimal: string) => String.fromCodePoint(parseInt(decimal, 10)));
 }
 
 function asDriveItemRaw(raw: unknown): DriveItemRaw | undefined {

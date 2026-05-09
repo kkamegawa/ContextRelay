@@ -24,6 +24,11 @@ suite('Item preview', () => {
     assert.equal(text, 'Hello world\nLine 2');
   });
 
+  test('decodes html entities without double decoding nested values', () => {
+    const text = normalizePreviewText('&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;', true);
+    assert.equal(text, '&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
+
   test('creates fallback preview from retrieval extracts', () => {
     const preview = createFallbackPreview(makeItem({
       source: 'sharepoint',

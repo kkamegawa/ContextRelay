@@ -31,6 +31,19 @@ suite('Handoff content adapter', () => {
     assert.equal(extractWordprocessingText(xml), 'Hello world\n\nSecond paragraph\nLine 2');
   });
 
+  test('decodes entities once when extracting Wordprocessing XML text', () => {
+    const xml = [
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
+      '<w:body>',
+      '<w:p><w:r><w:t>&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;</w:t></w:r></w:p>',
+      '<w:p><w:r><w:t>&#x1F642;</w:t></w:r></w:p>',
+      '</w:body>',
+      '</w:document>'
+    ].join('');
+
+    assert.equal(extractWordprocessingText(xml), '&lt;script&gt;alert(1)&lt;/script&gt;\n\n🙂');
+  });
+
   test('normalizes downloaded text and strips BOM', () => {
     assert.equal(normalizeDownloadedText('\uFEFFline1\r\n\r\n\r\nline2\r'), 'line1\n\nline2');
   });

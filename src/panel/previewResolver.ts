@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { ContextItem, ResolvedPreview } from '../models/contextItem';
 import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from '../adapters/graphClient';
+import { extractWordprocessingText } from '../textExtraction';
 import {
   createFallbackPreview,
   createImagePreviewContent,
@@ -237,34 +238,6 @@ async function extractDocxPreview(bytes: Uint8Array): Promise<{ text: string }> 
   }
 
   return { text: parts.join('\n\n').trim() };
-}
-
-function extractWordprocessingText(xml: string): string {
-  return decodeXmlEntities(
-    xml
-      .replace(/<w:tab\s*\/?>/gi, '\t')
-      .replace(/<w:(?:br|cr)\s*\/?>/gi, '\n')
-      .replace(/<\/w:p>/gi, '\n\n')
-      .replace(/<[^>]+>/g, '')
-  )
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n[ \t]+/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
-}
-
-function decodeXmlEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, decimal: string) => String.fromCodePoint(parseInt(decimal, 10)));
 }
 
 function getExtension(name: string): string {

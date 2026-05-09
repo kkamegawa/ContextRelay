@@ -49,6 +49,25 @@ suite('Retrieval adapter', () => {
     );
   });
 
+  test('rejects crafted or incomplete OneDrive-looking URLs', () => {
+    assert.equal(
+      isOneDriveUrl('https://contoso-my.sharepoint.com.attacker.test/personal/user_contoso_com/Documents/file.docx'),
+      false
+    );
+    assert.equal(
+      isOneDriveUrl('https://example.test/personal/user_contoso_com/Documents/file.docx'),
+      false
+    );
+    assert.equal(
+      isOneDriveUrl('https://contoso-my.sharepoint.com/sites/group/Documents/file.docx'),
+      false
+    );
+    assert.equal(
+      isOneDriveUrl('http://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/file.docx'),
+      false
+    );
+  });
+
   test('removes search highlight markup from summaries', () => {
     assert.equal(stripSearchMarkup('<c0>Project</c0> plan <ddd/> preview'), 'Project plan … preview');
   });
