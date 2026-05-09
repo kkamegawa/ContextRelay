@@ -297,7 +297,7 @@
     "@types/sanitize-html": "^2.16.0",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^8.58.2",
-    "@typescript-eslint/parser": "^8.58.2",
+    "@typescript-eslint/parser": "^8.59.1",
     "@vscode/test-electron": "^2.5.2",
     "concurrently": "^9.2.1",
     "esbuild": "^0.28.0",
