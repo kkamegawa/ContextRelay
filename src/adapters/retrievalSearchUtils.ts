@@ -13,7 +13,11 @@ export function stripSearchMarkup(value: string): string {
 export function isOneDriveUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return parsed.hostname.includes('-my.sharepoint.com') || parsed.pathname.includes('/personal/');
+    return (
+      parsed.protocol === 'https:' &&
+      /^[a-z0-9-]+-my\.sharepoint\.com$/i.test(parsed.hostname) &&
+      /^\/personal\/[^/]+(?:\/|$)/i.test(parsed.pathname)
+    );
   } catch {
     return false;
   }

@@ -1,5 +1,6 @@
 import sanitizeHtml from 'sanitize-html';
 import { ContextItem, PreviewContent, ResolvedPreview } from '../models/contextItem';
+import { decodeHtmlEntitiesOnce } from '../textExtraction';
 
 interface MailItemRaw {
   messageId?: string;
@@ -293,7 +294,7 @@ export function normalizePreviewText(value: string, isHtml = false): string {
       .replace(/<[^>]+>/g, ' ');
   }
 
-  normalized = decodeHtmlEntities(normalized)
+  normalized = decodeHtmlEntitiesOnce(normalized)
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .replace(/\u00a0/g, ' ')
@@ -340,19 +341,6 @@ export function sanitizePreviewHtml(value: string): string {
     }
   }).trim();
 }
-
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, decimal: string) => String.fromCodePoint(parseInt(decimal, 10)));
-}
-
 function asMailItemRaw(raw: unknown): MailItemRaw | undefined {
   return raw && typeof raw === 'object' ? raw as MailItemRaw : undefined;
 }

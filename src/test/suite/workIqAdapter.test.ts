@@ -591,7 +591,7 @@ suite('WorkIqAdapter', () => {
 
     test('does not include Graph scopes', () => {
       const scopes = buildWorkIqProviderScopes();
-      const graphScopes = scopes.filter(s => s.includes('graph.microsoft.com'));
+      const graphScopes = scopes.filter(s => s.startsWith('https://graph.microsoft.com/'));
       assert.equal(graphScopes.length, 0);
     });
 
