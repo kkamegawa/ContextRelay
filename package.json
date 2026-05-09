@@ -38,7 +38,7 @@
   },
   "engines": {
     "node": ">=22.0.0",
-    "vscode": "^1.85.0"
+    "vscode": "^1.116.0"
   },
   "main": "./dist/extension.js",
   "contributes": {
