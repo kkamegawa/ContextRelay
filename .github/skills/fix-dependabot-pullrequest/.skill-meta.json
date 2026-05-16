@@ -1,0 +1,10 @@
+{
+  "name": "fix-dependabot-pullrequest",
+  "source": "project",
+  "description": "Workflow skill to consolidate multiple Dependabot pull requests into one issue and one replacement pull request.",
+  "categories": [
+    "dependencies",
+    "security",
+    "workflow"
+  ]
+}
