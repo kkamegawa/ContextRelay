@@ -177,8 +177,8 @@ suite('Dependency security baselines', () => {
       `marked must stay on a vetted baseline or newer (found: ${packageJson.dependencies?.marked ?? 'missing'})`
     );
     assert.ok(
-      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.17.3') >= 0,
-      `sanitize-html must stay on a vetted baseline or newer (found: ${packageJson.dependencies?.['sanitize-html'] ?? 'missing'})`
+      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.17.4') >= 0,
+      `sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageJson.dependencies?.['sanitize-html'] ?? 'missing'})`
     );
 
     assert.equal(
@@ -190,6 +190,10 @@ suite('Dependency security baselines', () => {
       packageLockJson.packages?.['node_modules/sanitize-html']?.deprecated,
       undefined,
       `installed sanitize-html must not be deprecated (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.deprecated ?? 'not deprecated'})`
+    );
+    assert.ok(
+      compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.17.4') >= 0,
+      `installed sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.version ?? 'missing'})`
     );
   });
 });
