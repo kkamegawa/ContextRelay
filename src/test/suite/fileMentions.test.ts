@@ -34,6 +34,24 @@ suite('fileMentions', () => {
     }
   });
 
+  test('resolves dotfiles like .env and .gitignore', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-dotfile-'));
+    fs.writeFileSync(path.join(root, '.env'), 'SECRET=1', 'utf8');
+    fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules', 'utf8');
+
+    try {
+      const resultEnv = await resolveFileMentions('Check #.env', [root]);
+      assert.equal(resultEnv.errors.length, 0, '.env should be supported');
+      assert.equal(resultEnv.files.length, 1);
+
+      const resultGitignore = await resolveFileMentions('Check #.gitignore', [root]);
+      assert.equal(resultGitignore.errors.length, 0, '.gitignore should be supported');
+      assert.equal(resultGitignore.files.length, 1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('rejects unsupported extensions', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-mentions-'));
     fs.writeFileSync(path.join(root, 'capture.pcap'), 'pcap-binary', 'utf8');

@@ -28,6 +28,10 @@ export function isCopilotSupportedFileExtension(filePath: string): boolean {
   }
 
   const extension = path.extname(filePath).toLowerCase();
+  // path.extname('.env') returns '' — for dotfiles the full basename IS the extension
+  if (extension === '' && basename.startsWith('.')) {
+    return COPILOT_SUPPORTED_EXTENSIONS.has(basename);
+  }
   return COPILOT_SUPPORTED_EXTENSIONS.has(extension);
 }
 
