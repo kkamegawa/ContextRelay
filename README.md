@@ -131,17 +131,28 @@ The following delegated Microsoft Graph permissions are required by feature:
   npm install
   ```
 
-4. Build the extension:
+4. Build the extension once from the terminal:
 
-  ```bash
-  npm run compile
-  ```
+   ```bash
+   npm run compile
+   ```
 
-5. Press `F5` in VS Code to launch the Extension Development Host.
+   ```powershell
+   npm run compile
+   ```
+
+5. Press `F5` in VS Code to launch the Extension Development Host. The checked-in `.vscode/launch.json` now runs `npm: compile` automatically before the debugger starts, so a clean checkout no longer fails with a missing `dist/extension.js`.
 
 Before submitting changes, run:
 
 ```bash
+npm run compile
+npm run lint
+npm test
+npm run security:check
+```
+
+```powershell
 npm run compile
 npm run lint
 npm test

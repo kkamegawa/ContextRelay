@@ -30,6 +30,24 @@ interface PackageJson {
   };
 }
 
+interface LaunchJson {
+  configurations?: Array<{
+    name?: string;
+    type?: string;
+    request?: string;
+    args?: string[];
+    preLaunchTask?: string;
+  }>;
+}
+
+interface TasksJson {
+  tasks?: Array<{
+    label?: string;
+    type?: string;
+    script?: string;
+  }>;
+}
+
 suite('Extension manifest consistency', () => {
   const packageJsonPath = path.resolve(__dirname, '../../../../package.json');
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as PackageJson;
@@ -76,6 +94,37 @@ suite('Extension manifest consistency', () => {
       compileScript.includes('webpack'),
       'compile script must generate the webpack runtime bundle used by package.json#main'
     );
+  });
+
+  test('debug launch builds the extension bundle before starting', () => {
+    const launchJsonPath = path.resolve(__dirname, '../../../../.vscode/launch.json');
+    const launchJson = JSON.parse(fs.readFileSync(launchJsonPath, 'utf8')) as LaunchJson;
+
+    const debugConfig = launchJson.configurations?.find(config => config.name === 'Run ContextRelay');
+
+    assert.ok(debugConfig, 'launch.json must define a Run ContextRelay debug configuration');
+    assert.equal(debugConfig?.type, 'extensionHost', 'debug configuration must use the extension host');
+    assert.equal(debugConfig?.request, 'launch', 'debug configuration must launch the extension host');
+    assert.ok(
+      debugConfig?.args?.includes('--extensionDevelopmentPath=${workspaceFolder}'),
+      'debug configuration must point the extension host at the workspace'
+    );
+    assert.equal(
+      debugConfig?.preLaunchTask,
+      'npm: compile',
+      'debug configuration must build the extension bundle before launch'
+    );
+  });
+
+  test('debug task exposes npm compile for the launch configuration', () => {
+    const tasksJsonPath = path.resolve(__dirname, '../../../../.vscode/tasks.json');
+    const tasksJson = JSON.parse(fs.readFileSync(tasksJsonPath, 'utf8')) as TasksJson;
+
+    const compileTask = tasksJson.tasks?.find(task => task.label === 'npm: compile');
+
+    assert.ok(compileTask, 'tasks.json must define an npm: compile task');
+    assert.equal(compileTask?.type, 'npm', 'npm: compile task must be an npm task');
+    assert.equal(compileTask?.script, 'compile', 'npm: compile task must invoke the compile script');
   });
 
   test('wires Work IQ logging to the ContextRelay debug channel', () => {
