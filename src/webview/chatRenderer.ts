@@ -368,7 +368,15 @@ export class ChatRenderer {
     const comboCode = document.createElement('code');
     comboCode.textContent = '/mail /onedrive';
     commandsHint.appendChild(comboCode);
-    commandsHint.appendChild(document.createTextNode(' for source search. Plain text starts or continues chat.'));
+    commandsHint.appendChild(document.createTextNode(' for source search. Use '));
+    const hashCode = document.createElement('code');
+    hashCode.textContent = '#file';
+    commandsHint.appendChild(hashCode);
+    commandsHint.appendChild(document.createTextNode(' (or quoted paths like '));
+    const quotedHashCode = document.createElement('code');
+    quotedHashCode.textContent = '#"notes/Release Plan.md"';
+    commandsHint.appendChild(quotedHashCode);
+    commandsHint.appendChild(document.createTextNode(') to attach local workspace files to Copilot and /workiq prompts.'));
     welcome.appendChild(commandsHint);
 
     const askHint = document.createElement('p');
@@ -377,7 +385,11 @@ export class ChatRenderer {
     const askCode = document.createElement('code');
     askCode.textContent = '/ask';
     askHint.appendChild(askCode);
-    askHint.appendChild(document.createTextNode(' to process pinned context with Microsoft 365 Copilot.'));
+    askHint.appendChild(document.createTextNode(' to process pinned snippets or '));
+    const hashMentionCode = document.createElement('code');
+    hashMentionCode.textContent = '#file';
+    askHint.appendChild(hashMentionCode);
+    askHint.appendChild(document.createTextNode(' mentions with Microsoft 365 Copilot.'));
     welcome.appendChild(askHint);
 
     this.chatArea.appendChild(welcome);

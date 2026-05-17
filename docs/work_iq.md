@@ -68,6 +68,20 @@ Consecutive `/workiq` queries maintain conversation context via the A2A `context
 
 Use `/clear` to reset the conversation context and start fresh.
 
+### Add local workspace file context with `#`
+
+You can attach local workspace files to `/workiq` using `#` file mentions:
+
+```
+/workiq Summarize key decisions from #docs/plan.md
+/workiq Create a status email from #"notes/Release Plan.md"
+```
+
+Rules:
+- Only Copilot-supported file extensions are accepted.
+- File paths must resolve inside the opened workspace.
+- Invalid `#` mentions block the request with an error message.
+
 ### Slash command behavior
 
 When `/workiq` is specified, all other slash commands in the input are treated as part of the query text. For example:

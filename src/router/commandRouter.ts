@@ -187,7 +187,7 @@ export function getHelpText(command: string | readonly SearchCommandName[]): str
     planner: 'Example: /task release checklist\nExample: /task metadata comments onboarding',
     task: 'Example: /task release checklist\nExample: /task metadata comments onboarding',
     all: 'Example: /all architecture decisions\nExample: /mail /onedrive architecture decisions\nPlain text without a slash command starts or continues a Microsoft 365 Copilot chat.',
-    ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask Summarize the pinned docs as a bullet list\nPinned snippets are used as context and the Microsoft 365 Copilot response is shown in the panel.',
+    ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask #README.md Summarize this file as a bullet list\nPinned snippets or # file mentions are used as context and the Microsoft 365 Copilot response is shown in the panel.',
     clear: 'Example: /clear\nClears the current chat transcript and discards all pinned snippets.',
     workiq: 'Example: /workiq Summarize my recent emails from Alice\nExample: /workiq What meetings do I have today?\nSends a natural language query to the Work IQ Gateway (A2A protocol). Requires Microsoft 365 Copilot license.'
   };
