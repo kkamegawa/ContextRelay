@@ -8,6 +8,7 @@
  */
 
 import { SlashMenu } from './slashMenu';
+import { HashMenu } from './hashMenu';
 import { ChatRenderer } from './chatRenderer';
 
 // Acquire the VS Code API (available in webview context)
@@ -24,6 +25,7 @@ const chatArea = document.getElementById('chatArea')!;
 const promptInput = document.getElementById('promptInput') as HTMLTextAreaElement;
 const sendButton = document.getElementById('sendButton') as HTMLButtonElement;
 const slashMenuEl = document.getElementById('slashMenu')!;
+const hashMenuEl = document.getElementById('hashMenu')!;
 
 // --- Modules ---
 const renderer = new ChatRenderer(chatArea, vscode);
@@ -33,7 +35,15 @@ let hasPendingSubmission = false;
 const slashMenu = new SlashMenu(slashMenuEl, promptInput, (nextValue: string) => {
   promptInput.value = nextValue;
   promptInput.focus();
+  autoResizeInput();
   slashMenu.hide();
+});
+
+const hashMenu = new HashMenu(hashMenuEl, promptInput, (nextValue: string) => {
+  promptInput.value = nextValue;
+  promptInput.focus();
+  autoResizeInput();
+  hashMenu.hide();
 });
 
 // --- Input handling ---
@@ -54,6 +64,7 @@ function submitQuery(): void {
   promptInput.value = '';
   autoResizeInput();
   slashMenu.hide();
+  hashMenu.hide();
 }
 
 function autoResizeInput(): void {
@@ -89,7 +100,11 @@ promptInput.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Let slash menu handle navigation keys first
+  // Let hash/slash menus handle navigation keys first
+  if (hashMenu.handleKeyDown(e)) {
+    return;
+  }
+
   if (slashMenu.handleKeyDown(e)) {
     return;
   }
@@ -105,14 +120,21 @@ promptInput.addEventListener('keydown', (e) => {
 // Input changes — update slash menu and auto-resize
 promptInput.addEventListener('input', () => {
   autoResizeInput();
+  const hashVisible = hashMenu.update(promptInput.value);
+  if (hashVisible) {
+    slashMenu.hide();
+    return;
+  }
+
   slashMenu.update(promptInput.value);
 });
 
-// Close slash menu when clicking outside
+// Close menus when clicking outside
 document.addEventListener('click', (e) => {
   const target = e.target as HTMLElement;
-  if (!slashMenuEl.contains(target) && target !== promptInput) {
+  if (!slashMenuEl.contains(target) && !hashMenuEl.contains(target) && target !== promptInput) {
     slashMenu.hide();
+    hashMenu.hide();
   }
 });
 
@@ -204,6 +226,10 @@ window.addEventListener('message', (event) => {
 
     case 'pinnedItems':
       renderer.setPinnedItems((message.keys as string[]) ?? []);
+      break;
+
+    case 'workspaceFiles':
+      hashMenu.setFiles((message.files as string[]) ?? []);
       break;
   }
 });

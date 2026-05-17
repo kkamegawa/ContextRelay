@@ -2,7 +2,7 @@
   "name": "context-relay",
   "displayName": "ContextRelay for Microsoft 365",
   "description": "Surface Microsoft 365 context (SharePoint, OneDrive, Teams, Mail, WorkIQ) in a VS Code side panel",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "publisher": "KazushiKamegawa",
   "categories": [
     "Other"
@@ -38,7 +38,7 @@
   },
   "engines": {
     "node": ">=22.0.0",
-    "vscode": "^1.116.0"
+    "vscode": "^1.120.0"
   },
   "main": "./dist/extension.js",
   "contributes": {
@@ -285,7 +285,7 @@
     "watch": "concurrently -k \"npm:watch:extension\" \"npm:watch:webview\"",
     "prepackage": "npm run security:check",
     "package": "npm run compile:types && npm run compile:webview && webpack --mode production --devtool hidden-source-map && npm run bundle:webview:prod",
-    "vsce:package": "npx --yes @vscode/vsce@3.2.2 package --no-dependencies",
+    "vsce:package": "npx --yes @vscode/vsce@3.9.1 package --no-dependencies",
     "compile-tests": "tsc -p ./tsconfig.test.json",
     "pretest": "npm run compile-tests",
     "test": "mocha --ui tdd --timeout 10000 \"out-test/src/test/suite/**/*.test.js\"",

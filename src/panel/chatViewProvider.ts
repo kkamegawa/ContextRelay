@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { createConversation, sendMessage } from '../adapters/chatAdapter';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
@@ -16,6 +17,8 @@ import { type ContextItem, type ContextSource, type ResolvedPreview, getContextI
 import { getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
 import { buildChatContextPayload } from './chatContext';
+import { isCopilotSupportedFileExtension } from './copilotSupportedExtensions';
+import { buildWorkIqPromptWithFiles, resolveFileMentions, type ResolvedFileMention } from './fileMentions';
 import { buildPreviewWebviewHtml } from './openResult';
 import { detectOutputLanguage } from './outputLanguage';
 import { resolvePreview } from './previewResolver';
@@ -115,7 +118,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   public postMessage(message: HostToWebviewMessage): void {
     if (message.command === 'clearChat') {
       this.transcript = [message];
-    } else if (message.command !== 'pinnedItems') {
+    } else if (message.command !== 'pinnedItems' && message.command !== 'workspaceFiles') {
       this.transcript.push(message);
       if (this.transcript.length > ChatViewProvider.MAX_TRANSCRIPT_LENGTH) {
         this.transcript = this.transcript.slice(-ChatViewProvider.MAX_TRANSCRIPT_LENGTH);
@@ -207,6 +210,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       void host.webview.postMessage(message);
     }
     this.sendPinnedItems(kind);
+    void this.sendWorkspaceFiles(kind);
   }
 
   private async handleMessage(kind: ChatHostKind, message: WebviewToHostMessage): Promise<void> {
@@ -344,6 +348,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.broadcastMessage(message);
   }
 
+  private async sendWorkspaceFiles(kind?: ChatHostKind): Promise<void> {
+    let files: string[] = [];
+    try {
+      files = await this.collectWorkspaceFiles();
+    } catch {
+      files = [];
+    }
+
+    const message: HostToWebviewMessage = {
+      command: 'workspaceFiles',
+      files
+    };
+
+    if (kind) {
+      this.postMessageToHost(kind, message);
+      return;
+    }
+
+    this.broadcastMessage(message);
+  }
+
   private async handleOpenItemRequest(kind: ChatHostKind, item: ContextItem): Promise<void> {
     try {
       await this.handleOpenItem(item);
@@ -390,17 +415,62 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (parsed.target === 'ask') {
-      await this.handleAskCommand(parsed.query);
+      const mentionResolution = await this.resolveMentionsForPrompt(parsed.query);
+      if (!mentionResolution) {
+        return;
+      }
+
+      if (!mentionResolution.prompt.trim()) {
+        this.postMessage({
+          command: 'queryError',
+          source: 'all',
+          message: 'Prompt is empty after removing # file mentions.',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      await this.handleAskCommand(mentionResolution.prompt, mentionResolution.files);
       return;
     }
 
     if (parsed.target === 'workiq') {
-      await this.handleWorkIqCommand(parsed.query);
+      const mentionResolution = await this.resolveMentionsForPrompt(parsed.query);
+      if (!mentionResolution) {
+        return;
+      }
+
+      if (!mentionResolution.prompt.trim()) {
+        this.postMessage({
+          command: 'queryError',
+          source: 'all',
+          message: 'Prompt is empty after removing # file mentions.',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      await this.handleWorkIqCommand(mentionResolution.prompt, mentionResolution.files);
       return;
     }
 
     if (parsed.target === 'chat') {
-      await this.handlePlainChat(parsed.query);
+      const mentionResolution = await this.resolveMentionsForPrompt(trimmed);
+      if (!mentionResolution) {
+        return;
+      }
+
+      if (!mentionResolution.prompt.trim()) {
+        this.postMessage({
+          command: 'queryError',
+          source: 'all',
+          message: 'Prompt is empty after removing # file mentions.',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      await this.handlePlainChat(mentionResolution.prompt, mentionResolution.files);
       return;
     }
 
@@ -517,15 +587,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async handleAskCommand(prompt: string): Promise<void> {
-    await this.handleCopilotChat(prompt, 'ask', true);
+  private async handleAskCommand(prompt: string, mentionFiles: readonly ResolvedFileMention[] = []): Promise<void> {
+    await this.handleCopilotChat(prompt, 'ask', true, mentionFiles);
   }
 
-  private async handlePlainChat(prompt: string): Promise<void> {
-    await this.handleCopilotChat(prompt, 'chat', false);
+  private async handlePlainChat(prompt: string, mentionFiles: readonly ResolvedFileMention[] = []): Promise<void> {
+    await this.handleCopilotChat(prompt, 'chat', false, mentionFiles);
   }
 
-  private async handleWorkIqCommand(query: string): Promise<void> {
+  private async handleWorkIqCommand(query: string, mentionFiles: readonly ResolvedFileMention[]): Promise<void> {
     this.postMessage({
       command: 'loading',
       source: 'all',
@@ -550,7 +620,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const response = await sendWorkIqMessage(token, query, this.currentWorkIqContextId);
+      const workIqQuery = await buildWorkIqPromptWithFiles(query, mentionFiles);
+      const response = await sendWorkIqMessage(token, workIqQuery, this.currentWorkIqContextId);
 
       if (response.contextId) {
         this.currentWorkIqContextId = response.contextId;
@@ -584,11 +655,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async handleCopilotChat(
     prompt: string,
     kind: 'chat' | 'ask',
-    requirePinnedContext: boolean
+    requirePinnedContext: boolean,
+    mentionFiles: readonly ResolvedFileMention[] = []
   ): Promise<void> {
     const snippets = this.snippetStore.getAll();
-    if (requirePinnedContext && snippets.length === 0) {
-      const message = 'Pin one or more snippets first to use /ask. The pinned content is sent to Microsoft 365 Copilot as context.';
+    if (requirePinnedContext && snippets.length === 0 && mentionFiles.length === 0) {
+      const message = 'Pin snippets or mention local files with # to use /ask. ContextRelay sends that context to Microsoft 365 Copilot.';
       vscode.window.showWarningMessage(`ContextRelay: ${message}`);
       this.postMessage({
         command: 'queryError',
@@ -633,7 +705,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const contextPayload = buildChatContextPayload({
         snippets,
         searchSummary: this.latestSearchSummary,
-        visibleResult: this.latestVisibleResult
+        visibleResult: this.latestVisibleResult,
+        localFiles: mentionFiles.map(file => ({
+          uri: file.uri,
+          label: `Local file: ${file.relativePath}`
+        }))
       });
       const reply = await sendMessage(token, this.currentConversationId, prompt, contextPayload);
       if (!reply.trim()) {
@@ -661,6 +737,80 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     } finally {
       this.postMessage({ command: 'loading', source: 'all', isLoading: false });
     }
+  }
+
+  private async resolveMentionsForPrompt(
+    prompt: string
+  ): Promise<{ prompt: string; files: ResolvedFileMention[] } | undefined> {
+    const workspaceRoots = (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath);
+    const mentionResolution = await resolveFileMentions(prompt, workspaceRoots);
+    if (mentionResolution.errors.length > 0) {
+      this.postMessage({
+        command: 'queryError',
+        source: 'all',
+        message: mentionResolution.errors[0],
+        timestamp: new Date().toISOString()
+      });
+      return undefined;
+    }
+
+    return {
+      prompt: mentionResolution.cleanedPrompt,
+      files: mentionResolution.files
+    };
+  }
+
+  private async collectWorkspaceFiles(): Promise<string[]> {
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    if (workspaceFolders.length === 0) {
+      return [];
+    }
+
+    const fileUris = await vscode.workspace.findFiles(
+      '**/*',
+      '**/{.git,node_modules,dist,out,out-test,.contextrelay,coverage}/**',
+      4000
+    );
+    const groupedPaths = new Map<string, string[]>();
+
+    for (const fileUri of fileUris) {
+      if (fileUri.scheme !== 'file') {
+        continue;
+      }
+
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(fileUri);
+      if (!workspaceFolder) {
+        continue;
+      }
+
+      const relativePath = path.relative(workspaceFolder.uri.fsPath, fileUri.fsPath);
+      if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        continue;
+      }
+
+      if (!isCopilotSupportedFileExtension(relativePath)) {
+        continue;
+      }
+
+      const normalizedRelativePath = relativePath.split(path.sep).join('/');
+      const normalizedAbsolutePath = fileUri.fsPath.split(path.sep).join('/');
+      const paths = groupedPaths.get(normalizedRelativePath) ?? [];
+      paths.push(normalizedAbsolutePath);
+      groupedPaths.set(normalizedRelativePath, paths);
+    }
+
+    const candidates: string[] = [];
+    for (const [relativePath, absolutePaths] of groupedPaths.entries()) {
+      if (absolutePaths.length === 1) {
+        candidates.push(relativePath);
+      } else {
+        candidates.push(...absolutePaths);
+      }
+    }
+
+    return candidates
+      .sort((left, right) => left.localeCompare(right))
+      .slice(0, 1500);
   }
 
   private getEnabledTargetSources(
@@ -1229,7 +1379,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       z-index: 100;
     }
 
+    #hashMenu {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: var(--cr-spacing-md);
+      right: var(--cr-spacing-md);
+      background: var(--vscode-editorSuggestWidget-background, var(--vscode-editorWidget-background));
+      border: 1px solid var(--vscode-editorSuggestWidget-border, var(--vscode-editorWidget-border, transparent));
+      border-radius: var(--cr-border-radius);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
     #slashMenu.visible {
+      display: block;
+    }
+
+    #hashMenu.visible {
       display: block;
     }
 
@@ -1262,6 +1431,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       opacity: 0.7;
       font-size: 0.85em;
     }
+
+    .hash-item {
+      display: flex;
+      align-items: center;
+      gap: var(--cr-spacing-sm);
+      padding: var(--cr-spacing-sm) var(--cr-spacing-md);
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+
+    .hash-item:hover,
+    .hash-item.selected {
+      background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+      color: var(--vscode-editorSuggestWidget-selectedForeground, var(--vscode-list-activeSelectionForeground));
+    }
+
+    .hash-item .hash-icon {
+      width: 20px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .hash-item .hash-label {
+      font-family: var(--vscode-editor-font-family);
+    }
   </style>
 </head>
 <body>
@@ -1270,13 +1464,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       <div class="welcome" id="welcome">
         <h2>ContextRelay</h2>
         <p>Chat with Microsoft 365 Copilot, or search Microsoft 365 context with slash commands.</p>
-        <p style="font-size: 0.8em;">Type <code>/</code> for source search commands. Plain text starts or continues chat.</p>
-        <p style="font-size: 0.8em;">Pin snippets and run <code>/ask</code> to process them with Microsoft 365 Copilot in the panel.</p>
+        <p style="font-size: 0.8em;">Type <code>/</code> for source search commands. Use <code>#path/to/file</code> (or <code>#"path with spaces"</code>) to attach local workspace files to Copilot and /workiq prompts.</p>
+        <p style="font-size: 0.8em;">Pin snippets or mention <code>#files</code>, then run <code>/ask</code> to process that context with Microsoft 365 Copilot in the panel.</p>
       </div>
     </div>
 
     <div id="inputArea">
       <div id="slashMenu" role="listbox" aria-label="Slash commands"></div>
+      <div id="hashMenu" role="listbox" aria-label="Workspace files"></div>
 
       <div id="inputWrapper">
         <textarea
@@ -1285,7 +1480,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           placeholder="Ask Copilot, or type / for source search"
           aria-label="Copilot chat or source search input"
           aria-haspopup="listbox"
-          aria-controls="slashMenu"
+          aria-controls="slashMenu hashMenu"
         ></textarea>
         <button id="sendButton" aria-label="Send message" title="Send">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1294,7 +1489,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           </svg>
         </button>
       </div>
-      <div id="inputHint">Press Enter to send • Shift+Enter for new line • Type / for source search commands</div>
+      <div id="inputHint">Press Enter to send • Shift+Enter for new line • Type / for source search commands • Use #file to attach local context</div>
     </div>
   </div>
 

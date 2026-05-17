@@ -40,6 +40,28 @@ suite('chatContext', () => {
     assert.deepEqual(payload.labels, ['spec.docx', 'plan.docx']);
   });
 
+  test('adds local # mention files before snippet URLs and deduplicates by uri', () => {
+    const payload = buildChatContextPayload({
+      snippets: [
+        snippet('sharepoint', 'spec.docx', 'body', 'file:///workspace/spec.docx')
+      ],
+      localFiles: [
+        { uri: 'file:///workspace/spec.docx', label: 'Local file: spec.docx' },
+        { uri: 'file:///workspace/notes.md', label: 'Local file: notes.md' }
+      ]
+    });
+
+    assert.deepEqual(payload.contextualResources?.files, [
+      { uri: 'file:///workspace/spec.docx' },
+      { uri: 'file:///workspace/notes.md' }
+    ]);
+    assert.deepEqual(payload.labels, [
+      'Local file: spec.docx',
+      'Local file: notes.md',
+      'spec.docx'
+    ]);
+  });
+
   test('uses non-file snippets and visible result as additional context', () => {
     const payload = buildChatContextPayload({
       snippets: [snippet('teams', 'standup', 'Release is blocked by test failures.')],

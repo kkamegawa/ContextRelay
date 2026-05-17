@@ -109,6 +109,11 @@ export interface PinnedItemsMessage {
   keys: string[];
 }
 
+export interface WorkspaceFilesMessage {
+  command: 'workspaceFiles';
+  files: string[];
+}
+
 export type HostToWebviewMessage =
   | UserMessageDisplay
   | QueryResultMessage
@@ -117,4 +122,5 @@ export type HostToWebviewMessage =
   | SlashHelpMessage
   | ClearChatMessage
   | AssistantMessage
-  | PinnedItemsMessage;
+  | PinnedItemsMessage
+  | WorkspaceFilesMessage;

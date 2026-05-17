@@ -22,6 +22,7 @@ const capturedPayloads: Array<unknown> = [];
 const workIqRequests: Array<{ token: string; query: string; contextId?: string }> = [];
 let replies: string[] = [];
 let workIqReplies: Array<{ text: string; contextId?: string }> = [];
+let workspaceFolders: Array<{ uri: { fsPath: string } }> | undefined;
 
 class InMemoryMemento implements vscode.Memento {
   private readonly store = new Map<string, unknown>();
@@ -60,6 +61,17 @@ function createContext(): vscode.ExtensionContext {
 function createVscodeStub(): typeof vscode {
   return {
     workspace: {
+      get workspaceFolders() {
+        return workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined;
+      },
+      getWorkspaceFolder: (uri: { fsPath: string }) => {
+        const folders = workspaceFolders ?? [];
+        return folders.find(folder =>
+          uri.fsPath === folder.uri.fsPath ||
+          uri.fsPath.startsWith(`${folder.uri.fsPath}${path.sep}`)
+        ) as unknown as vscode.WorkspaceFolder | undefined;
+      },
+      findFiles: async () => [],
       getConfiguration: () => ({
         get: <T>(key: string, defaultValue: T): T =>
           (configValues.has(key) ? configValues.get(key) : defaultValue) as T
@@ -196,6 +208,7 @@ suite('ChatViewProvider', () => {
       { text: 'Work IQ first answer', contextId: 'ctx-workiq-1' },
       { text: 'Work IQ second answer', contextId: 'ctx-workiq-2' }
     ];
+    workspaceFolders = undefined;
   });
 
   test('loads the webview script via external URI (no blocking file read)', () => {
@@ -235,8 +248,8 @@ suite('ChatViewProvider', () => {
       {} as never
     );
 
-    await (provider as unknown as { handlePlainChat(prompt: string): Promise<void> }).handlePlainChat('first prompt');
-    await (provider as unknown as { handlePlainChat(prompt: string): Promise<void> }).handlePlainChat('follow-up prompt');
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('first prompt', []);
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('follow-up prompt', []);
 
     assert.equal(capturedPayloads.length, 2);
     assert.equal((capturedPayloads[0] as { additionalContext?: unknown }).additionalContext, undefined);
@@ -258,9 +271,9 @@ suite('ChatViewProvider', () => {
       {} as never
     );
 
-    await (provider as unknown as { handlePlainChat(prompt: string): Promise<void> }).handlePlainChat('first prompt');
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('first prompt', []);
     provider.clearChat();
-    await (provider as unknown as { handlePlainChat(prompt: string): Promise<void> }).handlePlainChat('after clear');
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('after clear', []);
 
     const secondPayload = capturedPayloads[1] as {
       additionalContext?: Array<{ description: string; text: string }>;
@@ -283,6 +296,32 @@ suite('ChatViewProvider', () => {
     assert.equal(capturedPayloads.length, 0);
     assert.equal(errorMessages.length, 0);
     assert.equal(infoMessages.length, 0);
+  });
+
+  test('/ask with # file mention does not require pinned snippets', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-ask-mentions-'));
+    fs.writeFileSync(path.join(root, 'notes.md'), 'ship checklist', 'utf8');
+    workspaceFolders = [{ uri: { fsPath: root } }];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getAccessToken: async () => 'token-123' } as never,
+        {} as never
+      );
+
+      await provider.submitQuery('/ask #notes.md summarize this');
+
+      assert.equal(warningMessages.length, 0);
+      assert.equal(capturedPayloads.length, 1);
+      const payload = capturedPayloads[0] as {
+        contextualResources?: { files?: Array<{ uri: string }> };
+      };
+      assert.equal(payload.contextualResources?.files?.length, 1);
+      assert.ok(payload.contextualResources?.files?.[0].uri.startsWith('file:///'));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test('/workiq sends query, shows loading, and renders the Work IQ response', async () => {
@@ -331,5 +370,55 @@ suite('ChatViewProvider', () => {
       { token: 'workiq-token', query: 'follow up', contextId: 'ctx-workiq-1' },
       { token: 'workiq-token', query: 'after clear', contextId: undefined }
     ]);
+  });
+
+  test('plain chat attaches #file mentions as Copilot contextual file resources', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-chat-mentions-'));
+    fs.writeFileSync(path.join(root, 'notes.md'), 'meeting notes', 'utf8');
+    workspaceFolders = [{ uri: { fsPath: root } }];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getAccessToken: async () => 'token-123' } as never,
+        {} as never
+      );
+
+      await provider.submitQuery('Summarize #notes.md');
+
+      const payload = capturedPayloads[0] as {
+        contextualResources?: { files?: Array<{ uri: string }> };
+        labels: string[];
+      };
+      assert.equal(payload.contextualResources?.files?.length, 1);
+      assert.ok(payload.contextualResources?.files?.[0].uri.startsWith('file:///'));
+      assert.ok(payload.labels.some(label => label.includes('Local file: notes.md')));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('/workiq blocks execution when #file mention is invalid', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-workiq-invalid-'));
+    workspaceFolders = [{ uri: { fsPath: root } }];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getWorkIqAccessToken: async () => 'workiq-token' } as never,
+        {} as never
+      );
+      const messages: Array<{ command: string; [key: string]: unknown }> = [];
+      (provider as unknown as { postMessage(message: { command: string; [key: string]: unknown }): void }).postMessage = (message) => {
+        messages.push(message);
+      };
+
+      await provider.submitQuery('/workiq summarize #missing.md');
+
+      assert.equal(workIqRequests.length, 0);
+      assert.equal(messages.some(message => message.command === 'queryError'), true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

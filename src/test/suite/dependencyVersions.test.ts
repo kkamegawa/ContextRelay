@@ -71,6 +71,19 @@ suite('Dependency security baselines', () => {
     assert.equal(testSecurity, 'npm run security:check', 'test:security must reuse security:check');
   });
 
+  test('pins vsce packaging script to the 3.9.1 baseline or newer', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const vsceScript = packageJson.scripts?.['vsce:package'];
+    const versionMatch = vsceScript?.match(/@vscode\/vsce@([0-9]+(?:\.[0-9]+){1,2})/);
+
+    assert.ok(vsceScript, 'vsce:package script must exist');
+    assert.ok(versionMatch?.[1], `vsce:package must pin an explicit @vscode/vsce version (found: ${vsceScript ?? 'missing'})`);
+    assert.ok(
+      compareVersions(versionMatch?.[1], '3.9.1') >= 0,
+      `vsce:package must use @vscode/vsce 3.9.1 or newer (found: ${versionMatch?.[1] ?? 'missing'})`
+    );
+  });
+
   test('uses non-vulnerable @typescript-eslint major versions', () => {
     const packageJson = readRepoJson<PackageJson>('package.json');
 
@@ -99,6 +112,19 @@ suite('Dependency security baselines', () => {
     assert.ok(
       (getMajor(nodeEngine) ?? 0) >= 22,
       `package.json must require Node.js 22 or later when using the supported glob baseline (found: ${nodeEngine ?? 'missing'})`
+    );
+  });
+
+  test('keeps @types/vscode aligned with engines.vscode', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const vscodeTypesVersion = packageJson.devDependencies?.['@types/vscode'];
+    const vscodeEngineVersion = packageJson.engines?.vscode;
+
+    assert.ok(vscodeTypesVersion, '@types/vscode must be declared in devDependencies');
+    assert.ok(vscodeEngineVersion, 'engines.vscode must be declared');
+    assert.ok(
+      compareVersions(vscodeEngineVersion, vscodeTypesVersion ?? '') >= 0,
+      `@types/vscode (${vscodeTypesVersion ?? 'missing'}) must not exceed engines.vscode (${vscodeEngineVersion ?? 'missing'})`
     );
   });
 
@@ -195,5 +221,32 @@ suite('Dependency security baselines', () => {
       compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.17.4') >= 0,
       `installed sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.version ?? 'missing'})`
     );
+  });
+
+  test('does not install known deprecated transitive packages', () => {
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+    const packageEntries = packageLockJson.packages ?? {};
+
+    const blockedPackages = ['node_modules/whatwg-encoding', 'node_modules/prebuild-install'];
+    for (const packageName of blockedPackages) {
+      assert.equal(
+        packageEntries[packageName],
+        undefined,
+        `${packageName} must not be present in package-lock.json`
+      );
+    }
+
+    const legacyGlobPackage = packageEntries['node_modules/glob'];
+    if (legacyGlobPackage) {
+      assert.ok(
+        compareVersions(legacyGlobPackage.version, '12.0.0') >= 0,
+        `installed glob must be 12.0.0+ (found: ${legacyGlobPackage.version ?? 'missing'})`
+      );
+      assert.equal(
+        legacyGlobPackage.deprecated,
+        undefined,
+        `installed glob must not be deprecated (found: ${legacyGlobPackage.deprecated ?? 'not deprecated'})`
+      );
+    }
   });
 });

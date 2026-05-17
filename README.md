@@ -7,6 +7,7 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 ## Features
 
 - **Plain Copilot chat** -- Type without a slash command to chat directly with Microsoft 365 Copilot in the panel.
+- **Local file mentions with `#`** -- Attach local workspace files (Copilot-supported extensions only) to plain Copilot chat, `/ask`, and `/workiq` prompts.
 - **Explicit source search** -- Search across connected Microsoft 365 sources with slash commands.
 - **Source targeting via slash commands** -- Narrow results to a specific source instantly.
 
@@ -22,6 +23,16 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/ask <instruction>` | Send pinned snippets to Microsoft 365 Copilot and show the reply in the panel |
 | `/workiq <query>` | Send a natural language query to Work IQ (A2A protocol) for Microsoft 365 work intelligence |
 | `/clear` | Clear the chat transcript and discard all pinned snippets |
+
+`#` mention examples (local workspace files):
+
+```text
+Summarize #docs/plan.md
+/ask Create release notes from #"docs/Release Plan.md"
+/workiq Draft a status update using #notes/today.md
+```
+
+> **Note**: If a `#` mention is invalid (missing file, outside workspace, unsupported extension), ContextRelay blocks the request and shows an error.
 
 - **Snippet pinning** -- Save any search result as a named snippet, visible across sessions.
 - **Timestamped handoff docs** -- Generate Markdown documents that capture current context.

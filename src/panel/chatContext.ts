@@ -11,6 +11,7 @@ export interface ChatContextOptions {
   snippets: SavedSnippet[];
   searchSummary?: string;
   visibleResult?: string;
+  localFiles?: { uri: string; label: string }[];
 }
 
 function buildTruncationSuffix(omittedChars: number): string {
@@ -70,12 +71,30 @@ export function buildChatContextPayload(options: ChatContextOptions): ChatContex
   const additionalContext: CopilotContextMessage[] = [];
   const contextualResources: CopilotContextualResources = {};
   const files: { uri: string }[] = [];
+  const seenFileUris = new Set<string>();
   const labels: string[] = [];
   const remainingBudget = { value: MAX_CHAT_CONTEXT_CHARS };
 
+  for (const file of options.localFiles ?? []) {
+    const uri = file.uri.trim();
+    if (!uri || seenFileUris.has(uri)) {
+      continue;
+    }
+
+    seenFileUris.add(uri);
+    files.push({ uri });
+    labels.push(file.label);
+  }
+
   for (const snippet of options.snippets) {
     if (isFileContextSnippet(snippet) && snippet.item.url) {
-      files.push({ uri: snippet.item.url });
+      const uri = snippet.item.url.trim();
+      if (!uri || seenFileUris.has(uri)) {
+        continue;
+      }
+
+      seenFileUris.add(uri);
+      files.push({ uri });
       labels.push(snippet.name || snippet.item.title);
       continue;
     }
