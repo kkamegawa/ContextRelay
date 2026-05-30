@@ -114,12 +114,22 @@ function resolveLatestReachableTag(exec) {
     'HEAD'
   ]);
 
-  const firstTag = output
+  const latestVersionTag = output
     .split('\n')
     .map(line => line.trim())
-    .find(line => line !== '');
+    .find(line => {
+      if (line === '') {
+        return false;
+      }
+      try {
+        normalizeTag(line);
+        return true;
+      } catch {
+        return false;
+      }
+    });
 
-  return firstTag ?? null;
+  return latestVersionTag ?? null;
 }
 
 /**

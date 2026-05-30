@@ -135,6 +135,14 @@ suite('Tag version resolver', () => {
     assert.equal(latest, 'v1.4.0');
   });
 
+  test('skips non-version v-prefixed tags during fallback discovery', () => {
+    const version = tagVersion.resolveVersion({
+      env: {} as NodeJS.ProcessEnv,
+      exec: () => 'vlatest\nv1.2.3\n'
+    });
+    assert.equal(version, '1.2.3');
+  });
+
   test('applies the version with the safe npm flags and both files in scope', () => {
     const calls: Array<{ file: string; args: string[] }> = [];
     tagVersion.applyVersion('3.1.4', (file, args) => {
