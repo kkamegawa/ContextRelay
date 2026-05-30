@@ -104,6 +104,41 @@ suite('Dependency security baselines', () => {
     );
   });
 
+  test('pins the consolidated Dependabot package.json baselines', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+
+    assert.equal(
+      packageJson.dependencies?.marked,
+      '^18.0.4',
+      `marked must stay aligned with the consolidated Dependabot update (found: ${packageJson.dependencies?.marked ?? 'missing'})`
+    );
+    assert.equal(
+      packageJson.devDependencies?.mocha,
+      '11.7.6',
+      `mocha must stay aligned with the consolidated Dependabot update (found: ${packageJson.devDependencies?.mocha ?? 'missing'})`
+    );
+    assert.equal(
+      packageJson.devDependencies?.['@types/node'],
+      '^25.9.0',
+      `@types/node must stay aligned with the consolidated Dependabot update (found: ${packageJson.devDependencies?.['@types/node'] ?? 'missing'})`
+    );
+    assert.equal(
+      packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
+      '^8.59.4',
+      `@typescript-eslint/eslint-plugin must stay aligned with the consolidated Dependabot update (found: ${packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'] ?? 'missing'})`
+    );
+    assert.equal(
+      packageJson.devDependencies?.['@typescript-eslint/parser'],
+      '^8.59.4',
+      `@typescript-eslint/parser must stay aligned with the consolidated Dependabot update (found: ${packageJson.devDependencies?.['@typescript-eslint/parser'] ?? 'missing'})`
+    );
+    assert.equal(
+      packageJson.overrides?.['brace-expansion'],
+      '5.0.6',
+      `brace-expansion override must stay on the audited non-vulnerable release (found: ${packageJson.overrides?.['brace-expansion'] ?? 'missing'})`
+    );
+  });
+
   test('declares Node 22+ for the supported glob baseline', () => {
     const packageJson = readRepoJson<PackageJson>('package.json');
     const nodeEngine = packageJson.engines?.node;
@@ -220,6 +255,46 @@ suite('Dependency security baselines', () => {
     assert.ok(
       compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.17.4') >= 0,
       `installed sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.version ?? 'missing'})`
+    );
+  });
+
+  test('locks the consolidated Dependabot package versions in package-lock.json', () => {
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+
+    assert.equal(
+      packageLockJson.packages?.['node_modules/marked']?.version,
+      '18.0.4',
+      `installed marked must stay aligned with the consolidated Dependabot update (found: ${packageLockJson.packages?.['node_modules/marked']?.version ?? 'missing'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/mocha']?.version,
+      '11.7.6',
+      `installed mocha must stay aligned with the consolidated Dependabot update (found: ${packageLockJson.packages?.['node_modules/mocha']?.version ?? 'missing'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/@types/node']?.version,
+      '25.9.0',
+      `installed @types/node must stay aligned with the consolidated Dependabot update (found: ${packageLockJson.packages?.['node_modules/@types/node']?.version ?? 'missing'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
+      '8.59.4',
+      `installed @typescript-eslint/eslint-plugin must stay aligned with the consolidated Dependabot update (found: ${packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version ?? 'missing'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
+      '8.59.4',
+      `installed @typescript-eslint/parser must stay aligned with the consolidated Dependabot update (found: ${packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version ?? 'missing'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/brace-expansion']?.version,
+      '5.0.6',
+      `installed brace-expansion must stay on the audited non-vulnerable release (found: ${packageLockJson.packages?.['node_modules/brace-expansion']?.version ?? 'missing'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/brace-expansion']?.deprecated,
+      undefined,
+      `installed brace-expansion must not be deprecated (found: ${packageLockJson.packages?.['node_modules/brace-expansion']?.deprecated ?? 'not deprecated'})`
     );
   });
 
