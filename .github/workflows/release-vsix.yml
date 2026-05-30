@@ -3,7 +3,7 @@ name: Release VSIX
 on:
   push:
     tags:
-      - '*'
+      - 'v*.*.*'
 
 permissions:
   contents: write
@@ -41,6 +41,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Sync extension version from pushed tag
+        id: version
+        shell: bash
+        run: node scripts/tag-version.cjs --apply --require-env --write-github-output
+
+      - name: Verify package.json matches the tag version
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ACTUAL_VERSION="$(node -p "require('./package.json').version")"
+          if [ "${ACTUAL_VERSION}" != "${EXPECTED_VERSION}" ]; then
+            echo "package.json version (${ACTUAL_VERSION}) does not match tag version (${EXPECTED_VERSION})."
+            exit 1
+          fi
+          echo "package.json version is ${ACTUAL_VERSION}."
+
       - name: Build extension package
         run: npm run package
 
@@ -50,12 +67,20 @@ jobs:
       - name: Locate VSIX artifact
         id: package
         shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
         run: |
           VSIX_PATH="$(ls -1 *.vsix | head -n 1)"
           if [ -z "${VSIX_PATH}" ]; then
             echo "VSIX file was not generated."
             exit 1
           fi
+          MANIFEST_VERSION="$(unzip -p "${VSIX_PATH}" extension/package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")"
+          if [ "${MANIFEST_VERSION}" != "${EXPECTED_VERSION}" ]; then
+            echo "VSIX manifest version (${MANIFEST_VERSION}) does not match tag version (${EXPECTED_VERSION})."
+            exit 1
+          fi
+          echo "VSIX manifest version is ${MANIFEST_VERSION}."
           echo "vsix_path=${VSIX_PATH}" >> "${GITHUB_OUTPUT}"
 
       - name: Publish VSIX to GitHub Artifacts
