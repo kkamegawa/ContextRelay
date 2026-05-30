@@ -24,6 +24,9 @@ tsconfig.webview.json
 .gitignore
 .nvmrc
 
+# Japanese-version docs (kept in the repo, not shipped in the VSIX)
+**/*_ja.md
+
 # Artifacts not required in VSIX runtime
 out/**
 **/*.ts
