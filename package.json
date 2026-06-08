@@ -300,7 +300,7 @@
     "@types/node": "^25.9.1",
     "@types/sanitize-html": "^2.16.1",
     "@types/vscode": "^1.120.0",
-    "@typescript-eslint/eslint-plugin": "^8.60.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
     "@typescript-eslint/parser": "^8.60.0",
     "@vscode/test-electron": "^2.5.2",
     "concurrently": "^9.2.1",
