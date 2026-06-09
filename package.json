@@ -307,7 +307,7 @@
     "esbuild": "^0.28.0",
     "eslint": "^10.4.1",
     "mocha": "11.7.6",
-    "ts-loader": "^9.5.7",
+    "ts-loader": "^9.6.0",
     "typescript": "^6.0.3",
     "webpack": "^5.107.2",
     "webpack-cli": "^7.0.3"
