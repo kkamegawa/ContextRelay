@@ -245,6 +245,16 @@ suite('Dependency security baselines', () => {
       compareVersions(packageJson.overrides?.diff, '8.0.3') >= 0,
       `diff override must stay outside the vulnerable range 6.0.0-8.0.2 (found: ${packageJson.overrides?.diff ?? 'missing'})`
     );
+
+    assert.ok(
+      compareVersions(packageJson.overrides?.['shell-quote'], '1.8.4') >= 0,
+      `shell-quote override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['shell-quote'] ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(packageJson.overrides?.['js-yaml'], '4.2.0') >= 0,
+      `js-yaml override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['js-yaml'] ?? 'missing'})`
+    );
   });
 
   test('locks installed glob, diff, and fast-uri versions outside known vulnerable ranges', () => {
