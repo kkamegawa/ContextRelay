@@ -180,7 +180,7 @@ function buildPreviewLinkMarkup(url: string): string {
 }
 
 function getSafePreviewImageSrc(src: string): string | undefined {
-  const safeExternalUrl = normalizeSafeExternalUrl(src, ['http:', 'https:']);
+    const safeExternalUrl = normalizeSafeExternalUrl(src, ['https:']);
   if (safeExternalUrl) {
     return safeExternalUrl;
   }

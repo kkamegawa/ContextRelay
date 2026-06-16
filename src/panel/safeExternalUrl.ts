@@ -1,7 +1,11 @@
 export function normalizeSafeExternalUrl(
-  url: string,
+  url: unknown,
   allowedProtocols: readonly string[] = ['http:', 'https:']
 ): string | undefined {
+  if (typeof url !== 'string') {
+    return undefined;
+  }
+
   const trimmed = url.trim();
   if (!trimmed) {
     return undefined;

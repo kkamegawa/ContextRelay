@@ -51,6 +51,23 @@ suite('Open result', () => {
       title: 'Unsafe image',
       content: {
         kind: 'image',
+        src: 'http://example.com/image.png',
+        alt: 'Unsafe HTTP image',
+        text: 'Fallback preview text'
+      }
+    }, 'vscode-resource:preview');
+
+    assert.ok(!html.includes('<img'));
+    assert.ok(!html.includes('http://example.com/image.png'));
+    assert.ok(html.includes('Fallback preview text'));
+  });
+
+  test('does not render unsafe svg image preview sources', () => {
+    const html = buildPreviewWebviewHtml({
+      source: 'sharepoint',
+      title: 'Unsafe image',
+      content: {
+        kind: 'image',
         src: 'data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+',
         alt: 'Unsafe SVG',
         text: 'Fallback preview text'

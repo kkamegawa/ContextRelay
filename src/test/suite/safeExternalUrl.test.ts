@@ -11,6 +11,7 @@ suite('safeExternalUrl', () => {
     assert.equal(normalizeSafeExternalUrl('javascript:alert(1)'), undefined);
     assert.equal(normalizeSafeExternalUrl('data:text/html;base64,PHNjcmlwdD4='), undefined);
     assert.equal(normalizeSafeExternalUrl('not a url'), undefined);
+    assert.equal(normalizeSafeExternalUrl({ url: 'https://example.com' }), undefined);
   });
 
   test('allows mailto only when the caller explicitly opts in', () => {
