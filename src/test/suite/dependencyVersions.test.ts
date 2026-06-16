@@ -111,7 +111,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'marked',
         actual: packageJson.dependencies?.marked,
-        expected: '^18.0.4',
+        expected: '^18.0.5',
+        message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
+        label: 'sanitize-html',
+        actual: packageJson.dependencies?.['sanitize-html'],
+        expected: '^2.17.5',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -123,20 +129,26 @@ suite('Dependency security baselines', () => {
       {
         label: '@types/node',
         actual: packageJson.devDependencies?.['@types/node'],
-        expected: '^25.9.1',
+        expected: '^25.9.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.60.0',
+        expected: '^8.60.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/parser',
         actual: packageJson.devDependencies?.['@typescript-eslint/parser'],
-        expected: '^8.60.0',
+        expected: '^8.60.1',
         message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
+        label: 'esbuild',
+        actual: packageJson.devDependencies?.esbuild,
+        expected: '^0.28.1',
+        message: 'must stay aligned with the audited security baseline'
       },
       {
         label: 'eslint',
@@ -157,9 +169,27 @@ suite('Dependency security baselines', () => {
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
+        label: 'ts-loader',
+        actual: packageJson.devDependencies?.['ts-loader'],
+        expected: '^9.6.0',
+        message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
         label: 'brace-expansion override',
         actual: packageJson.overrides?.['brace-expansion'],
         expected: '5.0.6',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'shell-quote override',
+        actual: packageJson.overrides?.['shell-quote'],
+        expected: '1.8.4',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'js-yaml override',
+        actual: packageJson.overrides?.['js-yaml'],
+        expected: '4.2.0',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
@@ -268,7 +298,7 @@ suite('Dependency security baselines', () => {
       `marked must stay on a vetted baseline or newer (found: ${packageJson.dependencies?.marked ?? 'missing'})`
     );
     assert.ok(
-      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.17.4') >= 0,
+      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.17.5') >= 0,
       `sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageJson.dependencies?.['sanitize-html'] ?? 'missing'})`
     );
 
@@ -283,7 +313,7 @@ suite('Dependency security baselines', () => {
       `installed sanitize-html must not be deprecated (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.deprecated ?? 'not deprecated'})`
     );
     assert.ok(
-      compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.17.4') >= 0,
+      compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.17.5') >= 0,
       `installed sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.version ?? 'missing'})`
     );
   });
@@ -295,7 +325,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed marked',
         actual: packageLockJson.packages?.['node_modules/marked']?.version,
-        expected: '18.0.4',
+        expected: '18.0.5',
+        message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
+        label: 'installed sanitize-html',
+        actual: packageLockJson.packages?.['node_modules/sanitize-html']?.version,
+        expected: '2.17.5',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -307,20 +343,26 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @types/node',
         actual: packageLockJson.packages?.['node_modules/@types/node']?.version,
-        expected: '25.9.1',
+        expected: '25.9.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.60.0',
+        expected: '8.60.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/parser',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
-        expected: '8.60.0',
+        expected: '8.60.1',
         message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
+        label: 'installed esbuild',
+        actual: packageLockJson.packages?.['node_modules/esbuild']?.version,
+        expected: '0.28.1',
+        message: 'must stay aligned with the audited security baseline'
       },
       {
         label: 'installed eslint',
@@ -341,9 +383,27 @@ suite('Dependency security baselines', () => {
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
+        label: 'installed ts-loader',
+        actual: packageLockJson.packages?.['node_modules/ts-loader']?.version,
+        expected: '9.6.0',
+        message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
         label: 'installed brace-expansion',
         actual: packageLockJson.packages?.['node_modules/brace-expansion']?.version,
         expected: '5.0.6',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'installed shell-quote',
+        actual: packageLockJson.packages?.['node_modules/shell-quote']?.version,
+        expected: '1.8.4',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'installed js-yaml',
+        actual: packageLockJson.packages?.['node_modules/js-yaml']?.version,
+        expected: '4.2.0',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
@@ -355,6 +415,16 @@ suite('Dependency security baselines', () => {
       packageLockJson.packages?.['node_modules/brace-expansion']?.deprecated,
       undefined,
       `installed brace-expansion must not be deprecated (found: ${packageLockJson.packages?.['node_modules/brace-expansion']?.deprecated ?? 'not deprecated'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/shell-quote']?.deprecated,
+      undefined,
+      `installed shell-quote must not be deprecated (found: ${packageLockJson.packages?.['node_modules/shell-quote']?.deprecated ?? 'not deprecated'})`
+    );
+    assert.equal(
+      packageLockJson.packages?.['node_modules/js-yaml']?.deprecated,
+      undefined,
+      `installed js-yaml must not be deprecated (found: ${packageLockJson.packages?.['node_modules/js-yaml']?.deprecated ?? 'not deprecated'})`
     );
   });
 

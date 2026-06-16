@@ -18,6 +18,7 @@ import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
 import { buildSearchSummary } from './searchSummary';
 import { buildHandoffSnippetDraft } from './handoffSelection';
 import { resolvePreview } from './previewResolver';
+import { normalizeSafeExternalUrl } from './safeExternalUrl';
 
 interface SearchResult {
   source: string;
@@ -313,12 +314,13 @@ export class PanelProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleOpenUrl(url: string): Promise<void> {
-    if (!url?.trim()) {
+    const safeUrl = normalizeSafeExternalUrl(url);
+    if (!safeUrl) {
       return;
     }
 
     try {
-      await vscode.env.openExternal(vscode.Uri.parse(url));
+      await vscode.env.openExternal(vscode.Uri.parse(safeUrl));
     } catch (err) {
       this.postMessage({
         type: 'error',
