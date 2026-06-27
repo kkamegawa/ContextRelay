@@ -129,19 +129,25 @@ suite('Dependency security baselines', () => {
       {
         label: '@types/node',
         actual: packageJson.devDependencies?.['@types/node'],
-        expected: '^25.9.3',
+        expected: '^25.9.4',
+        message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
+        label: 'concurrently',
+        actual: packageJson.devDependencies?.concurrently,
+        expected: '^10.0.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.60.1',
+        expected: '^8.61.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/parser',
         actual: packageJson.devDependencies?.['@typescript-eslint/parser'],
-        expected: '^8.60.1',
+        expected: '^8.61.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -153,7 +159,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'eslint',
         actual: packageJson.devDependencies?.eslint,
-        expected: '^10.4.1',
+        expected: '^10.5.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -171,7 +177,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'ts-loader',
         actual: packageJson.devDependencies?.['ts-loader'],
-        expected: '^9.6.0',
+        expected: '^9.6.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -353,19 +359,25 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @types/node',
         actual: packageLockJson.packages?.['node_modules/@types/node']?.version,
-        expected: '25.9.3',
+        expected: '25.9.4',
+        message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
+        label: 'installed concurrently',
+        actual: packageLockJson.packages?.['node_modules/concurrently']?.version,
+        expected: '10.0.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.60.1',
+        expected: '8.61.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/parser',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
-        expected: '8.60.1',
+        expected: '8.61.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -377,7 +389,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed eslint',
         actual: packageLockJson.packages?.['node_modules/eslint']?.version,
-        expected: '10.4.1',
+        expected: '10.5.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -395,7 +407,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed ts-loader',
         actual: packageLockJson.packages?.['node_modules/ts-loader']?.version,
-        expected: '9.6.0',
+        expected: '9.6.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
