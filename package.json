@@ -307,7 +307,7 @@
     "@vscode/test-electron": "^3.0.0",
     "concurrently": "^10.0.3",
     "esbuild": "^0.28.1",
-    "eslint": "^10.5.0",
+    "eslint": "^10.6.0",
     "mocha": "11.7.6",
     "ts-loader": "^9.6.2",
     "typescript": "^6.0.3",
