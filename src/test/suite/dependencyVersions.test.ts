@@ -62,8 +62,8 @@ suite('Dependency security baselines', () => {
 
     assert.equal(
       securityCheck,
-      'npm audit --audit-level=moderate',
-      'security:check must enforce zero moderate/high/critical vulnerabilities'
+      'node scripts/run-audit-safe.cjs',
+      'security:check must run the safe audit wrapper to avoid inherited allow-scripts runtime flags'
     );
 
     assert.equal(precompile, 'npm run security:check', 'precompile must run security:check');

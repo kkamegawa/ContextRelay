@@ -276,7 +276,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "security:check": "npm audit --audit-level=moderate",
+    "security:check": "node scripts/run-audit-safe.cjs",
     "precompile": "npm run security:check",
     "compile:types": "tsc -p ./ --noEmit",
     "compile:webview": "tsc -p ./tsconfig.webview.json --noEmit",
