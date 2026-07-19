@@ -131,6 +131,8 @@ The following delegated Microsoft Graph permissions are required by feature:
   npm install
   ```
 
+  > **Caution (npm allow-scripts policy)**: In environments that enforce npm allow-scripts policies, `npm run vsce:package` can fail with `EALLOWSCRIPTS` because `npx` may propagate allow-scripts runtime flags into nested npm executions. This project avoids that with `scripts/run-audit-safe.cjs` (used by `security:check` and build hooks), which runs `npm audit --audit-level=moderate` after clearing inherited `npm_config_allow_scripts` from the child process environment.
+
 4. Build the extension once from the terminal:
 
    ```bash
