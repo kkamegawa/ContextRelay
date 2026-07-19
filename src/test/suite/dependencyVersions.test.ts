@@ -111,13 +111,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'marked',
         actual: packageJson.dependencies?.marked,
-        expected: '^18.0.5',
+        expected: '^18.0.6',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'sanitize-html',
         actual: packageJson.dependencies?.['sanitize-html'],
-        expected: '^2.17.5',
+        expected: '^2.17.6',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -129,7 +129,7 @@ suite('Dependency security baselines', () => {
       {
         label: '@types/node',
         actual: packageJson.devDependencies?.['@types/node'],
-        expected: '^25.9.4',
+        expected: '^26.1.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -141,13 +141,13 @@ suite('Dependency security baselines', () => {
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.62.0',
+        expected: '^8.64.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/parser',
         actual: packageJson.devDependencies?.['@typescript-eslint/parser'],
-        expected: '8.62.0',
+        expected: '8.64.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -159,19 +159,19 @@ suite('Dependency security baselines', () => {
       {
         label: 'eslint',
         actual: packageJson.devDependencies?.eslint,
-        expected: '^10.5.0',
+        expected: '^10.7.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'webpack',
         actual: packageJson.devDependencies?.webpack,
-        expected: '^5.107.2',
+        expected: '^5.108.4',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'webpack-cli',
         actual: packageJson.devDependencies?.['webpack-cli'],
-        expected: '^7.0.3',
+        expected: '^7.2.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -341,13 +341,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed marked',
         actual: packageLockJson.packages?.['node_modules/marked']?.version,
-        expected: '18.0.5',
+        expected: '18.0.6',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed sanitize-html',
         actual: packageLockJson.packages?.['node_modules/sanitize-html']?.version,
-        expected: '2.17.5',
+        expected: '2.17.6',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -359,7 +359,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @types/node',
         actual: packageLockJson.packages?.['node_modules/@types/node']?.version,
-        expected: '25.9.4',
+        expected: '26.1.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -371,13 +371,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.62.0',
+        expected: '8.64.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/parser',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
-        expected: '8.62.0',
+        expected: '8.64.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -389,19 +389,19 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed eslint',
         actual: packageLockJson.packages?.['node_modules/eslint']?.version,
-        expected: '10.5.0',
+        expected: '10.7.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed webpack',
         actual: packageLockJson.packages?.['node_modules/webpack']?.version,
-        expected: '5.107.2',
+        expected: '5.108.4',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed webpack-cli',
         actual: packageLockJson.packages?.['node_modules/webpack-cli']?.version,
-        expected: '7.0.3',
+        expected: '7.2.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
