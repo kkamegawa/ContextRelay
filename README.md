@@ -131,6 +131,8 @@ The following delegated Microsoft Graph permissions are required by feature:
   npm install
   ```
 
+  > **Caution (npm allow-scripts policy)**: This repository includes a project-level `.npmrc` with `allow-scripts=` to neutralize user/global `allow-scripts` settings during project-scoped npm script execution. This avoids `EALLOWSCRIPTS` failures in commands that chain through `npm run` (for example `npm run compile` and `npm run security:check`).
+
 4. Build the extension once from the terminal:
 
    ```bash
