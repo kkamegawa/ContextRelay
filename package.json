@@ -25,7 +25,7 @@
     "productivity"
   ],
   "icon": "media/icon.png",
-  "preview": true,
+  "preview": false,
   "pricing": "Free",
   "license": "MIT",
   "homepage": "https://github.com/kkamegawa/ContextRelay/blob/main/README.md",
