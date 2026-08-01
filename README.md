@@ -518,8 +518,8 @@ What to check:
 1. Confirm the user has the expected Microsoft 365 license.
 2. For SharePoint / OneDrive search, confirm `Files.Read.All` and `Sites.Read.All` were granted and consented.
 3. For Chat scenarios, confirm the user also has the required Microsoft 365 Copilot license if your tenant requires it.
-3. If licenses were assigned recently, wait for propagation and retry.
-4. If the pilot does not need retrieval features yet, temporarily keep `contextRelay.adapters.sharepoint`, `contextRelay.adapters.onedrive`, and `contextRelay.enableChatPreview` disabled.
+4. If licenses were assigned recently, wait for propagation and retry.
+5. If the pilot does not need retrieval features yet, temporarily keep `contextRelay.adapters.sharepoint`, `contextRelay.adapters.onedrive`, and `contextRelay.enableChatPreview` disabled.
 
 ---
 
