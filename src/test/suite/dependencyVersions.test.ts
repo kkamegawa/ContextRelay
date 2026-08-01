@@ -7,12 +7,13 @@ interface PackageJson {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   engines?: Record<string, string>;
+  allowScripts?: Record<string, boolean>;
   scripts?: Record<string, string>;
   overrides?: Record<string, string>;
 }
 
 interface PackageLockJson {
-  packages?: Record<string, { deprecated?: string; version?: string }>;
+  packages?: Record<string, { deprecated?: string; hasInstallScript?: boolean; version?: string }>;
 }
 
 function readRepoJson<T>(fileName: string): T {
@@ -84,6 +85,44 @@ suite('Dependency security baselines', () => {
     assert.equal(precompile, 'npm run security:check', 'precompile must run security:check');
     assert.equal(prepackage, 'npm run security:check', 'prepackage must run security:check');
     assert.equal(testSecurity, 'npm run security:check', 'test:security must reuse security:check');
+  });
+
+  test('allowlists every dependency install script under a strict npm policy', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+    const repoRoot = path.resolve(__dirname, '../../../../');
+    const npmrcLines = fs
+      .readFileSync(path.join(repoRoot, '.npmrc'), 'utf8')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    assert.ok(
+      npmrcLines.includes('strict-allow-scripts=true'),
+      '.npmrc must enable strict-allow-scripts for CI'
+    );
+    assert.ok(
+      !npmrcLines.some(line => line.startsWith('allow-scripts=')),
+      '.npmrc must not define a redundant allow-scripts value when package.json owns the policy'
+    );
+
+    const installScriptPackages = Object.entries(packageLockJson.packages ?? {})
+      .filter(([packagePath, metadata]) => packagePath && metadata.hasInstallScript && metadata.version)
+      .map(([packagePath, metadata]) => {
+        const packageNameParts = packagePath.split('node_modules/').filter(Boolean);
+        const packageName = packageNameParts[packageNameParts.length - 1];
+        assert.ok(packageName, `install-script package path must contain a package name: ${packagePath}`);
+        return `${packageName}@${metadata.version}`;
+      });
+
+    assert.ok(installScriptPackages.length > 0, 'lockfile must identify install-script packages');
+    for (const packageIdentity of installScriptPackages) {
+      assert.equal(
+        packageJson.allowScripts?.[packageIdentity],
+        true,
+        `${packageIdentity} must be explicitly allowed in package.json#allowScripts`
+      );
+    }
   });
 
   test('pins vsce packaging script to the 3.9.1 baseline or newer', () => {
