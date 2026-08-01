@@ -1,4 +1,5 @@
 import { strict as assert } from 'assert';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -17,6 +18,20 @@ interface PackageLockJson {
 function readRepoJson<T>(fileName: string): T {
   const filePath = path.resolve(__dirname, '../../../../', fileName);
   return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+}
+
+function readToolVersion(command: 'tsc' | 'tsc6'): string {
+  const extension = process.platform === 'win32' ? '.cmd' : '';
+  const executable = path.resolve(__dirname, '../../../../', 'node_modules', '.bin', `${command}${extension}`);
+  return execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim().replace(/^Version\s+/, '');
+}
+
+function readTypeScriptApiVersion(): string {
+  const repoRoot = path.resolve(__dirname, '../../../../');
+  return execFileSync(process.execPath, ['-p', 'require("typescript").version'], {
+    cwd: repoRoot,
+    encoding: 'utf8'
+  }).trim();
 }
 
 function getMajor(versionRange: string | undefined): number | undefined {
@@ -104,6 +119,38 @@ suite('Dependency security baselines', () => {
     );
   });
 
+  test('uses the TypeScript 7 CLI with the TypeScript 6 compatibility API', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const nativeCompiler = packageJson.devDependencies?.['@typescript/native'];
+    const compatibilityCompiler = packageJson.devDependencies?.typescript;
+    const nativeVersion = readToolVersion('tsc');
+    const compatibilityVersion = readToolVersion('tsc6');
+    const apiVersion = readTypeScriptApiVersion();
+
+    assert.equal(
+      nativeCompiler,
+      'npm:typescript@^7.0.2',
+      `@typescript/native must provide the TypeScript 7 CLI (found: ${nativeCompiler ?? 'missing'})`
+    );
+    assert.equal(
+      compatibilityCompiler,
+      'npm:@typescript/typescript6@^6.0.2',
+      `typescript must provide the TypeScript 6 compatibility API (found: ${compatibilityCompiler ?? 'missing'})`
+    );
+    assert.equal(getMajor(nativeVersion), 7, `tsc must run TypeScript 7 (found: ${nativeVersion})`);
+    assert.ok(compareVersions(nativeVersion, '7.0.2') >= 0, `tsc must be TypeScript 7.0.2 or newer (found: ${nativeVersion})`);
+    assert.equal(getMajor(compatibilityVersion), 6, `tsc6 must run TypeScript 6 (found: ${compatibilityVersion})`);
+    assert.ok(
+      compareVersions(compatibilityVersion, '6.0.2') >= 0,
+      `tsc6 must be TypeScript 6.0.2 or newer (found: ${compatibilityVersion})`
+    );
+    assert.equal(getMajor(apiVersion), 6, `require("typescript") must resolve the TypeScript 6 API (found: ${apiVersion})`);
+    assert.ok(
+      compareVersions(apiVersion, '6.0.2') >= 0,
+      `require("typescript") must resolve TypeScript 6.0.2 or newer (found: ${apiVersion})`
+    );
+  });
+
   test('pins the consolidated Dependabot package.json baselines', () => {
     const packageJson = readRepoJson<PackageJson>('package.json');
 
@@ -135,19 +182,19 @@ suite('Dependency security baselines', () => {
       {
         label: 'concurrently',
         actual: packageJson.devDependencies?.concurrently,
-        expected: '^10.0.3',
+        expected: '^10.0.4',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.64.0',
+        expected: '^8.65.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/parser',
         actual: packageJson.devDependencies?.['@typescript-eslint/parser'],
-        expected: '8.64.0',
+        expected: '8.65.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -183,19 +230,25 @@ suite('Dependency security baselines', () => {
       {
         label: 'brace-expansion override',
         actual: packageJson.overrides?.['brace-expansion'],
-        expected: '5.0.6',
+        expected: '5.0.9',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
         label: 'shell-quote override',
         actual: packageJson.overrides?.['shell-quote'],
-        expected: '1.8.4',
+        expected: '1.10.0',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
         label: 'js-yaml override',
         actual: packageJson.overrides?.['js-yaml'],
-        expected: '4.2.0',
+        expected: '4.3.1',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'postcss override',
+        actual: packageJson.overrides?.postcss,
+        expected: '8.5.25',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
@@ -253,13 +306,23 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['shell-quote'], '1.8.4') >= 0,
+      compareVersions(packageJson.overrides?.['brace-expansion'], '5.0.9') >= 0,
+      `brace-expansion override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['brace-expansion'] ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(packageJson.overrides?.['shell-quote'], '1.10.0') >= 0,
       `shell-quote override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['shell-quote'] ?? 'missing'})`
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['js-yaml'], '4.2.0') >= 0,
+      compareVersions(packageJson.overrides?.['js-yaml'], '4.3.1') >= 0,
       `js-yaml override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['js-yaml'] ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(packageJson.overrides?.postcss, '8.5.25') >= 0,
+      `postcss override must stay on a non-vulnerable release (found: ${packageJson.overrides?.postcss ?? 'missing'})`
     );
   });
 
@@ -365,19 +428,19 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed concurrently',
         actual: packageLockJson.packages?.['node_modules/concurrently']?.version,
-        expected: '10.0.3',
+        expected: '10.0.4',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.64.0',
+        expected: '8.65.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/parser',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
-        expected: '8.64.0',
+        expected: '8.65.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -413,19 +476,25 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed brace-expansion',
         actual: packageLockJson.packages?.['node_modules/brace-expansion']?.version,
-        expected: '5.0.6',
+        expected: '5.0.9',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
         label: 'installed shell-quote',
         actual: packageLockJson.packages?.['node_modules/shell-quote']?.version,
-        expected: '1.8.4',
+        expected: '1.10.0',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
         label: 'installed js-yaml',
         actual: packageLockJson.packages?.['node_modules/js-yaml']?.version,
-        expected: '4.2.0',
+        expected: '4.3.1',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'installed postcss',
+        actual: packageLockJson.packages?.['node_modules/postcss']?.version,
+        expected: '8.5.25',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
