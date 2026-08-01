@@ -215,7 +215,7 @@ Recommended pre-run settings:
   2. Open the panel.
 - Expected:
   - Chat tab is visible.
-  - Beta/preview warning is visible.
+  - Beta API warning is visible.
 
 ### E2E-31 Chat disabled
 - Status: [ ]

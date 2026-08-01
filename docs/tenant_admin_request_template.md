@@ -44,7 +44,7 @@ Because the extension uses the built-in VS Code Microsoft authentication provide
 - `Files.Read.All`
 - `Sites.Read.All`
 
-**Chat preview / transcript / people context**
+**Chat / transcript / people context**
 
 - `People.Read.All`
 - `OnlineMeetingTranscript.Read.All`

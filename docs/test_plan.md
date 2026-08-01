@@ -6,7 +6,7 @@
 
 ## 1. Test scope
 
-Authentication, slash routing, Retrieval API, Chat API (preview), Exchange Mail adapter, Teams adapter, cache, saved snippets, timestamped doc generation, error handling, and security.
+Authentication, slash routing, Retrieval API, Chat API (beta), Exchange Mail adapter, Teams adapter, cache, saved snippets, timestamped doc generation, error handling, and security.
 
 ## 2. Environment
 
@@ -93,7 +93,7 @@ Authentication, slash routing, Retrieval API, Chat API (preview), Exchange Mail 
 
 ---
 
-## 6. Chat API (preview/beta)
+## 6. Chat API (beta)
 
 **T-CHAT-01 Create conversation**
 - Call: `POST /beta/copilot/conversations`
