@@ -22,6 +22,7 @@ import { buildWorkIqPromptWithFiles, resolveFileMentions, type ResolvedFileMenti
 import { buildPreviewWebviewHtml } from './openResult';
 import { detectOutputLanguage } from './outputLanguage';
 import { resolvePreview } from './previewResolver';
+import { normalizeSafeExternalUrl } from './safeExternalUrl';
 import { buildSearchSummary, type SearchSummaryResult } from './searchSummary';
 import { type HostToWebviewMessage, type WebviewToHostMessage } from './types';
 import { CHAT_EDITOR_PANEL_ID, CHAT_VIEW_ID } from './chatViewConstants';
@@ -240,14 +241,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleOpenLink(url: string): Promise<void> {
-    if (!url?.trim()) {
+    const safeUrl = normalizeSafeExternalUrl(url);
+    if (!safeUrl) {
       return;
     }
 
-    const uri = vscode.Uri.parse(url);
-    if (uri.scheme === 'http' || uri.scheme === 'https') {
-      await vscode.env.openExternal(uri);
-    }
+    await vscode.env.openExternal(vscode.Uri.parse(safeUrl));
   }
 
   private async handleCopySnippet(text: string): Promise<void> {

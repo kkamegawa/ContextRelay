@@ -75,7 +75,7 @@ This supports a safe initial mail-only rollout.
 - `Files.Read.All`
 - `Sites.Read.All`
 
-**Chat preview / richer people and transcript context**
+**Chat / richer people and transcript context**
 
 - `People.Read.All`
 - `OnlineMeetingTranscript.Read.All`

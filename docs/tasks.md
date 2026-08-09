@@ -32,7 +32,7 @@
 |---|---|
 | Retrieval (SharePoint/OneDrive) | `Files.Read.All`, `Sites.Read.All` |
 | Retrieval (Connectors) | `ExternalItem.Read.All` |
-| Chat (preview/beta) | `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All`, `ExternalItem.Read.All` |
+| Chat (beta) | `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All`, `ExternalItem.Read.All` |
 | Exchange Mail | `Mail.Read` |
 | Teams | `Chat.Read`, `ChannelMessage.Read.All` |
 
@@ -75,7 +75,7 @@
 
 ---
 
-## E. Chat adapter (Copilot Chat API preview/beta)
+## E. Chat adapter (Copilot Chat API beta)
 
 - [ ] Gate behind `contextRelay.enableChatPreview` setting (default: `true`)
 - [ ] Create conversation: `POST https://graph.microsoft.com/beta/copilot/conversations`

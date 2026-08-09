@@ -44,7 +44,7 @@ VS Code 拡張 **ContextRelay** の pilot 利用を開始したく、tenant 管�
 - `Files.Read.All`
 - `Sites.Read.All`
 
-**Chat preview / transcript / people context**
+**Chat / transcript / people context**
 
 - `People.Read.All`
 - `OnlineMeetingTranscript.Read.All`

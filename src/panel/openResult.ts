@@ -1,5 +1,6 @@
 import { getPreviewText, ResolvedPreview } from '../models/contextItem';
 import { getSourceLabel } from '../sourcePresentation';
+import { normalizeSafeExternalUrl } from './safeExternalUrl';
 export function buildPreviewDocument(preview: ResolvedPreview): string {
   const lines = [`# ${preview.title}`, ''];
   const metadata: string[] = [
@@ -142,8 +143,14 @@ function buildPreviewBodyHtml(preview: ResolvedPreview): string {
   switch (preview.content.kind) {
     case 'html':
       return `<section class="preview-body preview-body-html">${preview.content.html}</section>`;
-    case 'image':
-      return `<section class="preview-body preview-body-image"><img src="${escapeAttribute(preview.content.src)}" alt="${escapeAttribute(preview.content.alt ?? preview.title)}">${getPreviewText(preview) ? `<div class="preview-image-caption">${escapeHtml(getPreviewText(preview))}</div>` : ''}</section>`;
+    case 'image': {
+      const safeSrc = getSafePreviewImageSrc(preview.content.src);
+      if (!safeSrc) {
+        return `<section class="preview-body preview-body-text">${escapeHtml(getPreviewText(preview) || 'No preview text is available for this item yet.')}</section>`;
+      }
+
+      return `<section class="preview-body preview-body-image"><img src="${escapeAttribute(safeSrc)}" alt="${escapeAttribute(preview.content.alt ?? preview.title)}">${getPreviewText(preview) ? `<div class="preview-image-caption">${escapeHtml(getPreviewText(preview))}</div>` : ''}</section>`;
+    }
     default:
       return `<section class="preview-body preview-body-text">${escapeHtml(getPreviewText(preview) || 'No preview text is available for this item yet.')}</section>`;
   }
@@ -163,7 +170,7 @@ function escapeAttribute(value: string): string {
 }
 
 function buildPreviewLinkMarkup(url: string): string {
-  const safeUrl = getSafeExternalUrl(url);
+  const safeUrl = normalizeSafeExternalUrl(url, ['http:', 'https:', 'mailto:']);
   if (!safeUrl) {
     return escapeHtml(url);
   }
@@ -172,10 +179,28 @@ function buildPreviewLinkMarkup(url: string): string {
   return `<a href="${escaped}" target="_blank" rel="noreferrer noopener">${escapeHtml(safeUrl)}</a>`;
 }
 
-function getSafeExternalUrl(url: string): string | undefined {
+function getSafePreviewImageSrc(src: string): string | undefined {
+    const safeExternalUrl = normalizeSafeExternalUrl(src, ['https:']);
+  if (safeExternalUrl) {
+    return safeExternalUrl;
+  }
+
   try {
-    const parsed = new URL(url);
-    if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+    const parsed = new URL(src);
+    if (parsed.protocol !== 'data:') {
+      return undefined;
+    }
+
+    const [mediaType, data] = parsed.pathname.split(',', 2);
+    if (!mediaType || !data) {
+      return undefined;
+    }
+
+    if (!/^image\/(?:png|jpe?g|gif|webp);base64$/i.test(mediaType)) {
+      return undefined;
+    }
+
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data)) {
       return undefined;
     }
 
