@@ -273,7 +273,8 @@
     "brace-expansion": "5.0.9",
     "shell-quote": "1.10.0",
     "js-yaml": "4.3.1",
-    "postcss": "8.5.25"
+    "postcss": "8.5.25",
+    "nanoid": "3.3.17"
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
