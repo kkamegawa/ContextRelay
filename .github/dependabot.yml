@@ -11,7 +11,14 @@ updates:
       semver-major-days: 20
       semver-minor-days: 10
       semver-patch-days: 5
-    target-branch: main
+    groups:
+      security-minor-and-patch:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
     open-pull-requests-limit: 10
     labels:
       - dependencies
