@@ -22,9 +22,14 @@ function readRepoJson<T>(fileName: string): T {
 }
 
 function readToolVersion(command: 'tsc' | 'tsc6'): string {
-  const extension = process.platform === 'win32' ? '.cmd' : '';
-  const executable = path.resolve(__dirname, '../../../../', 'node_modules', '.bin', `${command}${extension}`);
-  return execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim().replace(/^Version\s+/, '');
+  const repoRoot = path.resolve(__dirname, '../../../../');
+  const toolScript = command === 'tsc'
+    ? path.join(repoRoot, 'node_modules', '@typescript', 'native', 'bin', 'tsc')
+    : path.join(repoRoot, 'node_modules', 'typescript', 'bin', 'tsc6');
+  return execFileSync(process.execPath, [toolScript, '--version'], {
+    cwd: repoRoot,
+    encoding: 'utf8'
+  }).trim().replace(/^Version\\s+/, '');
 }
 
 function readTypeScriptApiVersion(): string {
@@ -215,7 +220,7 @@ suite('Dependency security baselines', () => {
       {
         label: '@types/node',
         actual: packageJson.devDependencies?.['@types/node'],
-        expected: '^26.1.1',
+        expected: '^26.2.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -245,19 +250,19 @@ suite('Dependency security baselines', () => {
       {
         label: 'eslint',
         actual: packageJson.devDependencies?.eslint,
-        expected: '^10.7.0',
+        expected: '^10.8.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'webpack',
         actual: packageJson.devDependencies?.webpack,
-        expected: '^5.108.4',
+        expected: '^5.109.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'webpack-cli',
         actual: packageJson.devDependencies?.['webpack-cli'],
-        expected: '^7.2.1',
+        expected: '^7.2.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -365,6 +370,22 @@ suite('Dependency security baselines', () => {
     );
   });
 
+  test('pins nanoid outside its high-severity vulnerable range', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+    const nanoidOverride = packageJson.overrides?.nanoid;
+    const nanoidVersion = packageLockJson.packages?.['node_modules/nanoid']?.version;
+
+    assert.ok(
+      compareVersions(nanoidOverride, '3.3.17') >= 0,
+      `nanoid override must stay on 3.3.17 or newer (found: ${nanoidOverride ?? 'missing'})`
+    );
+    assert.ok(
+      compareVersions(nanoidVersion, '3.3.17') >= 0,
+      `installed nanoid must stay on 3.3.17 or newer (found: ${nanoidVersion ?? 'missing'})`
+    );
+  });
+
   test('locks installed glob, diff, and fast-uri versions outside known vulnerable ranges', () => {
     const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
 
@@ -461,7 +482,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @types/node',
         actual: packageLockJson.packages?.['node_modules/@types/node']?.version,
-        expected: '26.1.1',
+        expected: '26.2.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -491,19 +512,19 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed eslint',
         actual: packageLockJson.packages?.['node_modules/eslint']?.version,
-        expected: '10.7.0',
+        expected: '10.8.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed webpack',
         actual: packageLockJson.packages?.['node_modules/webpack']?.version,
-        expected: '5.108.4',
+        expected: '5.109.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed webpack-cli',
         actual: packageLockJson.packages?.['node_modules/webpack-cli']?.version,
-        expected: '7.2.1',
+        expected: '7.2.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
