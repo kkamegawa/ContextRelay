@@ -141,7 +141,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'brace-expansion override',
         actual: packageJson.overrides?.['brace-expansion'],
-        expected: '5.0.6',
+        expected: '5.0.9',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
@@ -197,6 +197,63 @@ suite('Dependency security baselines', () => {
       compareVersions(packageJson.overrides?.diff, '8.0.3') >= 0,
       `diff override must stay outside the vulnerable range 6.0.0-8.0.2 (found: ${packageJson.overrides?.diff ?? 'missing'})`
     );
+
+    const safeOverrideFloors = [
+      ['brace-expansion', '5.0.9'],
+      ['fast-uri', '3.1.5'],
+      ['js-yaml', '4.3.1'],
+      ['nanoid', '3.3.18'],
+      ['postcss', '8.5.26'],
+      ['shell-quote', '1.9.0']
+    ] as const;
+
+    for (const [packageName, minimumVersion] of safeOverrideFloors) {
+      const actualVersion = packageJson.overrides?.[packageName];
+      assert.ok(
+        compareVersions(actualVersion, minimumVersion) >= 0,
+        `${packageName} override must be ${minimumVersion} or newer (found: ${actualVersion ?? 'missing'})`
+      );
+    }
+  });
+
+  test('pins direct dependencies above the current npm audit baselines', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+
+    const directDependencyFloors = [
+      ['concurrently', packageJson.devDependencies?.concurrently, '9.2.4'],
+      ['esbuild', packageJson.devDependencies?.esbuild, '0.28.2'],
+      ['sanitize-html', packageJson.dependencies?.['sanitize-html'], '2.17.6']
+    ] as const;
+
+    for (const [packageName, actualVersion, minimumVersion] of directDependencyFloors) {
+      assert.ok(
+        compareVersions(actualVersion, minimumVersion) >= 0,
+        `${packageName} must be ${minimumVersion} or newer (found: ${actualVersion ?? 'missing'})`
+      );
+    }
+  });
+
+  test('locks npm audit remediations at safe versions', () => {
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+    const safeLockfileFloors = [
+      ['brace-expansion', '5.0.9'],
+      ['concurrently', '9.2.4'],
+      ['esbuild', '0.28.2'],
+      ['fast-uri', '3.1.5'],
+      ['js-yaml', '4.3.1'],
+      ['nanoid', '3.3.18'],
+      ['postcss', '8.5.26'],
+      ['sanitize-html', '2.17.6'],
+      ['shell-quote', '1.9.0']
+    ] as const;
+
+    for (const [packageName, minimumVersion] of safeLockfileFloors) {
+      const actualVersion = packageLockJson.packages?.[`node_modules/${packageName}`]?.version;
+      assert.ok(
+        compareVersions(actualVersion, minimumVersion) >= 0,
+        `installed ${packageName} must be ${minimumVersion} or newer (found: ${actualVersion ?? 'missing'})`
+      );
+    }
   });
 
   test('locks installed glob, diff, and fast-uri versions outside known vulnerable ranges', () => {
@@ -250,7 +307,7 @@ suite('Dependency security baselines', () => {
       `marked must stay on a vetted baseline or newer (found: ${packageJson.dependencies?.marked ?? 'missing'})`
     );
     assert.ok(
-      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.17.4') >= 0,
+      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.17.6') >= 0,
       `sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageJson.dependencies?.['sanitize-html'] ?? 'missing'})`
     );
 
@@ -265,7 +322,7 @@ suite('Dependency security baselines', () => {
       `installed sanitize-html must not be deprecated (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.deprecated ?? 'not deprecated'})`
     );
     assert.ok(
-      compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.17.4') >= 0,
+      compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.17.6') >= 0,
       `installed sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.version ?? 'missing'})`
     );
   });
@@ -307,7 +364,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed brace-expansion',
         actual: packageLockJson.packages?.['node_modules/brace-expansion']?.version,
-        expected: '5.0.6',
+        expected: '5.0.9',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
