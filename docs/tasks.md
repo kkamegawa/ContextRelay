@@ -229,6 +229,24 @@
 
 ---
 
+## M. `/ask` without pinned context, real attachments, and streaming
+
+Tracked in [issue #208](https://github.com/kkamegawa/ContextRelay/issues/208).
+
+- [x] Remove the pinned-snippet/attachment guard that blocked `/ask` from running at all (the Chat API's `additionalContext`/`contextualResources` are optional, not required)
+- [x] Redefine `/ask` as a strict-format mode (all available context + output-format instructions) vs. plain chat (no auto-attached ContextRelay context), matching the README's existing description of plain chat
+- [x] Fix local `#` mention attachments: they were being sent as `file://` URIs inside `contextualResources.files`, a field documented as OneDrive/SharePoint URIs only — so local file content never actually reached Copilot. Local files are now read and inlined via `additionalContext`
+- [x] Unify all attachment origins (`#` mention, drag-and-drop, attach-file picker, opt-in active editor) behind one `ResolvedAttachment` type and shared path-validation helpers (`src/panel/attachments.ts`, `src/panel/workspacePath.ts`)
+- [x] Add `contextRelay.chat.attachActiveEditor` (default `false`), `contextRelay.chat.streamResponses` (default `true`), `contextRelay.chat.maxAttachedFiles` (default `5`)
+- [x] Migrate response rendering to the Chat API's `chatOverStream` endpoint, with a one-shot fallback to the synchronous endpoint only when the streamed request was never accepted (falling back after acceptance would resend the prompt and create a duplicate conversation turn)
+
+**Acceptance**
+- `/ask` with no pinned snippets and no attachments still calls Copilot, with a non-blocking notice that no extra context was included.
+- `/ask #some-file.md ...` sends the actual file content to Copilot (verified via `contextRelay.enableGraphDebugLogging`, confirming no `file://` URI appears in `contextualResources.files`).
+- Plain chat continues to omit pinned snippets, the latest visible result, and the latest search summary; `/ask` includes them.
+
+---
+
 ## Milestone mapping
 
 | Milestone | Tasks |

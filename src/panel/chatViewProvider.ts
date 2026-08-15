@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { createConversation, sendMessage } from '../adapters/chatAdapter';
+import { createConversation, sendMessageAuto } from '../adapters/chatAdapter';
 import { hydrateItemForHandoff } from '../adapters/handoffContentAdapter';
 import { searchMail } from '../adapters/mailAdapter';
 import { searchOneNote } from '../adapters/onenoteAdapter';
@@ -16,9 +16,17 @@ import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
 import { type ContextItem, type ContextSource, type ResolvedPreview, getContextItemKey } from '../models/contextItem';
 import { getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
+import { buildAskInstruction } from './askPrompt';
+import {
+  DEFAULT_MAX_ATTACHMENTS,
+  mergeAttachments,
+  resolveAttachmentPath,
+  type AttachmentSelection,
+  type ResolvedAttachment
+} from './attachments';
 import { buildChatContextPayload } from './chatContext';
 import { isCopilotSupportedFileExtension } from './copilotSupportedExtensions';
-import { buildWorkIqPromptWithFiles, resolveFileMentions, type ResolvedFileMention } from './fileMentions';
+import { buildWorkIqPromptWithFiles, resolveFileMentions } from './fileMentions';
 import { buildPreviewWebviewHtml } from './openResult';
 import { detectOutputLanguage } from './outputLanguage';
 import { resolvePreview } from './previewResolver';
@@ -57,6 +65,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private currentWorkIqContextId?: string;
   private editorPanel?: vscode.WebviewPanel;
   private previewPanel?: vscode.WebviewPanel;
+  /** Files attached via drag-and-drop or the attach-file picker, pending the next Copilot message. */
+  private pendingAttachments: ResolvedAttachment[] = [];
+  /** Lets the Stop button cancel an in-flight streamed Copilot reply. */
+  private activeStreamController?: AbortController;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -117,9 +129,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   public postMessage(message: HostToWebviewMessage): void {
+    // Live/ephemeral UI state (pinned items, workspace files, attachment
+    // chips, and in-flight streaming progress) is re-sent to newly-attached
+    // hosts explicitly (see markHostReady) rather than replayed from the
+    // transcript, since only the latest value matters.
+    const isTranscriptExempt =
+      message.command === 'pinnedItems' ||
+      message.command === 'workspaceFiles' ||
+      message.command === 'attachmentsChanged' ||
+      message.command === 'assistantMessageStart' ||
+      message.command === 'assistantMessageProgress';
+
     if (message.command === 'clearChat') {
       this.transcript = [message];
-    } else if (message.command !== 'pinnedItems' && message.command !== 'workspaceFiles') {
+    } else if (!isTranscriptExempt) {
       this.transcript.push(message);
       if (this.transcript.length > ChatViewProvider.MAX_TRANSCRIPT_LENGTH) {
         this.transcript = this.transcript.slice(-ChatViewProvider.MAX_TRANSCRIPT_LENGTH);
@@ -139,8 +162,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.latestVisibleResult = undefined;
     this.currentConversationId = undefined;
     this.currentWorkIqContextId = undefined;
+    this.activeStreamController?.abort();
+    this.activeStreamController = undefined;
+    this.pendingAttachments = [];
     this.postMessage({ command: 'clearChat' });
     this.sendPinnedItems();
+    this.sendAttachments();
   }
 
   public clearCache(): void {
@@ -211,6 +238,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       void host.webview.postMessage(message);
     }
     this.sendPinnedItems(kind);
+    this.sendAttachments(kind);
     void this.sendWorkspaceFiles(kind);
   }
 
@@ -236,6 +264,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'pinSnippet':
         await this.handlePinSnippet(message.item);
+        break;
+      case 'attachFiles':
+        await this.handleAttachFiles(message.uris);
+        break;
+      case 'attachFilePicker':
+        await this.handleAttachFilePicker();
+        break;
+      case 'removeAttachment':
+        this.handleRemoveAttachment(message.absolutePath);
+        break;
+      case 'cancelAssistantMessage':
+        this.activeStreamController?.abort();
         break;
     }
   }
@@ -345,6 +385,176 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     this.broadcastMessage(message);
+  }
+
+  private sendAttachments(kind?: ChatHostKind): void {
+    const message: HostToWebviewMessage = {
+      command: 'attachmentsChanged',
+      attachments: this.pendingAttachments.map(attachment => ({
+        absolutePath: attachment.absolutePath,
+        relativePath: attachment.relativePath,
+        origin: attachment.origin
+      }))
+    };
+
+    if (kind) {
+      this.postMessageToHost(kind, message);
+      return;
+    }
+
+    this.broadcastMessage(message);
+  }
+
+  private getMaxAttachments(): number {
+    return vscode.workspace
+      .getConfiguration('contextRelay')
+      .get<number>('chat.maxAttachedFiles', DEFAULT_MAX_ATTACHMENTS);
+  }
+
+  private getWorkspaceRoots(): string[] {
+    return (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath);
+  }
+
+  /** Invoked from the ContextRelay: Attach File to Chat command as well as the webview's attach button. */
+  public async attachFileViaPicker(): Promise<void> {
+    await this.handleAttachFilePicker();
+  }
+
+  private async handleAttachFiles(uris: string[]): Promise<void> {
+    const workspaceRoots = this.getWorkspaceRoots();
+    const maxAttachments = this.getMaxAttachments();
+    const resolved: ResolvedAttachment[] = [];
+    let firstError: string | undefined;
+
+    for (const rawUri of uris) {
+      if (this.pendingAttachments.length + resolved.length >= maxAttachments) {
+        firstError ??= `You can attach up to ${maxAttachments} files per message.`;
+        break;
+      }
+
+      let fsPath: string;
+      try {
+        const uri = vscode.Uri.parse(rawUri, true);
+        if (uri.scheme !== 'file') {
+          firstError ??= `Only local files can be attached (dropped: ${rawUri}).`;
+          continue;
+        }
+        fsPath = uri.fsPath;
+      } catch {
+        firstError ??= `Could not read the dropped item: ${rawUri}`;
+        continue;
+      }
+
+      const attachment = await resolveAttachmentPath(fsPath, workspaceRoots, 'drop');
+      if (typeof attachment === 'string') {
+        firstError ??= attachment;
+        continue;
+      }
+      resolved.push(attachment);
+    }
+
+    if (resolved.length > 0) {
+      this.pendingAttachments = mergeAttachments(this.pendingAttachments, resolved);
+      this.sendAttachments();
+    }
+
+    if (firstError) {
+      this.postMessage({
+        command: 'queryError',
+        source: 'all',
+        message: firstError,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  private async handleAttachFilePicker(): Promise<void> {
+    const workspaceRoots = this.getWorkspaceRoots();
+    if (workspaceRoots.length === 0) {
+      vscode.window.showWarningMessage('ContextRelay: Open a workspace folder to attach files.');
+      return;
+    }
+
+    const candidates = await this.collectWorkspaceFiles();
+    const picked = await vscode.window.showQuickPick(candidates, {
+      canPickMany: true,
+      placeHolder: 'Select files to attach to the next Copilot message'
+    });
+    if (!picked || picked.length === 0) {
+      return;
+    }
+
+    const maxAttachments = this.getMaxAttachments();
+    const resolved: ResolvedAttachment[] = [];
+    let firstError: string | undefined;
+
+    for (const candidate of picked) {
+      if (this.pendingAttachments.length + resolved.length >= maxAttachments) {
+        firstError ??= `You can attach up to ${maxAttachments} files per message.`;
+        break;
+      }
+
+      const absolutePath = path.isAbsolute(candidate) ? candidate : path.join(workspaceRoots[0], candidate);
+      const attachment = await resolveAttachmentPath(absolutePath, workspaceRoots, 'picker');
+      if (typeof attachment === 'string') {
+        firstError ??= attachment;
+        continue;
+      }
+      resolved.push(attachment);
+    }
+
+    if (resolved.length > 0) {
+      this.pendingAttachments = mergeAttachments(this.pendingAttachments, resolved);
+      this.sendAttachments();
+    }
+
+    if (firstError) {
+      vscode.window.showWarningMessage(`ContextRelay: ${firstError}`);
+    }
+  }
+
+  private handleRemoveAttachment(absolutePath: string): void {
+    const next = this.pendingAttachments.filter(attachment => attachment.absolutePath !== absolutePath);
+    if (next.length === this.pendingAttachments.length) {
+      return;
+    }
+
+    this.pendingAttachments = next;
+    this.sendAttachments();
+  }
+
+  /**
+   * Resolve the active editor (and its selection, if any) into an
+   * attachment when contextRelay.chat.attachActiveEditor is enabled. Off by
+   * default, matching GitHub Copilot's opt-in behavior for implicit
+   * editor context. Resolution failures (e.g. an unsaved/untitled editor,
+   * or a file outside the workspace) are swallowed since this is an
+   * implicit convenience, not an explicit user action.
+   */
+  private async resolveActiveEditorAttachment(workspaceRoots: readonly string[]): Promise<ResolvedAttachment | undefined> {
+    const enabled = vscode.workspace
+      .getConfiguration('contextRelay')
+      .get<boolean>('chat.attachActiveEditor', false);
+    if (!enabled) {
+      return undefined;
+    }
+
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.document.uri.scheme !== 'file') {
+      return undefined;
+    }
+
+    const selection: AttachmentSelection | undefined = editor.selection.isEmpty
+      ? undefined
+      : { startLine: editor.selection.start.line + 1, endLine: editor.selection.end.line + 1 };
+
+    const attachment = await resolveAttachmentPath(
+      editor.document.uri.fsPath,
+      workspaceRoots,
+      'activeEditor',
+      selection
+    );
+    return typeof attachment === 'string' ? undefined : attachment;
   }
 
   private async sendWorkspaceFiles(kind?: ChatHostKind): Promise<void> {
@@ -586,15 +796,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async handleAskCommand(prompt: string, mentionFiles: readonly ResolvedFileMention[] = []): Promise<void> {
-    await this.handleCopilotChat(prompt, 'ask', true, mentionFiles);
+  private async handleAskCommand(prompt: string, mentionFiles: readonly ResolvedAttachment[] = []): Promise<void> {
+    // /ask is the "strict format" mode: it always includes ContextRelay's
+    // accumulated context (pinned snippets, latest visible result, latest
+    // search summary) plus any attachments, and wraps the instruction with
+    // a format-following preamble. See askPrompt.ts.
+    await this.handleCopilotChat(buildAskInstruction(prompt), 'ask', true, mentionFiles);
   }
 
-  private async handlePlainChat(prompt: string, mentionFiles: readonly ResolvedFileMention[] = []): Promise<void> {
+  private async handlePlainChat(prompt: string, mentionFiles: readonly ResolvedAttachment[] = []): Promise<void> {
+    // Plain chat sends the prompt as-is and does not auto-attach
+    // ContextRelay's own accumulated context — only explicit attachments
+    // (# mentions, drag-and-drop, the attach picker, or the opt-in active
+    // editor) are included. This matches the extension's documented
+    // behavior for un-prefixed messages.
     await this.handleCopilotChat(prompt, 'chat', false, mentionFiles);
   }
 
-  private async handleWorkIqCommand(query: string, mentionFiles: readonly ResolvedFileMention[]): Promise<void> {
+  private async handleWorkIqCommand(query: string, mentionFiles: readonly ResolvedAttachment[]): Promise<void> {
     this.postMessage({
       command: 'loading',
       source: 'all',
@@ -652,23 +871,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleCopilotChat(
-    prompt: string,
+    copilotPrompt: string,
     kind: 'chat' | 'ask',
-    requirePinnedContext: boolean,
-    mentionFiles: readonly ResolvedFileMention[] = []
+    includeContextRelayContext: boolean,
+    mentionFiles: readonly ResolvedAttachment[] = []
   ): Promise<void> {
     const snippets = this.snippetStore.getAll();
-    if (requirePinnedContext && snippets.length === 0 && mentionFiles.length === 0) {
-      const message = 'Pin snippets or mention local files with # to use /ask. ContextRelay sends that context to Microsoft 365 Copilot.';
-      vscode.window.showWarningMessage(`ContextRelay: ${message}`);
-      this.postMessage({
-        command: 'queryError',
-        source: 'all',
-        message,
-        timestamp: new Date().toISOString()
-      });
-      return;
-    }
+    const workspaceRoots = this.getWorkspaceRoots();
+    const activeEditorAttachment = await this.resolveActiveEditorAttachment(workspaceRoots);
+    const attachments = mergeAttachments(
+      this.pendingAttachments,
+      mentionFiles,
+      activeEditorAttachment ? [activeEditorAttachment] : []
+    );
 
     let token: string;
     try {
@@ -684,6 +899,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    // /ask has no hard requirement on pinned snippets or attachments — the
+    // Chat API's additionalContext/contextualResources are optional. Let it
+    // through with a non-blocking notice instead of refusing to run.
+    if (includeContextRelayContext && snippets.length === 0 && attachments.length === 0) {
+      this.postMessage({
+        command: 'assistantMessage',
+        kind: 'info',
+        text: 'No pinned snippets or attached files this time — sending /ask to Microsoft 365 Copilot without extra ContextRelay context.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     this.postMessage({
       command: 'loading',
       source: 'all',
@@ -691,6 +918,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       text: 'Thinking...',
       icon: '🧠'
     });
+
+    const streamingEnabled = vscode.workspace
+      .getConfiguration('contextRelay')
+      .get<boolean>('chat.streamResponses', true);
+    const controller = new AbortController();
+    this.activeStreamController = controller;
+    const streamId = `stream-${crypto.randomUUID()}`;
+    let streamStarted = false;
 
     try {
       if (!this.currentConversationId) {
@@ -700,48 +935,80 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Conversation history is preserved by the Copilot Chat API via the
       // conversation id, so we only forward explicit ContextRelay context:
       // pinned snippets, the latest visible generated result, and the latest
-      // search summary.
-      const contextPayload = buildChatContextPayload({
+      // search summary (only for /ask — see includeContextRelayContext) plus
+      // any explicitly attached local files (always, for both /ask and plain chat).
+      const contextPayload = await buildChatContextPayload({
         snippets,
         searchSummary: this.latestSearchSummary,
         visibleResult: this.latestVisibleResult,
-        localFiles: mentionFiles.map(file => ({
-          uri: file.uri,
-          label: `Local file: ${file.relativePath}`
-        }))
+        attachments,
+        includeContextRelayContext
       });
-      const reply = await sendMessage(token, this.currentConversationId, prompt, contextPayload);
+
+      const reply = await sendMessageAuto(
+        token,
+        this.currentConversationId,
+        copilotPrompt,
+        contextPayload,
+        streamingEnabled,
+        fullTextSoFar => {
+          if (!streamStarted) {
+            streamStarted = true;
+            this.postMessage({ command: 'assistantMessageStart', id: streamId, timestamp: new Date().toISOString() });
+          }
+          this.postMessage({ command: 'assistantMessageProgress', id: streamId, text: fullTextSoFar });
+        },
+        controller.signal
+      );
+
       if (!reply.trim()) {
         throw new Error('Microsoft 365 Copilot returned an empty response.');
       }
 
-      const { content } = detectOutputLanguage(prompt, reply);
+      const { content } = detectOutputLanguage(copilotPrompt, reply);
       this.latestVisibleResult = content;
       this.postMessage({
-        command: 'assistantMessage',
+        command: 'assistantMessageEnd',
+        id: streamId,
         kind,
         text: content,
         contextLabels: contextPayload.labels,
         timestamp: new Date().toISOString()
       });
+
+      if (this.pendingAttachments.length > 0) {
+        this.pendingAttachments = [];
+        this.sendAttachments();
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`ContextRelay: Copilot chat failed — ${message}`);
-      this.postMessage({
-        command: 'queryError',
-        source: 'all',
-        message,
-        timestamp: new Date().toISOString()
-      });
+      if (err instanceof Error && err.name === 'AbortError') {
+        this.postMessage({
+          command: 'assistantMessageEnd',
+          id: streamId,
+          kind: 'info',
+          text: 'Cancelled.',
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        vscode.window.showErrorMessage(`ContextRelay: Copilot chat failed — ${message}`);
+        this.postMessage({
+          command: 'queryError',
+          source: 'all',
+          message,
+          timestamp: new Date().toISOString()
+        });
+      }
     } finally {
+      this.activeStreamController = undefined;
       this.postMessage({ command: 'loading', source: 'all', isLoading: false });
     }
   }
 
   private async resolveMentionsForPrompt(
     prompt: string
-  ): Promise<{ prompt: string; files: ResolvedFileMention[] } | undefined> {
-    const workspaceRoots = (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath);
+  ): Promise<{ prompt: string; files: ResolvedAttachment[] } | undefined> {
+    const workspaceRoots = this.getWorkspaceRoots();
     const mentionResolution = await resolveFileMentions(prompt, workspaceRoots);
     if (mentionResolution.errors.length > 0) {
       this.postMessage({
@@ -1096,6 +1363,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       white-space: pre-wrap;
     }
 
+    .message.streaming .message-text::after {
+      content: '▍';
+      display: inline-block;
+      margin-left: 1px;
+      opacity: 0.6;
+      animation: blink 1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
     .message-text-rich {
       white-space: normal;
     }
@@ -1297,6 +1576,87 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       gap: var(--cr-spacing-sm);
     }
 
+    #attachmentChips {
+      display: none;
+      flex-wrap: wrap;
+      gap: var(--cr-spacing-xs);
+    }
+
+    #attachmentChips.visible {
+      display: flex;
+    }
+
+    .attachment-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--vscode-badge-background);
+      color: var(--vscode-badge-foreground);
+      border-radius: 999px;
+      padding: 2px 8px 2px 10px;
+      font-size: 0.75em;
+      max-width: 100%;
+    }
+
+    .attachment-chip .attachment-chip-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 220px;
+    }
+
+    .attachment-chip .attachment-chip-remove {
+      cursor: pointer;
+      opacity: 0.75;
+      border: none;
+      background: none;
+      color: inherit;
+      font-size: 1em;
+      line-height: 1;
+      padding: 0 0 0 2px;
+    }
+
+    .attachment-chip .attachment-chip-remove:hover {
+      opacity: 1;
+    }
+
+    #inputArea.drag-active {
+      outline: 2px dashed var(--vscode-focusBorder);
+      outline-offset: -2px;
+    }
+
+    #attachButton {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+      background: none;
+      border: 1px solid var(--vscode-button-secondaryBackground, var(--vscode-input-border, #555));
+      color: var(--vscode-foreground);
+      border-radius: var(--cr-border-radius);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1em;
+    }
+
+    #attachButton:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+
+    #attachButton:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #sendButton.stop-mode {
+      background: var(--vscode-inputValidation-errorBorder, #be1100);
+    }
+
+    #sendButton.stop-mode:hover {
+      opacity: 0.85;
+    }
+
     #promptInput {
       flex: 1;
       min-height: 36px;
@@ -1471,8 +1831,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     <div id="inputArea">
       <div id="slashMenu" role="listbox" aria-label="Slash commands"></div>
       <div id="hashMenu" role="listbox" aria-label="Workspace files"></div>
+      <div id="attachmentChips" role="list" aria-label="Attached files"></div>
 
       <div id="inputWrapper">
+        <button id="attachButton" aria-label="Attach files" title="Attach local files to the next message">📎</button>
         <textarea
           id="promptInput"
           rows="1"
@@ -1488,7 +1850,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           </svg>
         </button>
       </div>
-      <div id="inputHint">Press Enter to send • Shift+Enter for new line • Type / for source search commands • Use #file to attach local context</div>
+      <div id="inputHint">Press Enter to send • Shift+Enter for new line • Type / for source search commands • Use #file, 📎, or drag &amp; drop to attach local context</div>
     </div>
   </div>
 

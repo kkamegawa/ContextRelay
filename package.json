@@ -133,6 +133,10 @@
         "command": "contextRelay.openSettings",
         "title": "ContextRelay: Chat Settings",
         "shortTitle": "Chat Settings"
+      },
+      {
+        "command": "contextRelay.attachFile",
+        "title": "ContextRelay: Attach File to Chat"
       }
     ],
     "menus": {
@@ -261,6 +265,21 @@
           "type": "boolean",
           "default": false,
           "description": "Enable Copilot connectors adapter"
+        },
+        "contextRelay.chat.attachActiveEditor": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically include the active editor (or its selection) as chat context, like GitHub Copilot's editor context. Off by default."
+        },
+        "contextRelay.chat.streamResponses": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render Microsoft 365 Copilot chat replies incrementally using the Chat API's streamed endpoint. Falls back to the synchronous endpoint automatically if streaming isn't available."
+        },
+        "contextRelay.chat.maxAttachedFiles": {
+          "type": "number",
+          "default": 5,
+          "description": "Maximum number of local files that can be attached to a single chat message (via # mentions, drag-and-drop, or the attach picker)"
         }
       }
     }

@@ -24,13 +24,25 @@ const vscode = acquireVsCodeApi();
 const chatArea = document.getElementById('chatArea')!;
 const promptInput = document.getElementById('promptInput') as HTMLTextAreaElement;
 const sendButton = document.getElementById('sendButton') as HTMLButtonElement;
+const attachButton = document.getElementById('attachButton') as HTMLButtonElement;
+const attachmentChipsEl = document.getElementById('attachmentChips')!;
+const inputAreaEl = document.getElementById('inputArea')!;
 const slashMenuEl = document.getElementById('slashMenu')!;
 const hashMenuEl = document.getElementById('hashMenu')!;
+
+const SEND_ICON_HTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+  <path d="M1 1.91L7.2 8 1 14.09 1.91 15 9 8 1.91 1z"/>
+  <path d="M7 1.91L13.2 8 7 14.09 7.91 15 15 8 7.91 1z"/>
+</svg>`;
+const STOP_ICON_HTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+  <rect x="3" y="3" width="10" height="10" rx="1.5"/>
+</svg>`;
 
 // --- Modules ---
 const renderer = new ChatRenderer(chatArea, vscode);
 const activeLoadingKeys = new Set<string>();
 let hasPendingSubmission = false;
+let activeStreamId: string | null = null;
 
 const slashMenu = new SlashMenu(slashMenuEl, promptInput, (nextValue: string) => {
   promptInput.value = nextValue;
@@ -74,9 +86,15 @@ function autoResizeInput(): void {
 
 function setPromptBusy(isBusy: boolean): void {
   promptInput.disabled = isBusy;
-  sendButton.disabled = isBusy;
   promptInput.setAttribute('aria-disabled', String(isBusy));
-  sendButton.setAttribute('aria-disabled', String(isBusy));
+  attachButton.disabled = isBusy;
+
+  // While a Copilot reply is streaming, keep the send button enabled so it
+  // can act as a Stop button; otherwise disable it like the rest of the
+  // input while busy.
+  const sendDisabled = isBusy && !activeStreamId;
+  sendButton.disabled = sendDisabled;
+  sendButton.setAttribute('aria-disabled', String(sendDisabled));
 }
 
 function syncPromptBusy(): void {
@@ -88,10 +106,110 @@ function clearPendingSubmission(): void {
   syncPromptBusy();
 }
 
+function setSendButtonMode(mode: 'send' | 'stop'): void {
+  if (mode === 'stop') {
+    sendButton.innerHTML = STOP_ICON_HTML;
+    sendButton.classList.add('stop-mode');
+    sendButton.title = 'Stop';
+    sendButton.setAttribute('aria-label', 'Stop generating');
+  } else {
+    sendButton.innerHTML = SEND_ICON_HTML;
+    sendButton.classList.remove('stop-mode');
+    sendButton.title = 'Send';
+    sendButton.setAttribute('aria-label', 'Send message');
+  }
+}
+
+interface AttachmentSummary {
+  absolutePath: string;
+  relativePath: string;
+  origin: string;
+}
+
+function renderAttachmentChips(attachments: AttachmentSummary[]): void {
+  attachmentChipsEl.replaceChildren();
+  attachmentChipsEl.classList.toggle('visible', attachments.length > 0);
+
+  for (const attachment of attachments) {
+    const chip = document.createElement('div');
+    chip.className = 'attachment-chip';
+    chip.setAttribute('role', 'listitem');
+
+    const label = document.createElement('span');
+    label.className = 'attachment-chip-label';
+    label.textContent = attachment.relativePath;
+    label.title = attachment.relativePath;
+    chip.appendChild(label);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'attachment-chip-remove';
+    removeBtn.textContent = '✕';
+    removeBtn.setAttribute('aria-label', `Remove ${attachment.relativePath}`);
+    removeBtn.addEventListener('click', () => {
+      vscode.postMessage({ command: 'removeAttachment', absolutePath: attachment.absolutePath });
+    });
+    chip.appendChild(removeBtn);
+
+    attachmentChipsEl.appendChild(chip);
+  }
+}
+
 // --- Event listeners ---
 
-// Send button click
-sendButton.addEventListener('click', submitQuery);
+// Send button click (doubles as Stop while a reply is streaming)
+sendButton.addEventListener('click', () => {
+  if (activeStreamId) {
+    vscode.postMessage({ command: 'cancelAssistantMessage' });
+    return;
+  }
+  submitQuery();
+});
+
+// Attach-file picker button
+attachButton.addEventListener('click', () => {
+  if (attachButton.disabled) {
+    return;
+  }
+  vscode.postMessage({ command: 'attachFilePicker' });
+});
+
+// Drag-and-drop attachment: VS Code webviews receive dropped Explorer/editor
+// items as a text/uri-list DataTransfer entry (file:// URIs). Files dragged
+// in from an OS file manager don't carry a usable path in a browser context,
+// so those are rejected with an explanatory error from the host.
+inputAreaEl.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'copy';
+  }
+  inputAreaEl.classList.add('drag-active');
+});
+
+inputAreaEl.addEventListener('dragleave', (e) => {
+  if (e.target === inputAreaEl) {
+    inputAreaEl.classList.remove('drag-active');
+  }
+});
+
+inputAreaEl.addEventListener('drop', (e) => {
+  e.preventDefault();
+  inputAreaEl.classList.remove('drag-active');
+
+  const uriList = e.dataTransfer?.getData('text/uri-list');
+  if (!uriList) {
+    return;
+  }
+
+  const uris = uriList
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && !line.startsWith('#'));
+
+  if (uris.length > 0) {
+    vscode.postMessage({ command: 'attachFiles', uris });
+  }
+});
 
 // Keyboard handling
 promptInput.addEventListener('keydown', (e) => {
@@ -224,12 +342,40 @@ window.addEventListener('message', (event) => {
       );
       break;
 
+    case 'assistantMessageStart':
+      activeStreamId = message.id as string;
+      setSendButtonMode('stop');
+      syncPromptBusy();
+      renderer.beginAssistantStream(message.id as string);
+      break;
+
+    case 'assistantMessageProgress':
+      renderer.updateAssistantStream(message.id as string, message.text as string);
+      break;
+
+    case 'assistantMessageEnd':
+      activeStreamId = null;
+      setSendButtonMode('send');
+      clearPendingSubmission();
+      renderer.finalizeAssistantMessage(
+        message.id as string,
+        message.text as string,
+        message.timestamp as string,
+        message.kind as 'info' | 'ask' | 'chat' | undefined,
+        message.contextLabels as string[] | undefined
+      );
+      break;
+
     case 'pinnedItems':
       renderer.setPinnedItems((message.keys as string[]) ?? []);
       break;
 
     case 'workspaceFiles':
       hashMenu.setFiles((message.files as string[]) ?? []);
+      break;
+
+    case 'attachmentsChanged':
+      renderAttachmentChips((message.attachments as AttachmentSummary[]) ?? []);
       break;
   }
 });
