@@ -21,7 +21,11 @@ export class SseFrameParser {
   private buffer = '';
 
   push(chunk: string): SseEvent[] {
-    this.buffer += chunk.replace(/\r\n/g, '\n');
+    // Normalize CRLF after concatenating with any carry-over from the
+    // previous push, not before — a chunk boundary can split a \r\n pair
+    // (e.g. "...\r" | "\n..."), and normalizing each chunk in isolation
+    // would leave a stray \r in the buffer that breaks \n\n frame detection.
+    this.buffer = (this.buffer + chunk).replace(/\r\n/g, '\n');
     const events: SseEvent[] = [];
 
     let boundary = this.buffer.indexOf('\n\n');

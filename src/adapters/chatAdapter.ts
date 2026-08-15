@@ -196,6 +196,10 @@ export async function sendMessageStream(
       while (true) {
         const { value, done } = await reader.read();
         if (done) {
+          // Flush the decoder (no args = stream: false) so trailing bytes of
+          // a multi-byte UTF-8 codepoint split across the last two chunks
+          // aren't silently dropped from the final frame.
+          processEvents(parser.push(decoder.decode()));
           break;
         }
         processEvents(parser.push(decoder.decode(value, { stream: true })));

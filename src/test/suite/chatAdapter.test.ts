@@ -202,6 +202,38 @@ suite('Chat adapter', () => {
 });
 
 suite('sendMessageStream', () => {
+  test('reassembles a multi-byte UTF-8 character split across a chunk boundary, including at end-of-stream', async () => {
+    const fullFrame = `data: ${JSON.stringify({ messages: [{ text: 'q' }, { text: 'café done' }] })}\n\n`;
+    const bytes = new TextEncoder().encode(fullFrame);
+    const splitIndex = bytes.indexOf(0xc3); // first byte of "é"'s 2-byte UTF-8 encoding
+    assert.ok(splitIndex > 0, 'test fixture must contain the 2-byte UTF-8 encoding of "é"');
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          // Split so the lead byte of the multi-byte sequence ends one
+          // chunk and its continuation byte starts the next — this only
+          // decodes correctly if TextDecoder's internal carry-over state is
+          // preserved (via { stream: true }) and flushed once no more
+          // chunks remain (see the sendMessageStream() decoder.decode()
+          // flush on the done branch).
+          controller.enqueue(bytes.slice(0, splitIndex + 1));
+          controller.enqueue(bytes.slice(splitIndex + 1));
+          controller.close();
+        }
+      });
+      return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    }) as typeof globalThis.fetch;
+
+    try {
+      const reply = await sendMessageStream('t', 'c', 'q', {}, () => {});
+      assert.equal(reply, 'café done');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('POSTs to chatOverStream with Accept: text/event-stream and reports cumulative progress', async () => {
     const stub = installStreamingFetchStub(() => ({
       status: 200,

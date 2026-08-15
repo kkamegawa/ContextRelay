@@ -187,7 +187,13 @@ inputAreaEl.addEventListener('dragover', (e) => {
 });
 
 inputAreaEl.addEventListener('dragleave', (e) => {
-  if (e.target === inputAreaEl) {
+  // dragleave fires whenever the pointer crosses into a child element (the
+  // textarea, attach button, etc.), not just when it leaves inputAreaEl
+  // entirely. Only clear the outline once relatedTarget (where the pointer
+  // is headed) is outside inputAreaEl — relatedTarget is null when the drag
+  // left the window/webview altogether, which also counts as "left".
+  const related = e.relatedTarget as Node | null;
+  if (!related || !inputAreaEl.contains(related)) {
     inputAreaEl.classList.remove('drag-active');
   }
 });

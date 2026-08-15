@@ -26,6 +26,27 @@ suite('SseFrameParser', () => {
     assert.equal(events[0].data, '{"a":1}');
   });
 
+  test('handles a CRLF frame separator split across two push calls', () => {
+    // A network chunk boundary can split "\r\n\r\n" mid-sequence, e.g. after
+    // the first \r\n but before the second. Normalizing each chunk in
+    // isolation would leave a stray \r in the buffer and never find the \n\n
+    // boundary; normalizing must happen on the concatenated buffer instead.
+    const parser = new SseFrameParser();
+    const first = parser.push('data: {"a":1}\r\n\r');
+    assert.deepEqual(first, []);
+
+    const second = parser.push('\n');
+    assert.equal(second.length, 1);
+    assert.equal(second[0].data, '{"a":1}');
+  });
+
+  test('handles a lone \\r left over from a chunk boundary split, followed by more frames', () => {
+    const parser = new SseFrameParser();
+    parser.push('data: first\r\n\r');
+    const events = parser.push('\ndata: second\n\n');
+    assert.deepEqual(events.map(e => e.data), ['first', 'second']);
+  });
+
   test('returns multiple events from a single push in order', () => {
     const parser = new SseFrameParser();
     const events = parser.push('data: {"a":1}\n\ndata: {"a":2}\n\ndata: {"a":3}\n\n');

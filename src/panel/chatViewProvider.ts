@@ -494,8 +494,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
-      const absolutePath = path.isAbsolute(candidate) ? candidate : path.join(workspaceRoots[0], candidate);
-      const attachment = await resolveAttachmentPath(absolutePath, workspaceRoots, 'picker');
+      const attachment = path.isAbsolute(candidate)
+        ? await resolveAttachmentPath(candidate, workspaceRoots, 'picker')
+        : await this.resolveRelativePickerCandidate(candidate, workspaceRoots);
       if (typeof attachment === 'string') {
         firstError ??= attachment;
         continue;
@@ -511,6 +512,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (firstError) {
       vscode.window.showWarningMessage(`ContextRelay: ${firstError}`);
     }
+  }
+
+  /**
+   * collectWorkspaceFiles() returns a bare relative path only when that
+   * relative path is unique across every workspace folder combined, but it
+   * doesn't say which root the file actually lives under. In a multi-root
+   * workspace that root isn't necessarily workspaceRoots[0], so try each
+   * root in order and use the first one that actually resolves.
+   */
+  private async resolveRelativePickerCandidate(
+    relativePath: string,
+    workspaceRoots: readonly string[]
+  ): Promise<ResolvedAttachment | string> {
+    let lastError = `File not found for ${relativePath}.`;
+    for (const root of workspaceRoots) {
+      const attempt = await resolveAttachmentPath(path.join(root, relativePath), workspaceRoots, 'picker');
+      if (typeof attempt !== 'string') {
+        return attempt;
+      }
+      lastError = attempt;
+    }
+    return lastError;
   }
 
   private handleRemoveAttachment(absolutePath: string): void {

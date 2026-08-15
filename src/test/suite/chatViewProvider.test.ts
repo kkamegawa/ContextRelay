@@ -23,6 +23,7 @@ const workIqRequests: Array<{ token: string; query: string; contextId?: string }
 let replies: string[] = [];
 let workIqReplies: Array<{ text: string; contextId?: string }> = [];
 let workspaceFolders: Array<{ uri: { fsPath: string } }> | undefined;
+let quickPickSelection: string[] | undefined;
 
 class InMemoryMemento implements vscode.Memento {
   private readonly store = new Map<string, unknown>();
@@ -89,7 +90,8 @@ function createVscodeStub(): typeof vscode {
       showInformationMessage: async (message: string) => {
         infoMessages.push(message);
         return undefined;
-      }
+      },
+      showQuickPick: async () => quickPickSelection
     },
     env: {
       openExternal: async () => true,
@@ -217,6 +219,7 @@ suite('ChatViewProvider', () => {
       { text: 'Work IQ second answer', contextId: 'ctx-workiq-2' }
     ];
     workspaceFolders = undefined;
+    quickPickSelection = undefined;
   });
 
   test('loads the webview script via external URI (no blocking file read)', () => {
@@ -360,6 +363,39 @@ suite('ChatViewProvider', () => {
       assert.ok(payload.additionalContext?.[0].text.includes('ship checklist'));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('attach-file picker resolves a relative candidate against whichever workspace root actually contains it', async () => {
+    const rootA = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-attach-a-'));
+    const rootB = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-attach-b-'));
+    fs.writeFileSync(path.join(rootB, 'notes.md'), 'root B body', 'utf8');
+    // notes.md only exists under rootB (index 1), not rootA (index 0) — a
+    // picker resolver that always joins against workspaceRoots[0] would fail
+    // to find it in a multi-root workspace.
+    workspaceFolders = [{ uri: { fsPath: rootA } }, { uri: { fsPath: rootB } }];
+    quickPickSelection = ['notes.md'];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getAccessToken: async () => 'token-123' } as never,
+        {} as never
+      );
+
+      await (provider as unknown as { handleAttachFilePicker(): Promise<void> }).handleAttachFilePicker();
+      assert.equal(warningMessages.length, 0);
+
+      await (provider as unknown as { handleAskCommand(prompt: string): Promise<void> }).handleAskCommand('summarize');
+      const payload = capturedPayloads[0] as {
+        additionalContext?: Array<{ description: string; text: string }>;
+      };
+      assert.equal(payload.additionalContext?.length, 1);
+      assert.equal(payload.additionalContext?.[0].description, 'Local file: notes.md');
+      assert.ok(payload.additionalContext?.[0].text.includes('root B body'));
+    } finally {
+      fs.rmSync(rootA, { recursive: true, force: true });
+      fs.rmSync(rootB, { recursive: true, force: true });
     }
   });
 
