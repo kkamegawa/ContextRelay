@@ -36,7 +36,12 @@ manifest. A mismatch fails the build.
    - build and package the extension into a VSIX,
    - verify the VSIX manifest version matches the tag,
    - upload the VSIX as a build artifact, and
-   - create a GitHub Release with generated notes and the VSIX attached.
+   - create a draft GitHub Release with generated notes and the VSIX attached.
+
+4. After the workflow completes, open the draft GitHub Release and review the
+   generated notes, tag, version, and attached VSIX. When the release is ready,
+   select **Publish release** manually. The workflow does not publish the
+   release automatically.
 
 ## Local / CI tag-based builds
 

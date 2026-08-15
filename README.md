@@ -56,7 +56,7 @@ Summarize #docs/plan.md
 - [Visual Studio Code](https://code.visualstudio.com/) 1.85 or later
 - A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
 - **For Exchange Mail, Teams, SharePoint, OneDrive, OneNote, Planner, and Microsoft To Do search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
-- **For Chat preview / Copilot-grounded features**: Microsoft 365 Copilot license might still be required depending on tenant rollout and API availability
+- **For Copilot-grounded chat features**: Microsoft 365 Copilot license might still be required depending on tenant rollout and API availability
 
 ### Required permissions
 
@@ -378,7 +378,7 @@ If you want the smallest possible setup, use one of these patterns.
 - Admin consent:
   - usually required for several of the above
 - Additional requirement:
-  - Chat preview / Copilot-grounded features can still require Microsoft 365 Copilot licensing depending on tenant rollout
+  - Copilot-grounded chat features can still require Microsoft 365 Copilot licensing depending on tenant rollout
 
 **Pattern 5 — Full extension including connectors**
 
@@ -397,7 +397,7 @@ To reduce approval friction, start with the smallest viable permission set:
 1. **Pilot 1**: `User.Read` + `Mail.Read`
 2. **Pilot 2**: add `Chat.Read` + `ChannelMessage.Read.All`
 3. **Pilot 3**: add `Files.Read.All` + `Sites.Read.All`
-4. **Pilot 4**: add Chat-preview / connector scopes only if those features are actually needed
+4. **Pilot 4**: add Chat and connector scopes only if those features are actually needed
 
 This makes it easier to validate business need before granting broader delegated permissions.
 
@@ -530,9 +530,9 @@ What to check:
 
 1. Confirm the user has the expected Microsoft 365 license.
 2. For SharePoint / OneDrive search, confirm `Files.Read.All` and `Sites.Read.All` were granted and consented.
-3. For Chat preview scenarios, confirm the user also has the required Microsoft 365 Copilot license if your tenant requires it.
-3. If licenses were assigned recently, wait for propagation and retry.
-4. If the pilot does not need retrieval features yet, temporarily keep `contextRelay.adapters.sharepoint`, `contextRelay.adapters.onedrive`, and `contextRelay.enableChatPreview` disabled.
+3. For Chat scenarios, confirm the user also has the required Microsoft 365 Copilot license if your tenant requires it.
+4. If licenses were assigned recently, wait for propagation and retry.
+5. If the pilot does not need retrieval features yet, temporarily keep `contextRelay.adapters.sharepoint`, `contextRelay.adapters.onedrive`, and `contextRelay.enableChatPreview` disabled.
 
 ---
 
@@ -568,13 +568,13 @@ After you pin snippets or run a search, later `/ask` turns can continue in the s
 
 ### Building a Handoff from Search Results
 
-1. Run a search and open a result in the preview pane.
-2. Select the important text in the preview body.
-3. Click **Add selection** to save just that excerpt, or **Add preview** to save the full preview body.
+1. Run a search and open a result in the details pane.
+2. Select the important text in the details body.
+3. Click **Add selection** to save just that excerpt, or **Add preview** to save the full details body.
 4. Review saved excerpts in the **Handoff** tab.
 5. Click **Generate Docs** to write `HANDOFF.md`, `PLAN.md`, `TASKS.md`, and `TEST_PLAN.md`.
 
-You can still pin a result card directly. When the item is a supported document or message, ContextRelay now attempts to fetch the **full content** before saving it into the Handoff workflow. The recommended path is still **preview text selection → Handoff tab → document generation** when you only want the relevant excerpt.
+You can still pin a result card directly. When the item is a supported document or message, ContextRelay now attempts to fetch the **full content** before saving it into the Handoff workflow. The recommended path is still **details text selection → Handoff tab → document generation** when you only want the relevant excerpt.
 
 ### Generating Handoff Documents
 
@@ -630,7 +630,7 @@ Attached files are read and their content (or selected line range) is sent to Co
 
 3. ContextRelay sends the available context plus your instruction to Microsoft 365 Copilot and renders the response in the panel, streaming it incrementally as it arrives (see `contextRelay.chat.streamResponses`). Use the response actions to copy it, append it at the active editor cursor, or replace the active selection/document.
 
-Because this feature relies on the Microsoft 365 Copilot API (preview), you must have a Microsoft 365 Copilot license on the signed-in account and `contextRelay.enableChatPreview` enabled.
+Because this feature relies on the Microsoft 365 Copilot API (beta), you must have a Microsoft 365 Copilot license on the signed-in account and `contextRelay.enableChatPreview` enabled.
 
 To sign out, use the **Accounts** menu in VS Code.
 

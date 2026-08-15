@@ -16,7 +16,7 @@ ContextRelay is a VS Code extension that uses the signed-in organizational accou
 ## 2. Key scenarios (user stories)
 
 1. **Design-time context lookup** — Search Microsoft 365 content from a side panel using keyword queries, optionally narrowed by slash commands (e.g., `/mail`, `/teams`).
-2. **Grounded chat** — Multi-turn Q&A using the Microsoft 365 Copilot Chat API (preview/beta), grounded in organizational data.
+2. **Grounded chat** — Multi-turn Q&A using the Microsoft 365 Copilot Chat API (beta), grounded in organizational data.
 3. **Snippet pinning** — Save any search result as a named snippet for later reference across sessions.
 4. **Copilot handoff artifacts** — Generate and append timestamped sections to `PLAN.md`, `TASKS.md`, `TEST_PLAN.md`, and optionally `HANDOFF.md` for GitHub Copilot.
 
@@ -69,7 +69,7 @@ Used when the target source is SharePoint, OneDrive, or Connectors. Returns perm
 - **Requires**: Microsoft 365 Copilot license assigned to the user.
 - [Retrieval API overview](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/api/ai-services/retrieval/overview) | [API reference](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/api/ai-services/retrieval/copilotroot-retrieval)
 
-### 5.2 Microsoft 365 Copilot Chat API (preview/beta)
+### 5.2 Microsoft 365 Copilot Chat API (beta)
 
 Used for multi-turn conversation grounded in organizational data and optional web search. Backs both `/ask` and plain chat — see §7.6 for how ContextRelay context is attached.
 
@@ -120,7 +120,7 @@ The Copilot Retrieval API does not cover Teams messages directly, so this adapte
 |---|---|---|
 | Retrieval (SharePoint/OneDrive) | `Files.Read.All`, `Sites.Read.All` | Microsoft 365 Copilot |
 | Retrieval (Connectors) | `ExternalItem.Read.All` | Microsoft 365 Copilot |
-| Chat (preview/beta) | `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All`, `ExternalItem.Read.All` | Microsoft 365 Copilot |
+| Chat (beta) | `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All`, `ExternalItem.Read.All` | Microsoft 365 Copilot |
 | Exchange Mail | `Mail.Read` | Microsoft 365 (standard) |
 | Teams | `Chat.Read`, `ChannelMessage.Read.All` | Microsoft 365 (standard) |
 
@@ -384,7 +384,7 @@ A "Load more" button per source section that fetches the next page of results.
 | M0 | Scaffolding + authentication + WebviewView panel |
 | M1 | Retrieval adapter (SharePoint/OneDrive) + snippet pinning |
 | M2 | Slash router + Exchange Mail adapter + Teams adapter |
-| M3 | Chat tab (preview/beta) + conversation UI |
+| M3 | Chat tab (beta) + conversation UI |
 | M4 | Doc generation (timestamped append) + handoff bundle + Copilot helpers |
 | M5 | Cache (LRU + stale-while-revalidate) + error hardening + throttle/backoff |
 

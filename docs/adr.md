@@ -1,6 +1,15 @@
 # ContextRelay — Architecture Decision Record
 
-Records specification changes made during implementation that were not part of the original `docs/plan.md` / `docs/tasks.md` design, along with the reason. Consult this file before changing `/ask`, chat context, or attachment behavior again, to avoid re-introducing a decision that was already reversed here.
+Records specification changes made during implementation that were not part of the original `docs/plan.md` / `docs/tasks.md` design, along with the reason. Consult this file before changing `/ask`, chat context, attachment behavior, or dependency baselines again, to avoid re-introducing a decision that was already reversed here.
+
+---
+
+## 2026-08-10 - Expand the Dependabot grouping task to remediate npm audit findings
+
+- Task: Issue #199 and Sub-issue #200.
+- Decision: Update direct and transitive npm dependency baselines together with the Dependabot security grouping configuration.
+- Reason: Validation of the configuration-only change found existing moderate, high, and critical vulnerabilities, which prevented the required compile and security checks from passing.
+- Compatibility: Keep all dependency updates within their existing major-version ranges and add regression tests for the safe version floors.
 
 ---
 
@@ -24,4 +33,4 @@ Records specification changes made during implementation that were not part of t
   - **Why**: Requested directly by the repository owner during planning for this issue — "sync first" from the original task list was the deferral, not a decision against streaming, and the follow-up work is this change.
   - **Correctness constraint recorded here for future reference**: the fallback to the synchronous endpoint is only safe when the streamed request was **never accepted** by the service (i.e. failure happened before or during the initial POST, before a 200 response with a body was received). A failure that happens *after* acceptance — including user cancellation — must never fall back, because resending the same prompt via `/chat` would create a **duplicate conversation turn** server-side. This is enforced by `StreamAcceptedError` in `src/adapters/chatAdapter.ts`; do not remove that distinction when touching this code.
 
-**No contradiction check needed**: this is the first entry in this file, so there is no prior decision to reconcile against.
+**Contradiction check**: no conflict with the 2026-08-10 entry — that entry concerns dependency baselines and the security-check gate, unrelated to `/ask` or chat context behavior.

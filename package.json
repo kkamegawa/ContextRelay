@@ -25,7 +25,7 @@
     "productivity"
   ],
   "icon": "media/icon.png",
-  "preview": true,
+  "preview": false,
   "pricing": "Free",
   "license": "MIT",
   "homepage": "https://github.com/kkamegawa/ContextRelay/blob/main/README.md",
@@ -289,9 +289,11 @@
     "serialize-javascript": "7.0.5",
     "glob": "12.0.0",
     "diff": "8.0.4",
-    "brace-expansion": "5.0.6",
-    "shell-quote": "1.8.4",
-    "js-yaml": "4.2.0"
+    "brace-expansion": "5.0.9",
+    "shell-quote": "1.10.0",
+    "js-yaml": "4.3.1",
+    "postcss": "8.5.25",
+    "nanoid": "3.3.17"
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -318,24 +320,28 @@
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "@types/sanitize-html": "^2.16.1",
     "@types/vscode": "^1.125.0",
-    "@typescript-eslint/eslint-plugin": "^8.64.0",
-    "@typescript-eslint/parser": "8.64.0",
-    "@vscode/test-electron": "^3.0.0",
-    "concurrently": "^10.0.3",
-    "esbuild": "^0.28.1",
-    "eslint": "^10.7.0",
-    "mocha": "11.7.6",
+    "@typescript-eslint/eslint-plugin": "^8.66.0",
+    "@typescript-eslint/parser": "8.66.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "@vscode/test-electron": "^3.1.0",
+    "concurrently": "^10.0.4",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.8.1",
+    "mocha": "11.8.0",
     "ts-loader": "^9.6.2",
-    "typescript": "^6.0.3",
-    "webpack": "^5.108.4",
-    "webpack-cli": "^7.2.1"
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "webpack": "^5.109.2",
+    "webpack-cli": "^7.2.2"
   },
   "dependencies": {
     "jszip": "^3.10.1",
-    "marked": "^18.0.6",
+    "marked": "^18.0.9",
     "sanitize-html": "^2.17.6"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
