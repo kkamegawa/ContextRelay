@@ -163,7 +163,11 @@ suite('Dependency security baselines', () => {
     );
   });
 
-  test('uses the TypeScript 7 CLI with the TypeScript 6 compatibility API', () => {
+  test('uses the TypeScript 7 CLI with the TypeScript 6 compatibility API', function () {
+    // Spawning tsc, tsc6, and the TypeScript API probe can exceed the 10s suite default
+    // when the whole suite runs in one process.
+    this.timeout(60000);
+
     const packageJson = readRepoJson<PackageJson>('package.json');
     const nativeCompiler = packageJson.devDependencies?.['@typescript/native'];
     const compatibilityCompiler = packageJson.devDependencies?.typescript;
@@ -202,19 +206,19 @@ suite('Dependency security baselines', () => {
       {
         label: 'marked',
         actual: packageJson.dependencies?.marked,
-        expected: '^18.0.6',
+        expected: '^18.0.10',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'sanitize-html',
         actual: packageJson.dependencies?.['sanitize-html'],
-        expected: '^2.17.6',
+        expected: '^2.17.7',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'mocha',
         actual: packageJson.devDependencies?.mocha,
-        expected: '11.7.6',
+        expected: '11.8.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -226,31 +230,31 @@ suite('Dependency security baselines', () => {
       {
         label: 'concurrently',
         actual: packageJson.devDependencies?.concurrently,
-        expected: '^10.0.4',
+        expected: '^10.0.5',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.65.0',
+        expected: '^8.67.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/parser',
         actual: packageJson.devDependencies?.['@typescript-eslint/parser'],
-        expected: '8.65.0',
+        expected: '8.67.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'esbuild',
         actual: packageJson.devDependencies?.esbuild,
-        expected: '^0.28.1',
+        expected: '^0.28.2',
         message: 'must stay aligned with the audited security baseline'
       },
       {
         label: 'eslint',
         actual: packageJson.devDependencies?.eslint,
-        expected: '^10.8.1',
+        expected: '^10.9.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -292,7 +296,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'postcss override',
         actual: packageJson.overrides?.postcss,
-        expected: '8.5.25',
+        expected: '8.5.26',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
@@ -377,12 +381,12 @@ suite('Dependency security baselines', () => {
     const nanoidVersion = packageLockJson.packages?.['node_modules/nanoid']?.version;
 
     assert.ok(
-      compareVersions(nanoidOverride, '3.3.17') >= 0,
-      `nanoid override must stay on 3.3.17 or newer (found: ${nanoidOverride ?? 'missing'})`
+      compareVersions(nanoidOverride, '3.3.18') >= 0,
+      `nanoid override must stay on 3.3.18 or newer (found: ${nanoidOverride ?? 'missing'})`
     );
     assert.ok(
-      compareVersions(nanoidVersion, '3.3.17') >= 0,
-      `installed nanoid must stay on 3.3.17 or newer (found: ${nanoidVersion ?? 'missing'})`
+      compareVersions(nanoidVersion, '3.3.18') >= 0,
+      `installed nanoid must stay on 3.3.18 or newer (found: ${nanoidVersion ?? 'missing'})`
     );
   });
 
@@ -464,19 +468,19 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed marked',
         actual: packageLockJson.packages?.['node_modules/marked']?.version,
-        expected: '18.0.6',
+        expected: '18.0.10',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed sanitize-html',
         actual: packageLockJson.packages?.['node_modules/sanitize-html']?.version,
-        expected: '2.17.6',
+        expected: '2.17.7',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed mocha',
         actual: packageLockJson.packages?.['node_modules/mocha']?.version,
-        expected: '11.7.6',
+        expected: '11.8.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -488,31 +492,31 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed concurrently',
         actual: packageLockJson.packages?.['node_modules/concurrently']?.version,
-        expected: '10.0.4',
+        expected: '10.0.5',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.65.0',
+        expected: '8.67.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/parser',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
-        expected: '8.65.0',
+        expected: '8.67.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed esbuild',
         actual: packageLockJson.packages?.['node_modules/esbuild']?.version,
-        expected: '0.28.1',
+        expected: '0.28.2',
         message: 'must stay aligned with the audited security baseline'
       },
       {
         label: 'installed eslint',
         actual: packageLockJson.packages?.['node_modules/eslint']?.version,
-        expected: '10.8.1',
+        expected: '10.9.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -554,7 +558,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed postcss',
         actual: packageLockJson.packages?.['node_modules/postcss']?.version,
-        expected: '8.5.25',
+        expected: '8.5.26',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
