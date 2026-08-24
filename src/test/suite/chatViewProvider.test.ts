@@ -23,6 +23,7 @@ const workIqRequests: Array<{ token: string; query: string; contextId?: string }
 let replies: string[] = [];
 let workIqReplies: Array<{ text: string; contextId?: string }> = [];
 let workspaceFolders: Array<{ uri: { fsPath: string } }> | undefined;
+let quickPickSelection: string[] | undefined;
 
 class InMemoryMemento implements vscode.Memento {
   private readonly store = new Map<string, unknown>();
@@ -89,7 +90,8 @@ function createVscodeStub(): typeof vscode {
       showInformationMessage: async (message: string) => {
         infoMessages.push(message);
         return undefined;
-      }
+      },
+      showQuickPick: async () => quickPickSelection
     },
     env: {
       openExternal: async () => true,
@@ -116,7 +118,15 @@ suite('ChatViewProvider', () => {
       if (request === '../adapters/chatAdapter') {
         return {
           createConversation: async () => 'conv-1',
-          sendMessage: async (_token: string, _conversationId: string, _prompt: string, payload?: unknown) => {
+          sendMessageAuto: async (
+            _token: string,
+            _conversationId: string,
+            _prompt: string,
+            payload?: unknown,
+            _streamingEnabled?: boolean,
+            _onProgress?: (text: string) => void,
+            _signal?: AbortSignal
+          ) => {
             capturedPayloads.push(payload);
             return replies.shift() ?? 'stub reply';
           }
@@ -209,6 +219,7 @@ suite('ChatViewProvider', () => {
       { text: 'Work IQ second answer', contextId: 'ctx-workiq-2' }
     ];
     workspaceFolders = undefined;
+    quickPickSelection = undefined;
   });
 
   test('loads the webview script via external URI (no blocking file read)', () => {
@@ -241,15 +252,15 @@ suite('ChatViewProvider', () => {
     }
   });
 
-  test('includes the latest visible result in follow-up Copilot chat context', async () => {
+  test('/ask carries the latest visible result into a follow-up turn', async () => {
     const provider = new ChatViewProvider(
       createContext(),
       { getAccessToken: async () => 'token-123' } as never,
       {} as never
     );
 
-    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('first prompt', []);
-    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('follow-up prompt', []);
+    await (provider as unknown as { handleAskCommand(prompt: string, mentionFiles: unknown[]): Promise<void> }).handleAskCommand('first prompt', []);
+    await (provider as unknown as { handleAskCommand(prompt: string, mentionFiles: unknown[]): Promise<void> }).handleAskCommand('follow-up prompt', []);
 
     assert.equal(capturedPayloads.length, 2);
     assert.equal((capturedPayloads[0] as { additionalContext?: unknown }).additionalContext, undefined);
@@ -264,7 +275,7 @@ suite('ChatViewProvider', () => {
     assert.ok(secondPayload.labels.includes('Latest visible ContextRelay result'));
   });
 
-  test('clearChat removes the latest visible result from future context payloads', async () => {
+  test('plain chat never includes ContextRelay context (pinned snippets, visible result, search summary)', async () => {
     const provider = new ChatViewProvider(
       createContext(),
       { getAccessToken: async () => 'token-123' } as never,
@@ -272,8 +283,25 @@ suite('ChatViewProvider', () => {
     );
 
     await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('first prompt', []);
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('follow-up prompt', []);
+
+    assert.equal(capturedPayloads.length, 2);
+    for (const payload of capturedPayloads) {
+      assert.equal((payload as { additionalContext?: unknown }).additionalContext, undefined);
+      assert.equal((payload as { contextualResources?: unknown }).contextualResources, undefined);
+    }
+  });
+
+  test('clearChat removes the latest visible result from future /ask context payloads', async () => {
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getAccessToken: async () => 'token-123' } as never,
+      {} as never
+    );
+
+    await (provider as unknown as { handleAskCommand(prompt: string, mentionFiles: unknown[]): Promise<void> }).handleAskCommand('first prompt', []);
     provider.clearChat();
-    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('after clear', []);
+    await (provider as unknown as { handleAskCommand(prompt: string, mentionFiles: unknown[]): Promise<void> }).handleAskCommand('after clear', []);
 
     const secondPayload = capturedPayloads[1] as {
       additionalContext?: Array<{ description: string; text: string }>;
@@ -283,22 +311,33 @@ suite('ChatViewProvider', () => {
     assert.deepEqual(secondPayload.labels, []);
   });
 
-  test('ask without pinned snippets surfaces a single guard message and skips Copilot calls', async () => {
+  test('/ask without pinned snippets or attachments still calls Copilot with a non-blocking notice', async () => {
     const provider = new ChatViewProvider(
       createContext(),
       { getAccessToken: async () => 'token-123' } as never,
       {} as never
     );
+    const messages: Array<{ command: string; [key: string]: unknown }> = [];
+    (provider as unknown as { postMessage(message: { command: string; [key: string]: unknown }): void }).postMessage = (message) => {
+      messages.push(message);
+    };
 
     await (provider as unknown as { handleAskCommand(prompt: string): Promise<void> }).handleAskCommand('need a summary');
 
-    assert.equal(warningMessages.length, 1);
-    assert.equal(capturedPayloads.length, 0);
+    assert.equal(warningMessages.length, 0);
     assert.equal(errorMessages.length, 0);
-    assert.equal(infoMessages.length, 0);
+    assert.equal(capturedPayloads.length, 1, '/ask must still call Copilot even with no pinned context');
+    assert.ok(
+      messages.some(message => message.command === 'assistantMessage' && message.kind === 'info'),
+      'expected a non-blocking info notice about the missing context'
+    );
+    assert.ok(
+      messages.some(message => message.command === 'assistantMessageEnd'),
+      'expected the Copilot reply to still be rendered'
+    );
   });
 
-  test('/ask with # file mention does not require pinned snippets', async () => {
+  test('/ask with # file mention reads the file content into additionalContext', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-ask-mentions-'));
     fs.writeFileSync(path.join(root, 'notes.md'), 'ship checklist', 'utf8');
     workspaceFolders = [{ uri: { fsPath: root } }];
@@ -315,12 +354,48 @@ suite('ChatViewProvider', () => {
       assert.equal(warningMessages.length, 0);
       assert.equal(capturedPayloads.length, 1);
       const payload = capturedPayloads[0] as {
+        additionalContext?: Array<{ description: string; text: string }>;
         contextualResources?: { files?: Array<{ uri: string }> };
       };
-      assert.equal(payload.contextualResources?.files?.length, 1);
-      assert.ok(payload.contextualResources?.files?.[0].uri.startsWith('file:///'));
+      assert.equal(payload.contextualResources, undefined, 'local files must never be sent as contextualResources.files');
+      assert.equal(payload.additionalContext?.length, 1);
+      assert.equal(payload.additionalContext?.[0].description, 'Local file: notes.md');
+      assert.ok(payload.additionalContext?.[0].text.includes('ship checklist'));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('attach-file picker resolves a relative candidate against whichever workspace root actually contains it', async () => {
+    const rootA = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-attach-a-'));
+    const rootB = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-attach-b-'));
+    fs.writeFileSync(path.join(rootB, 'notes.md'), 'root B body', 'utf8');
+    // notes.md only exists under rootB (index 1), not rootA (index 0) — a
+    // picker resolver that always joins against workspaceRoots[0] would fail
+    // to find it in a multi-root workspace.
+    workspaceFolders = [{ uri: { fsPath: rootA } }, { uri: { fsPath: rootB } }];
+    quickPickSelection = ['notes.md'];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getAccessToken: async () => 'token-123' } as never,
+        {} as never
+      );
+
+      await (provider as unknown as { handleAttachFilePicker(): Promise<void> }).handleAttachFilePicker();
+      assert.equal(warningMessages.length, 0);
+
+      await (provider as unknown as { handleAskCommand(prompt: string): Promise<void> }).handleAskCommand('summarize');
+      const payload = capturedPayloads[0] as {
+        additionalContext?: Array<{ description: string; text: string }>;
+      };
+      assert.equal(payload.additionalContext?.length, 1);
+      assert.equal(payload.additionalContext?.[0].description, 'Local file: notes.md');
+      assert.ok(payload.additionalContext?.[0].text.includes('root B body'));
+    } finally {
+      fs.rmSync(rootA, { recursive: true, force: true });
+      fs.rmSync(rootB, { recursive: true, force: true });
     }
   });
 
@@ -372,7 +447,7 @@ suite('ChatViewProvider', () => {
     ]);
   });
 
-  test('plain chat attaches #file mentions as Copilot contextual file resources', async () => {
+  test('plain chat attaches #file mentions as inlined local file content, even though it skips ContextRelay context', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-chat-mentions-'));
     fs.writeFileSync(path.join(root, 'notes.md'), 'meeting notes', 'utf8');
     workspaceFolders = [{ uri: { fsPath: root } }];
@@ -387,11 +462,13 @@ suite('ChatViewProvider', () => {
       await provider.submitQuery('Summarize #notes.md');
 
       const payload = capturedPayloads[0] as {
+        additionalContext?: Array<{ description: string; text: string }>;
         contextualResources?: { files?: Array<{ uri: string }> };
         labels: string[];
       };
-      assert.equal(payload.contextualResources?.files?.length, 1);
-      assert.ok(payload.contextualResources?.files?.[0].uri.startsWith('file:///'));
+      assert.equal(payload.contextualResources, undefined, 'local files must never be sent as contextualResources.files');
+      assert.equal(payload.additionalContext?.length, 1);
+      assert.ok(payload.additionalContext?.[0].text.includes('meeting notes'));
       assert.ok(payload.labels.some(label => label.includes('Local file: notes.md')));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });

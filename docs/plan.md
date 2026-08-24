@@ -71,14 +71,16 @@ Used when the target source is SharePoint, OneDrive, or Connectors. Returns perm
 
 ### 5.2 Microsoft 365 Copilot Chat API (beta)
 
-Used for multi-turn conversation grounded in organizational data and optional web search.
+Used for multi-turn conversation grounded in organizational data and optional web search. Backs both `/ask` and plain chat — see §7.6 for how ContextRelay context is attached.
 
 - **Create conversation**: `POST https://graph.microsoft.com/beta/copilot/conversations`
-- **Continue conversation**: `POST https://graph.microsoft.com/beta/copilot/conversations/{id}/messages`
+- **Continue conversation (synchronous)**: `POST https://graph.microsoft.com/beta/copilot/conversations/{id}/chat` — request body: `{ message: { text }, locationHint: { timeZone }, additionalContext?, contextualResources? }`
+- **Continue conversation (streamed)**: `POST https://graph.microsoft.com/beta/copilot/conversations/{id}/chatOverStream` — same request body, `Accept: text/event-stream`; each SSE frame carries a full `copilotConversation` snapshot (not a delta). ContextRelay renders replies incrementally from this endpoint by default (`contextRelay.chat.streamResponses`), falling back to the synchronous endpoint once if the streamed request is never accepted by the service. A failure *after* acceptance is never retried via the synchronous endpoint, since that would resend the prompt and create a duplicate conversation turn.
+- `contextualResources.files` accepts **OneDrive/SharePoint URIs only** — local files are never passed by reference there. ContextRelay reads local file content and sends it via `additionalContext` instead.
 - **Note**: `/beta` APIs may change without notice and are not recommended for production use.
 - **Delegated permissions**: `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All`, `ExternalItem.Read.All`
 - **Requires**: Microsoft 365 Copilot license assigned to the user.
-- [Chat API overview](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/api/ai-services/chat/overview) | [API reference](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/api/ai-services/chat/copilotroot-post-conversations)
+- [Chat API overview](https://learn.microsoft.com/microsoft-365/copilot/extensibility/api/ai-services/chat/overview) | [Continue conversation (chat)](https://learn.microsoft.com/microsoft-365/copilot/extensibility/api/ai-services/chat/copilotconversation-chat) | [Continue conversation (chatOverStream)](https://learn.microsoft.com/microsoft-365/copilot/extensibility/api/ai-services/chat/copilotconversation-chatoverstream)
 
 ### 5.3 Exchange Mail adapter (Microsoft Graph)
 
@@ -196,6 +198,22 @@ const session = await vscode.authentication.getSession(
 - Root cause of `AADSTS65002`: VS Code's default first-party client ID is not preauthorized for this extension's Graph scopes.
 - [VS Code Microsoft auth provider issue #115626](https://github.com/microsoft/vscode/issues/115626) | [Scopes and permissions](https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc)
 
+### 7.6 Local file attachment pipeline
+
+Four attachment origins — `#file` mentions typed in the prompt, drag-and-drop onto the input, the attach-file picker button, and the (opt-in) active-editor auto-attach — all resolve into a single `ResolvedAttachment` shape (`src/panel/attachments.ts`) so downstream context-building code only has one type to handle:
+
+```
+#mention ──┐
+drop ──────┼─→ resolveAttachmentPath() ─→ ResolvedAttachment[] ─→ mergeAttachments() ─→ buildChatContextPayload()
+picker ────┤        (workspace containment,                    (dedupe by canonical
+activeEditor ┘        symlink realpath,                          absolute path,
+                       extension allowlist)                      later group wins)
+```
+
+- Path validation (workspace containment, symlink realpath resolution) is shared via `src/panel/workspacePath.ts` so every attachment origin gets identical guarantees, including `#` mentions.
+- Attached file content (or the selected line range, for the active-editor origin) is read and inlined into `additionalContext` at send time — never passed by reference in `contextualResources.files`, since that field only accepts OneDrive/SharePoint URIs (see §5.2).
+- Attachments are always included regardless of `/ask` vs. plain chat — attaching a file is an explicit user action, unlike ContextRelay's own accumulated context (pinned snippets, latest visible result, latest search summary), which only `/ask` includes.
+
 ---
 
 ## 8. Unified result model
@@ -287,6 +305,9 @@ All settings use the `contextRelay.*` namespace.
 | `contextRelay.cache.maxEntries` | number | 200 | Maximum number of cached entries (LRU eviction) |
 | `contextRelay.cache.persistWorkspaceState` | boolean | true | Persist cache snapshot in workspace state |
 | `contextRelay.enableChatPreview` | boolean | true | Enable the Chat tab (Copilot Chat API is in beta) |
+| `contextRelay.chat.attachActiveEditor` | boolean | false | Automatically include the active editor (or its selection) as chat context, like GitHub Copilot's editor context |
+| `contextRelay.chat.streamResponses` | boolean | true | Render Copilot replies incrementally via the Chat API's streamed endpoint; falls back to the synchronous endpoint automatically if unavailable |
+| `contextRelay.chat.maxAttachedFiles` | number | 5 | Maximum number of local files attachable to a single chat message |
 | `contextRelay.adapters.mail` | boolean | true | Enable Exchange Mail adapter |
 | `contextRelay.adapters.teams` | boolean | true | Enable Teams adapter |
 | `contextRelay.adapters.sharepoint` | boolean | true | Enable SharePoint adapter |
@@ -371,14 +392,14 @@ A "Load more" button per source section that fetches the next page of results.
 
 ## Appendix A: Minimum VS Code version
 
-**Target**: VS Code 1.85+
+**Target**: VS Code 1.125+ (see `package.json` `engines.vscode`)
 
 Key API dependencies:
 - `vscode.authentication.getSession` (available since VS Code 1.63)
 - `WebviewViewProvider` (available since VS Code 1.51)
 - Microsoft authentication provider built-in extension (available since VS Code 1.75)
 
-VS Code 1.85 is chosen to ensure stable support for all required APIs with recent bug fixes.
+The minimum version tracks the pinned `@types/vscode` dependency rather than a fixed floor from the original 1.85 baseline, so this section should be kept in sync with `package.json` rather than treated as a separate source of truth.
 
 ---
 

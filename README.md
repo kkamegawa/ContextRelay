@@ -6,8 +6,10 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 
 ## Features
 
-- **Plain Copilot chat** -- Type without a slash command to chat directly with Microsoft 365 Copilot in the panel.
-- **Local file mentions with `#`** -- Attach local workspace files (Copilot-supported extensions only) to plain Copilot chat, `/ask`, and `/workiq` prompts.
+- **Plain Copilot chat** -- Type without a slash command to chat directly with Microsoft 365 Copilot in the panel. Plain chat never auto-attaches ContextRelay's own context (pinned snippets, search results); only files you explicitly attach are sent.
+- **`/ask` — strict-format Copilot chat with full context** -- Sends every available ContextRelay context (pinned snippets, attached files, the latest visible result, the latest search summary) along with an instruction telling Copilot to follow your request exactly and, if you asked for a specific output format, to produce only that format. `/ask` works even with no pinned snippets or attachments — it just sends the instruction alone in that case.
+- **Attach local files four ways** -- `#file` mentions typed in the prompt, dragging a file from the Explorer or an editor tab onto the input, the 📎 attach button (workspace file picker), or the active editor (opt-in, off by default — see [Settings](#configuration)). Attached file content is read and sent to Copilot as chat context.
+- **Streamed replies** -- Copilot responses render incrementally as they arrive, using the Chat API's streamed endpoint. Falls back to the synchronous endpoint automatically if streaming isn't available.
 - **Explicit source search** -- Search across connected Microsoft 365 sources with slash commands.
 - **Source targeting via slash commands** -- Narrow results to a specific source instantly.
 
@@ -20,11 +22,11 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/onenote <query>` | OneNote pages |
 | `/task <query>` | Planner and Microsoft To Do tasks |
 | `/all <query>` | All enabled sources |
-| `/ask <instruction>` | Send pinned snippets to Microsoft 365 Copilot and show the reply in the panel |
+| `/ask <instruction>` | Send all available ContextRelay context (pinned snippets, attached files, latest result) to Microsoft 365 Copilot with strict output-format instructions, and show the reply in the panel |
 | `/workiq <query>` | Send a natural language query to Work IQ (A2A protocol) for Microsoft 365 work intelligence |
-| `/clear` | Clear the chat transcript and discard all pinned snippets |
+| `/clear` | Clear the chat transcript, discard all pinned snippets, and clear any pending attachments |
 
-`#` mention examples (local workspace files):
+Attach local workspace files with `#` mentions, drag-and-drop, the 📎 attach button, or (opt-in) the active editor:
 
 ```text
 Summarize #docs/plan.md
@@ -32,7 +34,7 @@ Summarize #docs/plan.md
 /workiq Draft a status update using #notes/today.md
 ```
 
-> **Note**: If a `#` mention is invalid (missing file, outside workspace, unsupported extension), ContextRelay blocks the request and shows an error.
+> **Note**: If a `#` mention or dropped/picked file is invalid (missing file, outside workspace, unsupported extension), ContextRelay shows an error instead of sending the request. Drag-and-drop only works for files dragged from inside VS Code (the Explorer or an editor tab) — files dropped from an OS file manager aren't supported, since a browser-context `File` object has no usable path in that case.
 
 - **Snippet pinning** -- Save any search result as a named snippet, visible across sessions.
 - **Timestamped handoff docs** -- Generate Markdown documents that capture current context.
@@ -207,6 +209,17 @@ Add the following settings to your `settings.json` (all optional):
 
   // Enable the Chat tab — Copilot Chat API is in beta (default: true)
   "contextRelay.enableChatPreview": true,
+
+  // Automatically include the active editor (or its selection) as chat context,
+  // similar to GitHub Copilot's editor context. Off by default.
+  "contextRelay.chat.attachActiveEditor": false,
+
+  // Render Copilot replies incrementally via the Chat API's streamed endpoint.
+  // Falls back to the synchronous endpoint automatically if unavailable. (default: true)
+  "contextRelay.chat.streamResponses": true,
+
+  // Maximum number of local files attachable to a single chat message (default: 5)
+  "contextRelay.chat.maxAttachedFiles": 5,
 
   // Per-adapter enable/disable toggles (all default to true except connectors)
   "contextRelay.adapters.mail": true,
@@ -539,7 +552,7 @@ On first use, VS Code prompts you to sign in using the built-in Microsoft authen
 
 ### Chatting and Searching
 
-Type a normal message without a slash command and press **Enter** to start or continue a Microsoft 365 Copilot chat. ContextRelay does not automatically search or attach source results for plain chat messages. The response stays in the panel and offers explicit actions to **Copy**, **Append** to the active editor, or **Replace** the active selection/document.
+Type a normal message without a slash command and press **Enter** to start or continue a Microsoft 365 Copilot chat. ContextRelay does not automatically search or attach source results for plain chat messages — only explicitly attached files (see the `/ask` section below for the four ways to attach a file) are included. The response stays in the panel and offers explicit actions to **Copy**, **Append** to the active editor, or **Replace** the active selection/document.
 
 To search Microsoft 365 sources, prefix your query with a slash command:
 
@@ -551,7 +564,7 @@ To search Microsoft 365 sources, prefix your query with a slash command:
 /onedrive architecture diagram
 ```
 
-After you pin snippets or run a search, later chat turns can continue in the same Copilot conversation with that explicit ContextRelay context. The latest visible generated result is also treated as panel context for follow-up turns unless you clear the chat.
+After you pin snippets or run a search, later `/ask` turns can continue in the same Copilot conversation with that explicit ContextRelay context. The latest visible generated result is also treated as `/ask` context for follow-up turns unless you clear the chat. Plain chat turns share the same underlying Copilot conversation (so Copilot itself remembers earlier turns) but never auto-attach pinned snippets, search results, or the latest visible result — only explicitly attached files.
 
 ### Building a Handoff from Search Results
 
@@ -590,22 +603,34 @@ Use the built-in commands to hand off context to GitHub Copilot:
 
 Attach `HANDOFF.md` in Copilot Chat using VS Code's context mechanisms (#-mentions / Add Context).
 
-### `/ask` — Process pinned snippets with Microsoft 365 Copilot
+### `/ask` — strict-format Copilot chat with full context
 
-Use `/ask` to let **Microsoft 365 Copilot** (not GitHub Copilot) process your currently pinned snippets and show the answer in the ContextRelay panel.
+Use `/ask` to let **Microsoft 365 Copilot** (not GitHub Copilot) process everything currently available to ContextRelay — pinned snippets, attached files, and the latest visible panel result — and show the answer in the panel. `/ask` also tells Copilot to follow your instruction exactly and, if you request a specific output format, to produce only that format with no extra commentary. This is the difference between `/ask` and plain chat: plain chat sends your message as-is with no auto-attached ContextRelay context, while `/ask` always includes it.
 
-1. Pin one or more documents (`.docx`, SharePoint / OneDrive files, mail, Teams messages). ContextRelay hydrates full document text where possible.
+`/ask` does **not** require anything to be pinned or attached — if there is no context available, it still sends your instruction to Copilot, with a note in the panel that no extra context was included that turn.
+
+**Attaching local files (any of these four ways):**
+
+- **`#file` mentions** — type `#path/to/file` (or `#"quoted path"`) in your message.
+- **Drag and drop** — drag a file from the Explorer or an editor tab onto the chat input. (Files dropped from an OS file manager aren't supported — see the note above.)
+- **Attach button** — click 📎 next to the input to pick one or more workspace files from a list.
+- **Active editor (opt-in, off by default)** — enable `contextRelay.chat.attachActiveEditor` to automatically include the active editor's file, or just its current selection, in every message.
+
+Attached files are read and their content (or selected line range) is sent to Copilot as chat context — up to `contextRelay.chat.maxAttachedFiles` files per message (default 5).
+
+1. Optionally pin one or more documents (`.docx`, SharePoint / OneDrive files, mail, Teams messages) and/or attach local files as above. ContextRelay hydrates full document text for pinned snippets where possible.
 2. In the chat input, type `/ask` followed by your instruction, for example:
 
   ```
   /ask Translate the pinned document into Japanese and output as markdown.
   /ask Summarize the pinned documents as a bullet list.
   /ask Extract every action item as JSON with fields owner, due, task.
+  /ask #README.md Summarize this file as a bullet list.
   ```
 
-3. ContextRelay sends the pinned content plus your instruction to Microsoft 365 Copilot and renders the response in the panel. Use the response actions to copy it, append it at the active editor cursor, or replace the active selection/document.
+3. ContextRelay sends the available context plus your instruction to Microsoft 365 Copilot and renders the response in the panel, streaming it incrementally as it arrives (see `contextRelay.chat.streamResponses`). Use the response actions to copy it, append it at the active editor cursor, or replace the active selection/document.
 
-If no snippets are pinned, `/ask` is aborted with a warning. Because this feature relies on the Microsoft 365 Copilot API (beta), you must have a Microsoft 365 Copilot license on the signed-in account and `contextRelay.enableChatPreview` enabled.
+Because this feature relies on the Microsoft 365 Copilot API (beta), you must have a Microsoft 365 Copilot license on the signed-in account and `contextRelay.enableChatPreview` enabled.
 
 To sign out, use the **Accounts** menu in VS Code.
 

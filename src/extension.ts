@@ -295,6 +295,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await vscode.commands.executeCommand('workbench.action.openSettings', 'contextRelay');
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('contextRelay.attachFile', async () => {
+      await focusPanel();
+      await chatViewProvider.attachFileViaPicker();
+    })
+  );
 }
 
 function buildHandoffPrompt(handoffPath: string): string {
