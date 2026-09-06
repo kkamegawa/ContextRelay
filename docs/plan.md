@@ -40,7 +40,8 @@ ContextRelay is a VS Code extension that uses the signed-in organizational accou
 | `/sharepoint <query>` | Retrieval adapter (SharePoint) |
 | `/onedrive <query>` | Retrieval adapter (OneDrive for Business) |
 | `/all <query>` | Fan-out to all enabled adapters |
-| `<query>` (no prefix) | Same as `/all` |
+| `/ask <prompt>` | Microsoft 365 Copilot Chat API; **requires** at least one pinned snippet or `#file` mention, otherwise aborts with a warning |
+| `<prompt>` (no prefix) | Microsoft 365 Copilot Chat API; same context handling as `/ask` but does **not** require pinned/`#file` context |
 
 ### 4.2 Router rules
 
@@ -52,6 +53,7 @@ ContextRelay is a VS Code extension that uses the signed-in organizational accou
 
 - Results are rendered as **source sections** (Mail / Teams / SharePoint / OneDrive / Connectors), not a single mixed list.
 - In `/all` or no-prefix mode, cached results are included in the merge (see Section 9 — Cache policy).
+- `/ask` and no-prefix chat share one code path: whenever pinned snippets or `#file` mentions are present, they are attached as Copilot `additionalContext` / `contextualResources.files`, the prompt is prefixed with an explicit grounding instruction, and `contextualResources.webContext.isWebEnabled` is set to `false` for that turn so Copilot prefers the attached context over web search. The only behavioral difference is that `/ask` refuses to send the message when neither pinned snippets nor `#file` mentions are present; no-prefix chat sends the message ungrounded instead.
 
 ---
 
@@ -74,10 +76,12 @@ Used when the target source is SharePoint, OneDrive, or Connectors. Returns perm
 Used for multi-turn conversation grounded in organizational data and optional web search.
 
 - **Create conversation**: `POST https://graph.microsoft.com/beta/copilot/conversations`
-- **Continue conversation**: `POST https://graph.microsoft.com/beta/copilot/conversations/{id}/messages`
+- **Continue conversation**: `POST https://graph.microsoft.com/beta/copilot/conversations/{id}/chat`
 - **Note**: `/beta` APIs may change without notice and are not recommended for production use.
 - **Delegated permissions**: `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All`, `ExternalItem.Read.All`
 - **Requires**: Microsoft 365 Copilot license assigned to the user.
+- **Grounding**: `additionalContext` is *extra* grounding only — Copilot still consults web and enterprise search unless told otherwise. ContextRelay pairs it with an explicit prompt instruction and `contextualResources.webContext = { isWebEnabled: false }` whenever pinned snippets or `#file` mentions are attached (see §4.3). Pinned SharePoint/OneDrive files with an `https://` URL are sent as `contextualResources.files` instead, so Copilot fetches them directly.
+- **Conversation history**: the Chat API keeps prior turns server-side via the conversation id, so ContextRelay does not re-send previous answers as context.
 - [Chat API overview](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/api/ai-services/chat/overview) | [API reference](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/api/ai-services/chat/copilotroot-post-conversations)
 
 ### 5.3 Exchange Mail adapter (Microsoft Graph)
