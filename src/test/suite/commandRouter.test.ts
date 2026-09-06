@@ -200,10 +200,22 @@ suite('CommandRouter', () => {
     assert.ok(text.toLowerCase().includes('microsoft 365 copilot'));
   });
 
+  test('getHelpText for ask notes it is optional when plain chat already attaches context', () => {
+    const text = getHelpText('ask').toLowerCase();
+    assert.ok(text.includes('plain chat'));
+    assert.ok(text.includes('automatically'));
+  });
+
   test('getHelpText for all explains plain text is chat', () => {
     const text = getHelpText('all');
     assert.ok(text.toLowerCase().includes('plain text'));
     assert.ok(text.toLowerCase().includes('chat'));
+  });
+
+  test('getHelpText for all notes pinned snippets and #file mentions are attached automatically', () => {
+    const text = getHelpText('all').toLowerCase();
+    assert.ok(text.includes('pinned snippets'));
+    assert.ok(text.includes('automatically'));
   });
 
   test('/clear command routes to clear with empty query but is not isEmpty', () => {

@@ -239,3 +239,14 @@
 | M3 | E (Chat adapter) |
 | M4 | J (Doc generation), K (Copilot handoff helpers) |
 | M5 | H (Cache), L (Error handling and hardening) |
+
+---
+
+## Work log
+
+### 2026-09-07 — Ground plain chat and `/ask` on pinned context automatically
+
+- Issue: [kkamegawa/ContextRelay#232](https://github.com/kkamegawa/ContextRelay/issues/232)
+- Summary: `/ask` and no-prefix plain chat already shared the same Copilot context-building code, but neither told Copilot to prefer pinned/`#file` context over web and enterprise search. Added an explicit grounding instruction and `contextualResources.webContext.isWebEnabled = false` whenever pinned snippets or `#file` mentions are attached, for both paths. Stopped re-sending the previous Copilot reply as context each turn. Removed the unused `src/panel/askPrompt.ts` prompt builder.
+- Design record: [docs/adr.md](adr.md) — 2026-09-07 entry.
+- Tests: `src/test/suite/chatContext.test.ts`, `src/test/suite/chatViewProvider.test.ts`, `src/test/suite/commandRouter.test.ts`.

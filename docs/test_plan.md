@@ -111,6 +111,18 @@ Authentication, slash routing, Retrieval API, Chat API (beta), Exchange Mail ada
 - Setup: Set `contextRelay.enableChatPreview` to `false`
 - Expected: Chat tab is hidden or disabled.
 
+**T-CHAT-05 Pinned context grounds plain chat without `/ask`**
+- Steps: Pin a search result → send a plain chat message (no `/ask`) referencing it
+- Expected: Request body includes `additionalContext` (or `contextualResources.files` for a SharePoint/OneDrive URL) built from the pinned snippet, `contextualResources.webContext.isWebEnabled` is `false`, and the sent message text is prefixed with the ContextRelay grounding instruction. Response reflects the pinned content and the panel shows `Context: 📌 <title>`.
+
+**T-CHAT-06 No pinned context leaves the request ungrounded**
+- Steps: With no pinned snippets and no `#file` mention, send a plain chat message
+- Expected: Request body has no `additionalContext`/`contextualResources`, and the message text sent to Copilot equals the user's input verbatim (no grounding prefix).
+
+**T-CHAT-07 Previous answer is not re-sent as context**
+- Steps: Send a first chat message → receive a response → send a second unrelated message
+- Expected: The second request's `additionalContext` does not include the first response's text (conversation history is left to the Chat API's conversation id).
+
 ---
 
 ## 7. Exchange Mail adapter
