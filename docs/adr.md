@@ -34,3 +34,14 @@ Records specification changes made during implementation that were not part of t
   - **Correctness constraint recorded here for future reference**: the fallback to the synchronous endpoint is only safe when the streamed request was **never accepted** by the service (i.e. failure happened before or during the initial POST, before a 200 response with a body was received). A failure that happens *after* acceptance — including user cancellation — must never fall back, because resending the same prompt via `/chat` would create a **duplicate conversation turn** server-side. This is enforced by `StreamAcceptedError` in `src/adapters/chatAdapter.ts`; do not remove that distinction when touching this code.
 
 **Contradiction check**: no conflict with the 2026-08-10 entry — that entry concerns dependency baselines and the security-check gate, unrelated to `/ask` or chat context behavior.
+
+---
+
+## 2026-09-07 - Raise the minimum supported VS Code version with the consolidated Dependabot update
+
+- Task: Issue #230.
+- Decision: Adopt `@types/vscode` 1.136.0 and raise `engines.vscode` to `^1.136.0`, and land every pending Dependabot npm update in a single consolidated pull request instead of merging pull requests #222-#229 individually.
+- Reason: The repository policy adopts the newest stable release that has been public for more than 24 hours, and `dependencyVersions.test.ts` requires `@types/vscode` to stay at or below `engines.vscode`, so the type definitions cannot move forward without the engine declaration. Merging the Dependabot pull requests one at a time would break the exact-match version baselines in that test on every merge, which already required the repair in #221.
+- Compatibility: The extension now requires VS Code 1.136.0 or later. All other updates stay within their existing major versions. `browserslist` and `fast-uri` were also advanced to clear GHSA-c83g-rgw3-j3cx and GHSA-5jgf-p345-68v8, and both now have version floors in `dependencyVersions.test.ts`.
+
+**Contradiction check**: no conflict with the 2026-08-15 entry — that entry concerns `/ask` behavior and attachments, unrelated to the VS Code engine version or dependency baselines.
