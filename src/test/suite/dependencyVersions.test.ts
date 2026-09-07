@@ -260,7 +260,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'webpack',
         actual: packageJson.devDependencies?.webpack,
-        expected: '^5.109.2',
+        expected: '^5.110.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -529,7 +529,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed webpack',
         actual: packageLockJson.packages?.['node_modules/webpack']?.version,
-        expected: '5.109.2',
+        expected: '5.110.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
