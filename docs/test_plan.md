@@ -123,6 +123,18 @@ Authentication, slash routing, Retrieval API, Chat API (beta), Exchange Mail ada
 - Steps: Send a first chat message → receive a response → send a second unrelated message
 - Expected: The second request's `additionalContext` does not include the first response's text (conversation history is left to the Chat API's conversation id).
 
+**T-CHAT-08 Attached local file content is inlined**
+- Steps: Attach a workspace file with `#file`, the 📎 picker, or drag and drop → send a plain chat message
+- Expected: Request body has an `additionalContext` entry `Local file: <path>` containing the file content (capped at 12,000 characters), no `file://` URI in `contextualResources.files`, `webContext.isWebEnabled` is `false`, and the message text carries the grounding prefix. An attachment whose file cannot be read is skipped and does not ground the turn.
+
+**T-CHAT-09 Attachments satisfy the `/ask` guard**
+- Steps: With no pinned snippets, attach a file with the 📎 picker → run `/ask <instruction>`
+- Expected: `/ask` is sent (no guard warning) with the attached file content. Pending attachments are cleared after the message is sent.
+
+**T-CHAT-10 Streaming and fallback**
+- Steps: Send a message with `contextRelay.chat.streamResponses` `true`, then `false`
+- Expected: With `true`, the reply renders incrementally and ends with the final text; if the streamed endpoint returns 404, 405, or 501, the synchronous endpoint is used once, while network errors and other failures are reported without resending; Stop cancels without resending. With `false`, only the final reply is rendered.
+
 ---
 
 ## 7. Exchange Mail adapter

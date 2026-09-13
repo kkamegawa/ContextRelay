@@ -24,6 +24,8 @@ const workIqRequests: Array<{ token: string; query: string; contextId?: string }
 let replies: string[] = [];
 let workIqReplies: Array<{ text: string; contextId?: string }> = [];
 let workspaceFolders: Array<{ uri: { fsPath: string } }> | undefined;
+let quickPickSelection: string[] | undefined;
+let sendOverride: ((onProgress?: (fullTextSoFar: string) => void, signal?: AbortSignal) => Promise<string>) | undefined;
 
 class InMemoryMemento implements vscode.Memento {
   private readonly store = new Map<string, unknown>();
@@ -90,7 +92,8 @@ function createVscodeStub(): typeof vscode {
       showInformationMessage: async (message: string) => {
         infoMessages.push(message);
         return undefined;
-      }
+      },
+      showQuickPick: async () => quickPickSelection
     },
     env: {
       openExternal: async () => true,
@@ -117,10 +120,26 @@ suite('ChatViewProvider', () => {
       if (request === '../adapters/chatAdapter') {
         return {
           createConversation: async () => 'conv-1',
-          sendMessage: async (_token: string, _conversationId: string, prompt: string, payload?: unknown) => {
+          sendMessageAuto: async (
+            _token: string,
+            _conversationId: string,
+            prompt: string,
+            payload?: unknown,
+            streamingEnabled?: boolean,
+            onProgress?: (fullTextSoFar: string) => void,
+            signal?: AbortSignal
+          ) => {
             capturedPrompts.push(prompt);
             capturedPayloads.push(payload);
-            return replies.shift() ?? 'stub reply';
+            if (sendOverride) {
+              return sendOverride(onProgress, signal);
+            }
+            const reply = replies.shift() ?? 'stub reply';
+            if (streamingEnabled) {
+              onProgress?.(reply.slice(0, Math.ceil(reply.length / 2)));
+              onProgress?.(reply);
+            }
+            return reply;
           }
         };
       }
@@ -212,6 +231,8 @@ suite('ChatViewProvider', () => {
       { text: 'Work IQ second answer', contextId: 'ctx-workiq-2' }
     ];
     workspaceFolders = undefined;
+    quickPickSelection = undefined;
+    sendOverride = undefined;
   });
 
   test('loads the webview script via external URI (no blocking file read)', () => {
@@ -351,10 +372,16 @@ suite('ChatViewProvider', () => {
       assert.equal(warningMessages.length, 0);
       assert.equal(capturedPayloads.length, 1);
       const payload = capturedPayloads[0] as {
-        contextualResources?: { files?: Array<{ uri: string }> };
+        additionalContext?: Array<{ description: string; text: string }>;
+        contextualResources?: { files?: Array<{ uri: string }>; webContext?: { isWebEnabled: boolean } };
       };
-      assert.equal(payload.contextualResources?.files?.length, 1);
-      assert.ok(payload.contextualResources?.files?.[0].uri.startsWith('file:///'));
+      // Local file content is inlined; file:// URIs are never sent as contextual resources.
+      assert.equal(payload.contextualResources?.files, undefined);
+      assert.deepEqual(payload.additionalContext, [
+        { description: 'Local file: notes.md', text: 'ship checklist' }
+      ]);
+      assert.equal(payload.contextualResources?.webContext?.isWebEnabled, false);
+      assert.ok(capturedPrompts[0].startsWith('[ContextRelay grounding]'));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -408,7 +435,7 @@ suite('ChatViewProvider', () => {
     ]);
   });
 
-  test('plain chat attaches #file mentions as Copilot contextual file resources', async () => {
+  test('plain chat attaches #file mentions as inlined local file content and grounds the prompt', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-chat-mentions-'));
     fs.writeFileSync(path.join(root, 'notes.md'), 'meeting notes', 'utf8');
     workspaceFolders = [{ uri: { fsPath: root } }];
@@ -423,12 +450,249 @@ suite('ChatViewProvider', () => {
       await provider.submitQuery('Summarize #notes.md');
 
       const payload = capturedPayloads[0] as {
-        contextualResources?: { files?: Array<{ uri: string }> };
+        additionalContext?: Array<{ description: string; text: string }>;
+        contextualResources?: { files?: Array<{ uri: string }>; webContext?: { isWebEnabled: boolean } };
         labels: string[];
       };
-      assert.equal(payload.contextualResources?.files?.length, 1);
-      assert.ok(payload.contextualResources?.files?.[0].uri.startsWith('file:///'));
+      assert.equal(payload.contextualResources?.files, undefined);
+      assert.ok(payload.additionalContext?.some(item => item.text.includes('meeting notes')));
       assert.ok(payload.labels.some(label => label.includes('Local file: notes.md')));
+      assert.equal(payload.contextualResources?.webContext?.isWebEnabled, false);
+      assert.ok(capturedPrompts[0].startsWith('[ContextRelay grounding]'));
+      assert.ok(capturedPrompts[0].endsWith('Summarize'));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('attach-file picker resolves a relative candidate against whichever workspace root actually contains it and satisfies the /ask guard', async () => {
+    const rootA = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-attach-a-'));
+    const rootB = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-attach-b-'));
+    fs.writeFileSync(path.join(rootB, 'notes.md'), 'root B body', 'utf8');
+    // notes.md only exists under rootB (index 1), not rootA (index 0). A
+    // picker resolver that always joins against workspaceRoots[0] would fail
+    // to find it in a multi-root workspace.
+    workspaceFolders = [{ uri: { fsPath: rootA } }, { uri: { fsPath: rootB } }];
+    quickPickSelection = ['notes.md'];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getAccessToken: async () => 'token-123' } as never,
+        {} as never
+      );
+
+      await (provider as unknown as { handleAttachFilePicker(): Promise<void> }).handleAttachFilePicker();
+      assert.equal(warningMessages.length, 0);
+
+      // No pins and no # mention: the picker attachment alone must satisfy the /ask guard.
+      await (provider as unknown as { handleAskCommand(prompt: string): Promise<void> }).handleAskCommand('summarize');
+      assert.equal(warningMessages.length, 0);
+      assert.equal(capturedPayloads.length, 1);
+      const payload = capturedPayloads[0] as {
+        additionalContext?: Array<{ description: string; text: string }>;
+      };
+      assert.equal(payload.additionalContext?.length, 1);
+      assert.equal(payload.additionalContext?.[0].description, 'Local file: notes.md');
+      assert.ok(payload.additionalContext?.[0].text.includes('root B body'));
+      assert.ok(capturedPrompts[0].startsWith('[ContextRelay grounding]'));
+
+      // Pending attachments are consumed by the message they were sent with.
+      await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('next', []);
+      assert.equal((capturedPayloads[1] as { additionalContext?: unknown }).additionalContext, undefined);
+      assert.equal(capturedPrompts[1], 'next');
+    } finally {
+      fs.rmSync(rootA, { recursive: true, force: true });
+      fs.rmSync(rootB, { recursive: true, force: true });
+    }
+  });
+
+  test('streams progress with the grounded prompt and finishes with the raw reply', async () => {
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getAccessToken: async () => 'token-123' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; [key: string]: unknown }> = [];
+    (provider as unknown as { postMessage(message: { command: string; [key: string]: unknown }): void }).postMessage = (message) => {
+      messages.push(message);
+    };
+
+    await (provider as unknown as { handlePinSnippet(item: unknown): Promise<void> }).handlePinSnippet({
+      source: 'teams',
+      title: 'standup notes',
+      snippet: 'Release is blocked by test failures.',
+      cache: { hit: false }
+    });
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('what is blocking?', []);
+
+    assert.ok(capturedPrompts[0].startsWith('[ContextRelay grounding]'));
+    const commands = messages.map(message => message.command).filter(command => command.startsWith('assistantMessage'));
+    assert.deepEqual(commands, ['assistantMessageStart', 'assistantMessageProgress', 'assistantMessageProgress', 'assistantMessageEnd']);
+    const end = messages.find(message => message.command === 'assistantMessageEnd');
+    assert.equal(end?.text, 'First answer');
+    assert.equal(end?.kind, 'chat');
+  });
+
+  test('does not emit streaming progress when contextRelay.chat.streamResponses is off', async () => {
+    configValues.set('chat.streamResponses', false);
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getAccessToken: async () => 'token-123' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; [key: string]: unknown }> = [];
+    (provider as unknown as { postMessage(message: { command: string; [key: string]: unknown }): void }).postMessage = (message) => {
+      messages.push(message);
+    };
+
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('hello', []);
+
+    const commands = messages.map(message => message.command).filter(command => command.startsWith('assistantMessage'));
+    assert.deepEqual(commands, ['assistantMessageEnd']);
+  });
+
+  test('/ask stays blocked when its only attachment can no longer be read', async () => {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-ask-deleted-')));
+    fs.writeFileSync(path.join(root, 'notes.md'), 'draft', 'utf8');
+    workspaceFolders = [{ uri: { fsPath: root } }];
+    quickPickSelection = ['notes.md'];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getAccessToken: async () => 'token-123' } as never,
+        {} as never
+      );
+
+      await (provider as unknown as { handleAttachFilePicker(): Promise<void> }).handleAttachFilePicker();
+      fs.rmSync(path.join(root, 'notes.md'));
+      await (provider as unknown as { handleAskCommand(prompt: string): Promise<void> }).handleAskCommand('summarize');
+
+      assert.equal(warningMessages.length, 1);
+      assert.equal(capturedPayloads.length, 0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('caps merged attachments at contextRelay.chat.maxAttachedFiles, preferring # mentions', async () => {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-cap-')));
+    fs.writeFileSync(path.join(root, 'a.md'), 'alpha body', 'utf8');
+    fs.writeFileSync(path.join(root, 'b.md'), 'beta body', 'utf8');
+    workspaceFolders = [{ uri: { fsPath: root } }];
+    quickPickSelection = ['b.md'];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getAccessToken: async () => 'token-123' } as never,
+        {} as never
+      );
+      const messages: Array<{ command: string; [key: string]: unknown }> = [];
+      (provider as unknown as { postMessage(message: { command: string; [key: string]: unknown }): void }).postMessage = (message) => {
+        messages.push(message);
+      };
+
+      await (provider as unknown as { handleAttachFilePicker(): Promise<void> }).handleAttachFilePicker();
+      configValues.set('chat.maxAttachedFiles', 1);
+      await provider.submitQuery('Summarize #a.md');
+
+      const payload = capturedPayloads[0] as { additionalContext?: Array<{ description: string; text: string }> };
+      assert.equal(payload.additionalContext?.length, 1);
+      assert.ok(payload.additionalContext?.[0].text.includes('alpha body'));
+      assert.ok(messages.some(message => message.command === 'assistantMessage' && String(message.text).includes('b.md')));
+      // The file left out stays attached for the next message.
+      const pending = (provider as unknown as { pendingAttachments: Array<{ relativePath: string }> }).pendingAttachments;
+      assert.deepEqual(pending.map(attachment => attachment.relativePath), ['b.md']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('clearing the chat while a reply is in flight posts nothing for the aborted request', async () => {
+    sendOverride = (_onProgress, signal) => new Promise<string>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => {
+        const err = new Error('The operation was aborted.');
+        err.name = 'AbortError';
+        reject(err);
+      });
+    });
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getAccessToken: async () => 'token-123' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; [key: string]: unknown }> = [];
+    (provider as unknown as { postMessage(message: { command: string; [key: string]: unknown }): void }).postMessage = (message) => {
+      messages.push(message);
+    };
+
+    const pending = (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('long question', []);
+    for (let attempt = 0; attempt < 100 && capturedPrompts.length === 0; attempt++) {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.equal(capturedPrompts.length, 1);
+
+    provider.clearChat();
+    await pending;
+
+    const clearIndex = messages.findIndex(message => message.command === 'clearChat');
+    assert.ok(clearIndex >= 0);
+    assert.deepEqual(messages.slice(clearIndex + 1).map(message => message.command), []);
+  });
+
+  test('a stream that fails after progress is closed before the error is reported', async () => {
+    sendOverride = async onProgress => {
+      onProgress?.('partial answer');
+      throw new Error('stream broke');
+    };
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getAccessToken: async () => 'token-123' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; [key: string]: unknown }> = [];
+    (provider as unknown as { postMessage(message: { command: string; [key: string]: unknown }): void }).postMessage = (message) => {
+      messages.push(message);
+    };
+
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('question', []);
+
+    const commands = messages
+      .map(message => message.command)
+      .filter(command => command.startsWith('assistantMessage') || command === 'queryError');
+    assert.deepEqual(commands, ['assistantMessageStart', 'assistantMessageProgress', 'assistantMessageEnd', 'queryError']);
+    assert.equal(messages.find(message => message.command === 'assistantMessageEnd')?.text, 'partial answer');
+  });
+
+  test('attachments sent with a submitted turn are consumed even when it fails, and files attached meanwhile stay pending', async () => {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-consume-')));
+    fs.writeFileSync(path.join(root, 'a.md'), 'alpha body', 'utf8');
+    fs.writeFileSync(path.join(root, 'b.md'), 'beta body', 'utf8');
+    workspaceFolders = [{ uri: { fsPath: root } }];
+    quickPickSelection = ['a.md'];
+
+    try {
+      const provider = new ChatViewProvider(
+        createContext(),
+        { getAccessToken: async () => 'token-123' } as never,
+        {} as never
+      );
+      (provider as unknown as { postMessage(message: unknown): void }).postMessage = () => {};
+      const pickFiles = (provider as unknown as { handleAttachFilePicker(): Promise<void> }).handleAttachFilePicker.bind(provider);
+
+      await pickFiles();
+      sendOverride = async () => {
+        // A file attached while the reply is in flight belongs to the next message.
+        quickPickSelection = ['b.md'];
+        await pickFiles();
+        throw new Error('stream broke');
+      };
+      await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('question', []);
+
+      const pending = (provider as unknown as { pendingAttachments: Array<{ relativePath: string }> }).pendingAttachments;
+      assert.deepEqual(pending.map(attachment => attachment.relativePath), ['b.md']);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

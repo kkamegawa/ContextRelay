@@ -249,6 +249,19 @@ Recommended pre-run settings:
   - Step 3: no `Context:` line is shown, and the response is a normal ungrounded chat reply (no error).
   - `/ask` sent with no pinned snippet and no `#file` mention still aborts with the existing warning.
 
+### E2E-34 Attach local files and stream replies
+- Status: [ ]
+- Steps:
+  1. Click 📎 and pick a workspace file; drag another file from the Explorer onto the input area.
+  2. Remove one attachment chip with its × button, then send a plain chat message about the remaining file.
+  3. While the reply is streaming, click Stop on a second message.
+  4. Enable `contextRelay.chat.attachActiveEditor`, select a few lines in an editor, and send a message.
+- Expected:
+  - Step 1: each file appears as a chip; the input area shows a dashed outline while dragging.
+  - Step 2: the reply reflects the file content, shows `Context: Local file: <path>`, and the chips are cleared after sending.
+  - Step 3: the reply renders incrementally with a cursor, and Stop ends it with `Cancelled.` without sending a duplicate turn.
+  - Step 4: the context line shows `Local file: <path> (L<start>-L<end>)`.
+
 ---
 
 ## 6. Snippets flow

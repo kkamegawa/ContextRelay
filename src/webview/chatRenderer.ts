@@ -32,6 +32,7 @@ export class ChatRenderer {
   private vscode: VsCodeApi;
   private loadingElements: Map<string, HTMLElement> = new Map();
   private pinnedKeys: Set<string> = new Set();
+  private streamingElements: Map<string, { container: HTMLElement; textEl: HTMLElement }> = new Map();
 
   constructor(chatArea: HTMLElement, vscode: VsCodeApi) {
     this.chatArea = chatArea;
@@ -173,6 +174,102 @@ export class ChatRenderer {
     }
 
     this.chatArea.appendChild(el);
+    this.scrollToBottom();
+  }
+
+  /**
+   * Start a streaming assistant bubble. Content is filled in incrementally
+   * via updateAssistantStream() and made final via finalizeAssistantMessage().
+   */
+  beginAssistantStream(id: string): void {
+    this.hideWelcome();
+
+    const el = document.createElement('div');
+    el.className = 'message assistant streaming';
+    el.setAttribute('role', 'article');
+    el.setAttribute('aria-live', 'polite');
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
+    el.appendChild(textDiv);
+
+    this.chatArea.appendChild(el);
+    this.streamingElements.set(id, { container: el, textEl: textDiv });
+    this.scrollToBottom();
+  }
+
+  /**
+   * Update a streaming bubble with the cumulative reply text so far. The
+   * Chat API's streamed frames each carry the full reply-so-far rather than
+   * a delta, so this replaces the bubble's content rather than appending.
+   */
+  updateAssistantStream(id: string, text: string): void {
+    const entry = this.streamingElements.get(id);
+    if (!entry) {
+      return;
+    }
+
+    entry.textEl.textContent = text;
+    this.scrollToBottom();
+  }
+
+  /**
+   * Render the final assistant reply, replacing a streaming bubble in place
+   * if one exists for `id` (normal path), or creating a fresh bubble if not
+   * (e.g. streaming was disabled and the reply arrived via the synchronous
+   * endpoint with no preceding assistantMessageStart/Progress).
+   */
+  finalizeAssistantMessage(
+    id: string,
+    text: string,
+    timestamp: string,
+    kind?: 'info' | 'ask' | 'chat',
+    contextLabels: string[] = []
+  ): void {
+    const entry = this.streamingElements.get(id);
+    this.streamingElements.delete(id);
+
+    let el = entry?.container;
+    if (!el) {
+      this.hideWelcome();
+      el = document.createElement('div');
+      el.className = 'message assistant';
+      el.setAttribute('role', 'article');
+      this.chatArea.appendChild(el);
+    }
+
+    el.classList.remove('streaming');
+    el.replaceChildren();
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
+    if (hasRichTextFormatting(text)) {
+      textDiv.classList.add('message-text-rich');
+      textDiv.innerHTML = formatAssistantMessageAsHtml(text);
+    } else {
+      textDiv.textContent = text;
+    }
+    el.appendChild(textDiv);
+
+    if (contextLabels.length > 0) {
+      const contextDiv = document.createElement('div');
+      contextDiv.className = 'context-used';
+      contextDiv.textContent = `Context: ${contextLabels.join(', ')}`;
+      el.appendChild(contextDiv);
+    }
+
+    if (kind === 'chat' || kind === 'ask') {
+      el.appendChild(this.buildAssistantActions(text));
+    }
+
+    const timeStr = this.formatTime(timestamp);
+    if (timeStr) {
+      const tsDiv = document.createElement('div');
+      tsDiv.className = 'timestamp';
+      tsDiv.textContent = timeStr;
+      el.appendChild(tsDiv);
+    }
+
     this.scrollToBottom();
   }
 
