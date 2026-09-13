@@ -317,6 +317,17 @@ suite('Dependency security baselines', () => {
     );
   });
 
+  test('declares Node 22.12+ so the CommonJS tests can require the ESM-only happy-dom', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const nodeEngine = packageJson.engines?.node;
+
+    // require(esm) is available without a flag from Node.js 22.12.
+    assert.ok(
+      compareVersions(nodeEngine, '22.12.0') >= 0,
+      `package.json must require Node.js 22.12 or later to load happy-dom through require(esm) (found: ${nodeEngine ?? 'missing'})`
+    );
+  });
+
   test('keeps @types/vscode aligned with engines.vscode', () => {
     const packageJson = readRepoJson<PackageJson>('package.json');
     const vscodeTypesVersion = packageJson.devDependencies?.['@types/vscode'];
