@@ -257,3 +257,10 @@
 - Summary: Rebuilt the design-independent parts of PR #209 on top of the #232 grounding model. Attached local files are now read and inlined into `additionalContext` instead of being sent as unsupported `file://` URIs. Added drag and drop, the 📎 picker, opt-in active-editor auto-attach, and `chatOverStream` streaming with a safe fallback. Every attachment source grounds the turn and satisfies the `/ask` guard. PR #209's `/ask` redefinition was not adopted.
 - Design record: [docs/adr.md](adr.md) — 2026-09-13 entry.
 - Tests: `src/test/suite/chatContext.test.ts`, `src/test/suite/chatViewProvider.test.ts`, `src/test/suite/attachments.test.ts`, `src/test/suite/sseParser.test.ts`, `src/test/suite/chatAdapter.test.ts`.
+
+### 2026-09-14 — DOM/webview unit testing infrastructure
+
+- Issue: [kkamegawa/ContextRelay#210](https://github.com/kkamegawa/ContextRelay/issues/210), with sub-issues [#211](https://github.com/kkamegawa/ContextRelay/issues/211), [#212](https://github.com/kkamegawa/ContextRelay/issues/212), [#213](https://github.com/kkamegawa/ContextRelay/issues/213), [#214](https://github.com/kkamegawa/ContextRelay/issues/214), and [#215](https://github.com/kkamegawa/ContextRelay/issues/215)
+- Summary: Added `happy-dom` and a shared DOM test utility that loads the production panel HTML into a locked-down happy-dom window. Added unit tests for `ChatRenderer` (messages, streaming, result cards, pin state, loading, errors, and `clear()`), `HashMenu`, and the `SlashMenu` DOM class. Raised `engines.node` to `>=22.12.0` for `require(esm)`.
+- Design record: [docs/adr.md](adr.md) — 2026-09-14 entry. Plan: [Wiki — Add DOM/Webview Unit Testing Infrastructure](https://github.com/kkamegawa/ContextRelay/wiki/dom-webview-test-infrastructure).
+- Tests: `src/test/suite/domTestUtils.test.ts`, `src/test/suite/chatRenderer.test.ts`, `src/test/suite/hashMenu.test.ts`, `src/test/suite/slashMenu.test.ts`, `src/test/suite/dependencyVersions.test.ts`.

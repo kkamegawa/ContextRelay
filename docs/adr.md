@@ -36,3 +36,15 @@
   - Adopt PR #209's `chatOverStream` streaming (`contextRelay.chat.streamResponses`), falling back to the synchronous endpoint only when the service reports the streamed endpoint as unavailable (HTTP 404, 405, or 501). This is narrower than PR #209, which fell back on any failure before a response: after review of PR #237, a network error or timeout is surfaced instead, because the service may already have processed the POST. The grounded prompt is sent on both paths.
 - Reason: The user chose the #232 grounding model as the baseline and asked to keep the parts of #209 that do not change it. Without the inline file fix, `#file` grounding from 2026-09-07 never delivered file content to Copilot.
 - Compatibility: With `contextRelay.chat.attachActiveEditor` enabled, every Copilot message sent while a workspace file is open is grounded on that file; the setting is off by default. Consistent with the 2026-09-07 entry, which this entry extends rather than reverses.
+
+## 2026-09-14 - Unit-test the webview DOM classes with happy-dom
+
+- Task: Issue #210 (sub-issues #211-#215).
+- Decision:
+  - Use `happy-dom` (`^20.14.5`) as the DOM implementation for unit tests instead of `jsdom`, whose `whatwg-encoding` dependency is blocked by `dependencyVersions.test.ts`. The declared and installed versions are checked against a floor of 20.0.0 (GHSA-37j7-fg3j-429f) rather than an exact baseline.
+  - Raise `engines.node` from `>=22.0.0` to `>=22.12.0`. `happy-dom` ships only as an ES module, and the CommonJS test build loads it through `require(esm)`, which Node.js enables without a flag from 22.12.
+  - Keep a single `tsconfig.test.json`, now with the `DOM` lib and including `src/webview`.
+  - Load the production panel HTML from `ChatViewProvider.getHtmlForWebview()` into a happy-dom window with JavaScript evaluation, script, stylesheet, and frame loading, and navigation disabled. The provider is loaded with a minimal `vscode` stub, and the module cache entries added by that load are removed so `chatViewProvider.test.ts` keeps loading the provider with its own stubs.
+  - Add no DOM API stubs. happy-dom implements `scrollIntoView`, `requestAnimationFrame`, `KeyboardEvent`, and `click()`.
+- Reason: `ChatRenderer`, `HashMenu`, and `SlashMenu` had no automated coverage, so webview regressions such as the `dragleave` bug found on PR #209 could not be covered by a test.
+- Compatibility: Local development and `npm test` need Node.js 22.12 or later. `.nvmrc` (`22`) already resolves to a newer 22.x release, and the extension itself runs on the Node.js bundled with VS Code. No production code changed. Consistent with the 2026-08-10 and 2026-09-07 dependency entries: the floor does not add another exact-match baseline for Dependabot updates to break.
