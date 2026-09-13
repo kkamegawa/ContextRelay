@@ -290,7 +290,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'js-yaml override',
         actual: packageJson.overrides?.['js-yaml'],
-        expected: '4.3.1',
+        expected: '4.3.2',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
@@ -364,7 +364,7 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['js-yaml'], '4.3.1') >= 0,
+      compareVersions(packageJson.overrides?.['js-yaml'], '4.3.2') >= 0,
       `js-yaml override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['js-yaml'] ?? 'missing'})`
     );
 
@@ -559,7 +559,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed js-yaml',
         actual: packageLockJson.packages?.['node_modules/js-yaml']?.version,
-        expected: '4.3.1',
+        expected: '4.3.2',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
