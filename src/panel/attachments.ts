@@ -102,3 +102,16 @@ export function mergeAttachments(
   }
   return [...byPath.values()];
 }
+
+/**
+ * Keep at most `max` attachments in the order given (callers pass the
+ * highest-priority source first) and return the rest separately so the
+ * caller can tell the user which files were left out.
+ */
+export function limitAttachments(
+  attachments: readonly ResolvedAttachment[],
+  max: number
+): { kept: ResolvedAttachment[]; dropped: ResolvedAttachment[] } {
+  const limit = Math.max(0, Math.floor(max));
+  return { kept: attachments.slice(0, limit), dropped: attachments.slice(limit) };
+}

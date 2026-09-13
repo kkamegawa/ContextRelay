@@ -156,11 +156,20 @@ export async function sendMessageStream(
     signal
   });
 
-  if (!response.ok || !response.body) {
+  if (!response.ok) {
+    if (STREAM_UNAVAILABLE_STATUSES.has(response.status)) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new StreamUnavailableError(response.status);
+    }
     // Reuses the shared status-code handling (401 / 403 / CopilotLicenseRequired / generic).
-    // This always throws for a non-ok response, before the request has been accepted.
+    // This always throws for a non-ok response.
     await handleGraphResponse(response);
-    throw new Error('Microsoft 365 Copilot streamed response had no body.');
+    throw new Error(`Graph API error ${response.status}`);
+  }
+
+  if (!response.body) {
+    // A 2xx response means the service accepted the request, so this must not fall back.
+    throw new StreamAcceptedError(new Error('Microsoft 365 Copilot streamed response had no body.'));
   }
 
   // From here on, the service has accepted the request and the conversation
@@ -216,6 +225,24 @@ export async function sendMessageStream(
 }
 
 /**
+ * HTTP statuses that mean the streamed endpoint itself is unavailable (not
+ * deployed for this tenant or not supported), so the prompt was never
+ * processed and resending it through the synchronous endpoint is safe.
+ */
+const STREAM_UNAVAILABLE_STATUSES = new Set([404, 405, 501]);
+
+/** The service reported the streamed endpoint as unavailable; see STREAM_UNAVAILABLE_STATUSES. */
+export class StreamUnavailableError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`Microsoft 365 Copilot streamed endpoint is unavailable (HTTP ${status}).`);
+    this.name = 'StreamUnavailableError';
+    this.status = status;
+  }
+}
+
+/**
  * Marks a streaming failure that happened after the Chat API had already
  * accepted the request (i.e. after a 200 response with a body was
  * received). Preserves the original error's `name` (e.g. `AbortError` on
@@ -230,12 +257,14 @@ export class StreamAcceptedError extends Error {
 
 /**
  * Send a message using the streamed endpoint when enabled, falling back to
- * the synchronous endpoint once if the streamed request was never accepted
- * by the service (e.g. `chatOverStream` isn't available for this tenant, or
- * a network error prevented the initial POST from completing). A failure
- * that happens *after* the service accepted the streamed request — including
- * user cancellation — is never retried, since resending would create a
- * duplicate conversation turn; see StreamAcceptedError.
+ * the synchronous endpoint once only when the service reports the streamed
+ * endpoint as unavailable (see STREAM_UNAVAILABLE_STATUSES). Every other
+ * failure is surfaced instead of retried: a network error or timeout may
+ * happen after the service already processed the POST, other HTTP errors
+ * are not specific to streaming, a failure after the stream was accepted
+ * (StreamAcceptedError) means the turn already exists, and cancellation is
+ * the user's choice. Resending in any of those cases could create a
+ * duplicate conversation turn.
  */
 export async function sendMessageAuto(
   token: string,
@@ -253,15 +282,10 @@ export async function sendMessageAuto(
   try {
     return await sendMessageStream(token, conversationId, message, options, onProgress, signal);
   } catch (err) {
-    // Never fall back on user cancellation — whether the abort happened
-    // before the request was accepted (a plain AbortError from fetch) or
-    // after (wrapped in StreamAcceptedError, see below), silently sending
-    // the prompt anyway via the synchronous endpoint would ignore the
-    // user's Stop click.
-    if (err instanceof StreamAcceptedError || (err instanceof Error && err.name === 'AbortError')) {
-      throw err;
+    if (err instanceof StreamUnavailableError) {
+      return sendMessage(token, conversationId, message, options);
     }
-    return sendMessage(token, conversationId, message, options);
+    throw err;
   }
 }
 

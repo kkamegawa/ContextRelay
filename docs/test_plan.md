@@ -133,7 +133,7 @@ Authentication, slash routing, Retrieval API, Chat API (beta), Exchange Mail ada
 
 **T-CHAT-10 Streaming and fallback**
 - Steps: Send a message with `contextRelay.chat.streamResponses` `true`, then `false`
-- Expected: With `true`, the reply renders incrementally and ends with the final text; if the streamed endpoint is not accepted, the synchronous endpoint is used once; Stop cancels without resending. With `false`, only the final reply is rendered.
+- Expected: With `true`, the reply renders incrementally and ends with the final text; if the streamed endpoint returns 404, 405, or 501, the synchronous endpoint is used once, while network errors and other failures are reported without resending; Stop cancels without resending. With `false`, only the final reply is rendered.
 
 ---
 

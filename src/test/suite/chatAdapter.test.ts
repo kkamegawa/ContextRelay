@@ -372,6 +372,42 @@ suite('sendMessageAuto', () => {
     }
   });
 
+  test('does not fall back when the streamed request fails with a network error', async () => {
+    let call = 0;
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async () => {
+      call += 1;
+      // The service may already have processed the POST before the
+      // connection dropped, so resending could duplicate the turn.
+      throw new TypeError('fetch failed');
+    }) as typeof globalThis.fetch;
+
+    try {
+      await assert.rejects(() => sendMessageAuto('t', 'c', 'q', {}, true, () => {}), /fetch failed/);
+      assert.equal(call, 1, 'the synchronous endpoint must not be called after an ambiguous network failure');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('does not fall back on HTTP errors that do not mean the streamed endpoint is unavailable', async () => {
+    let call = 0;
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async () => {
+      call += 1;
+      return new Response('internal error', { status: 500 });
+    }) as typeof globalThis.fetch;
+
+    try {
+      await assert.rejects(() => sendMessageAuto('t', 'c', 'q', {}, true, () => {}), /Graph API error 500/);
+      assert.equal(call, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('does not fall back when the user cancels before the stream was ever accepted', async () => {
     let call = 0;
     const originalFetch = globalThis.fetch;

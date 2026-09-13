@@ -4,7 +4,7 @@ import { pathToFileURL } from 'url';
 import { normalizeExtractedText } from '../textExtraction';
 import { type ResolvedAttachment } from './attachments';
 import { isCopilotSupportedFileExtension } from './copilotSupportedExtensions';
-import { resolveWorkspaceFile, toDisplayRelativePath } from './workspacePath';
+import { readValidatedWorkspaceFile, resolveWorkspaceFile, toDisplayRelativePath } from './workspacePath';
 
 const FILE_MENTION_PATTERN = /(^|\s)#(?:"([^"]+)"|'([^']+)'|([^\s#]+))/g;
 const ONLY_DIGITS_PATTERN = /^\d+$/;
@@ -131,8 +131,17 @@ export async function buildWorkIqPromptWithFiles(
       break;
     }
 
-    const content = await fs.readFile(file.absolutePath, 'utf8');
-    const normalized = normalizeExtractedText(content);
+    // Re-validate at read time (the path may have been swapped for a symlink
+    // since it was resolved) and read only what the budget can use.
+    const read = await readValidatedWorkspaceFile(
+      file.absolutePath,
+      file.workspaceRoot,
+      Math.min(MAX_WORKIQ_FILE_CHARS, remainingBudget)
+    );
+    if (!read) {
+      continue;
+    }
+    const normalized = normalizeExtractedText(read.text);
     const bounded = truncateForBudget(normalized || '(empty file)', Math.min(MAX_WORKIQ_FILE_CHARS, remainingBudget));
     if (!bounded.trim()) {
       continue;

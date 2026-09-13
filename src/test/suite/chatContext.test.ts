@@ -47,7 +47,9 @@ suite('chatContext', () => {
   let root: string;
 
   setup(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-chatcontext-'));
+    // Attachments carry canonical paths from fs.promises.realpath (the native implementation),
+    // so the test root must use the same form; the JS realpathSync can keep 8.3 short names on Windows.
+    root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-chatcontext-')));
   });
 
   teardown(() => {
@@ -141,6 +143,46 @@ suite('chatContext', () => {
     assert.deepEqual(payload.labels, []);
     assert.equal(payload.hasGroundingContext, false);
     assert.equal(payload.contextualResources, undefined);
+  });
+
+  test('reads a selected line range deep inside a large file', async () => {
+    const filePath = path.join(root, 'big.log');
+    const lines = Array.from({ length: 20000 }, (_, index) => `line ${index + 1}`);
+    fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
+
+    const payload = await buildChatContextPayload({
+      snippets: [],
+      attachments: [makeAttachment(filePath, 'big.log', { startLine: 19999, endLine: 20000 })]
+    });
+
+    assert.deepEqual(payload.additionalContext, [
+      { description: 'Local file: big.log (L19999-L20000)', text: 'line 19999\nline 20000' }
+    ]);
+  });
+
+  test('skips an attachment whose path was swapped for a symlink to a file outside the workspace', async function (this: Mocha.Context) {
+    const outside = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'context-relay-outside-')));
+    try {
+      const secretPath = path.join(outside, 'secret.md');
+      fs.writeFileSync(secretPath, 'outside secret', 'utf8');
+      const linkPath = path.join(root, 'notes.md');
+      try {
+        fs.symlinkSync(secretPath, linkPath, 'file');
+      } catch {
+        // Creating symlinks needs extra privileges on some Windows setups.
+        this.skip();
+      }
+
+      const payload = await buildChatContextPayload({
+        snippets: [],
+        attachments: [makeAttachment(linkPath, 'notes.md')]
+      });
+
+      assert.equal(payload.additionalContext, undefined);
+      assert.equal(payload.hasGroundingContext, false);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
   });
 
   test('caps a single large attachment at MAX_LOCAL_FILE_CHARS', async () => {

@@ -18,6 +18,7 @@ import { getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
 import {
   DEFAULT_MAX_ATTACHMENTS,
+  limitAttachments,
   mergeAttachments,
   resolveAttachmentPath,
   type AttachmentSelection,
@@ -67,6 +68,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private pendingAttachments: ResolvedAttachment[] = [];
   /** Lets the Stop button cancel an in-flight streamed Copilot reply. */
   private activeStreamController?: AbortController;
+  /** Bumped on every chat reset so an in-flight request can tell it was cleared. */
+  private chatGeneration = 0;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -159,6 +162,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.latestSearchSummary = undefined;
     this.currentConversationId = undefined;
     this.currentWorkIqContextId = undefined;
+    this.chatGeneration += 1;
     this.activeStreamController?.abort();
     this.activeStreamController = undefined;
     this.pendingAttachments = [];
@@ -889,14 +893,41 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   ): Promise<void> {
     const snippets = this.snippetStore.getAll();
     const activeEditorAttachment = await this.resolveActiveEditorAttachment(this.getWorkspaceRoots());
-    // Every attachment source counts as explicit context: pending drag-and-drop
-    // / picker files, # mentions, and the opt-in active editor.
-    const attachments = mergeAttachments(
-      this.pendingAttachments,
-      mentionFiles,
-      activeEditorAttachment ? [activeEditorAttachment] : []
+    // Every attachment source counts as explicit context. Sources are merged
+    // in priority order (# mentions typed in this message, then pending
+    // drag-and-drop / picker files, then the opt-in active editor) and the
+    // contextRelay.chat.maxAttachedFiles cap applies to the merged list.
+    const { kept: attachments, dropped } = limitAttachments(
+      mergeAttachments(
+        mentionFiles,
+        this.pendingAttachments,
+        activeEditorAttachment ? [activeEditorAttachment] : []
+      ),
+      this.getMaxAttachments()
     );
-    if (requirePinnedContext && snippets.length === 0 && attachments.length === 0) {
+    if (dropped.length > 0) {
+      this.postMessage({
+        command: 'assistantMessage',
+        kind: 'info',
+        text: `Only ${attachments.length} attached file(s) are sent per message (contextRelay.chat.maxAttachedFiles). Left out: ${dropped.map(attachment => attachment.relativePath).join(', ')}.`,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Conversation history is preserved by the Copilot Chat API via the
+    // conversation id, so we only forward explicit ContextRelay context:
+    // attached local files, pinned snippets, and the latest search summary.
+    // This applies to both /ask and plain chat turns alike.
+    const contextPayload = await buildChatContextPayload({
+      snippets,
+      searchSummary: this.latestSearchSummary,
+      attachments
+    });
+
+    // Check /ask's guard against what will actually be sent: an attachment
+    // whose file can no longer be read is skipped by buildChatContextPayload
+    // and must not let /ask through ungrounded.
+    if (requirePinnedContext && !contextPayload.hasGroundingContext) {
       const message = 'Pin snippets or attach local files (#file, 📎, or drag & drop) to use /ask. ContextRelay sends that context to Microsoft 365 Copilot.';
       vscode.window.showWarningMessage(`ContextRelay: ${message}`);
       this.postMessage({
@@ -922,7 +953,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    this.postMessage({
+    // A reset (clearChat or /clear) while this request is in flight bumps the
+    // generation. From then on this request posts nothing, so none of its
+    // messages reappear in the cleared transcript.
+    const generation = this.chatGeneration;
+    const post = (message: HostToWebviewMessage): void => {
+      if (generation === this.chatGeneration) {
+        this.postMessage(message);
+      }
+    };
+
+    post({
       command: 'loading',
       source: 'all',
       isLoading: true,
@@ -937,25 +978,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.activeStreamController = controller;
     const streamId = `stream-${crypto.randomUUID()}`;
     let streamStarted = false;
+    let lastProgressText = '';
+    let submitted = false;
 
     try {
       if (!this.currentConversationId) {
         this.currentConversationId = await createConversation(token);
       }
 
-      // Conversation history is preserved by the Copilot Chat API via the
-      // conversation id, so we only forward explicit ContextRelay context:
-      // attached local files, pinned snippets, and the latest search summary.
-      // This applies to both /ask and plain chat turns alike.
-      const contextPayload = await buildChatContextPayload({
-        snippets,
-        searchSummary: this.latestSearchSummary,
-        attachments
-      });
       // additionalContext is only "extra" grounding to Copilot, so when pins
       // or attached files are included, tell it explicitly to prefer that
       // context over web/enterprise search results.
       const groundedPrompt = buildGroundedPrompt(prompt, contextPayload);
+      // From here the prompt may reach the service, so the attachments sent
+      // with it are consumed whatever the outcome (see finally).
+      submitted = true;
       const reply = await sendMessageAuto(
         token,
         this.currentConversationId,
@@ -965,9 +1002,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         fullTextSoFar => {
           if (!streamStarted) {
             streamStarted = true;
-            this.postMessage({ command: 'assistantMessageStart', id: streamId, timestamp: new Date().toISOString() });
+            post({ command: 'assistantMessageStart', id: streamId, timestamp: new Date().toISOString() });
           }
-          this.postMessage({ command: 'assistantMessageProgress', id: streamId, text: fullTextSoFar });
+          lastProgressText = fullTextSoFar;
+          post({ command: 'assistantMessageProgress', id: streamId, text: fullTextSoFar });
         },
         controller.signal
       );
@@ -978,7 +1016,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Use the raw prompt (not the grounded one) for output-language
       // detection so the English grounding instruction doesn't skew it.
       const { content } = detectOutputLanguage(prompt, reply);
-      this.postMessage({
+      post({
         command: 'assistantMessageEnd',
         id: streamId,
         kind,
@@ -986,14 +1024,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         contextLabels: contextPayload.labels,
         timestamp: new Date().toISOString()
       });
-
-      if (this.pendingAttachments.length > 0) {
-        this.pendingAttachments = [];
-        this.sendAttachments();
-      }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        this.postMessage({
+      if (generation !== this.chatGeneration) {
+        // Aborted by a chat reset; the transcript was cleared, so report nothing.
+      } else if (err instanceof Error && err.name === 'AbortError') {
+        post({
           command: 'assistantMessageEnd',
           id: streamId,
           kind: 'info',
@@ -1001,9 +1036,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           timestamp: new Date().toISOString()
         });
       } else {
+        if (streamStarted) {
+          // Close the partially streamed bubble so the webview leaves its
+          // streaming state (Stop button, cursor) before the error is shown.
+          post({
+            command: 'assistantMessageEnd',
+            id: streamId,
+            kind,
+            text: lastProgressText,
+            contextLabels: contextPayload.labels,
+            timestamp: new Date().toISOString()
+          });
+        }
         const message = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(`ContextRelay: Copilot chat failed — ${message}`);
-        this.postMessage({
+        post({
           command: 'queryError',
           source: 'all',
           message,
@@ -1011,9 +1058,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         });
       }
     } finally {
-      this.activeStreamController = undefined;
-      this.postMessage({ command: 'loading', source: 'all', isLoading: false });
+      if (this.activeStreamController === controller) {
+        this.activeStreamController = undefined;
+      }
+      if (submitted) {
+        this.consumePendingAttachments(attachments);
+      }
+      post({ command: 'loading', source: 'all', isLoading: false });
     }
+  }
+
+  /**
+   * Remove the attachments that were sent with a submitted message from the
+   * pending list. Files attached while that message was in flight, or left
+   * out by the attachment cap, stay pending for the next message.
+   */
+  private consumePendingAttachments(sent: readonly ResolvedAttachment[]): void {
+    const sentPaths = new Set(sent.map(attachment => attachment.absolutePath));
+    const remaining = this.pendingAttachments.filter(attachment => !sentPaths.has(attachment.absolutePath));
+    if (remaining.length === this.pendingAttachments.length) {
+      return;
+    }
+
+    this.pendingAttachments = remaining;
+    this.sendAttachments();
   }
 
   private async resolveMentionsForPrompt(

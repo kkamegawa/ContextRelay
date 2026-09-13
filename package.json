@@ -279,7 +279,7 @@
         "contextRelay.chat.maxAttachedFiles": {
           "type": "number",
           "default": 5,
-          "description": "Maximum number of local files that can be attached to a single chat message (via # mentions, drag-and-drop, or the attach picker)"
+          "description": "Maximum number of local files that can be attached to a single chat message (# mentions, drag-and-drop, the attach picker, and the active editor combined)"
         }
       }
     }

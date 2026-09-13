@@ -1,8 +1,8 @@
-import * as fs from 'fs/promises';
 import type { CopilotContextMessage, CopilotContextualResources, SendMessageOptions } from '../adapters/chatAdapter';
 import type { SavedSnippet } from '../models/contextItem';
 import { normalizeExtractedText } from '../textExtraction';
 import type { ResolvedAttachment } from './attachments';
+import { readValidatedWorkspaceFile } from './workspacePath';
 
 export const MAX_CHAT_CONTEXT_CHARS = 60_000;
 export const MAX_LOCAL_FILE_CHARS = 12_000;
@@ -108,13 +108,6 @@ function addTextContext(
   return pushContext(additionalContext, labels, description, text, remainingBudget.value, remainingBudget);
 }
 
-function sliceSelectedLines(content: string, selection: { startLine: number; endLine: number }): string {
-  const lines = content.split(/\r\n|\n/);
-  const start = Math.max(0, selection.startLine - 1);
-  const end = Math.min(lines.length, selection.endLine);
-  return lines.slice(start, end).join('\n');
-}
-
 function describeAttachment(attachment: ResolvedAttachment): string {
   return attachment.selection
     ? `Local file: ${attachment.relativePath} (L${attachment.selection.startLine}-L${attachment.selection.endLine})`
@@ -138,18 +131,24 @@ async function addLocalFileContext(
     return false;
   }
 
-  let raw: string;
-  try {
-    raw = await fs.readFile(attachment.absolutePath, 'utf8');
-  } catch {
-    // The file may have been moved or deleted between attachment and send; skip it rather than fail the whole request.
+  // Re-validate at read time and read at most the per-file cap: the path was
+  // checked when the file was attached, but it may since have been moved,
+  // deleted, or swapped for a symlink that points outside the workspace.
+  // Such a file is skipped rather than failing the whole request.
+  const read = await readValidatedWorkspaceFile(
+    attachment.absolutePath,
+    attachment.workspaceRoot,
+    MAX_LOCAL_FILE_CHARS,
+    attachment.selection
+  );
+  if (!read) {
     return false;
   }
 
-  const selected = attachment.selection ? sliceSelectedLines(raw, attachment.selection) : raw;
-  const normalized = normalizeExtractedText(selected || '(empty file)');
+  const normalized = normalizeExtractedText(read.text || '(empty file)');
   const cap = Math.min(MAX_LOCAL_FILE_CHARS, remainingBudget.value);
-  return pushContext(additionalContext, labels, describeAttachment(attachment), normalized, cap, remainingBudget);
+  const body = read.truncated && normalized.length <= cap ? `${normalized}\n[truncated]` : normalized;
+  return pushContext(additionalContext, labels, describeAttachment(attachment), body, cap, remainingBudget);
 }
 
 export async function buildChatContextPayload(options: ChatContextOptions): Promise<ChatContextPayload> {
