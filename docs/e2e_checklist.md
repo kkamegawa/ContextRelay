@@ -238,6 +238,17 @@ Recommended pre-run settings:
   - Follow-up uses the same conversation.
   - New Conversation clears the visible conversation.
 
+### E2E-33 Plain chat grounds on pinned snippets without `/ask`
+- Status: [ ]
+- Steps:
+  1. Run a search and pin a result with the 📌 button.
+  2. Without typing `/ask`, send a plain chat message asking about the pinned content.
+  3. Unpin the item and send the same message again.
+- Expected:
+  - Step 2: the response reflects the pinned content, and the message shows `Context: 📌 <title>` beneath it.
+  - Step 3: no `Context:` line is shown, and the response is a normal ungrounded chat reply (no error).
+  - `/ask` sent with no pinned snippet and no `#file` mention still aborts with the existing warning.
+
 ---
 
 ## 6. Snippets flow

@@ -19,6 +19,7 @@ const warningMessages: string[] = [];
 const errorMessages: string[] = [];
 const infoMessages: string[] = [];
 const capturedPayloads: Array<unknown> = [];
+const capturedPrompts: string[] = [];
 const workIqRequests: Array<{ token: string; query: string; contextId?: string }> = [];
 let replies: string[] = [];
 let workIqReplies: Array<{ text: string; contextId?: string }> = [];
@@ -116,7 +117,8 @@ suite('ChatViewProvider', () => {
       if (request === '../adapters/chatAdapter') {
         return {
           createConversation: async () => 'conv-1',
-          sendMessage: async (_token: string, _conversationId: string, _prompt: string, payload?: unknown) => {
+          sendMessage: async (_token: string, _conversationId: string, prompt: string, payload?: unknown) => {
+            capturedPrompts.push(prompt);
             capturedPayloads.push(payload);
             return replies.shift() ?? 'stub reply';
           }
@@ -202,6 +204,7 @@ suite('ChatViewProvider', () => {
     errorMessages.length = 0;
     infoMessages.length = 0;
     capturedPayloads.length = 0;
+    capturedPrompts.length = 0;
     workIqRequests.length = 0;
     replies = ['First answer', 'Second answer'];
     workIqReplies = [
@@ -241,7 +244,7 @@ suite('ChatViewProvider', () => {
     }
   });
 
-  test('includes the latest visible result in follow-up Copilot chat context', async () => {
+  test('does not re-send the previous Copilot reply as context on the next turn', async () => {
     const provider = new ChatViewProvider(
       createContext(),
       { getAccessToken: async () => 'token-123' } as never,
@@ -258,29 +261,62 @@ suite('ChatViewProvider', () => {
       additionalContext?: Array<{ description: string; text: string }>;
       labels: string[];
     };
-    assert.ok(secondPayload.additionalContext?.some(item =>
-      item.description === 'Latest visible ContextRelay result' && item.text.includes('First answer')
-    ));
-    assert.ok(secondPayload.labels.includes('Latest visible ContextRelay result'));
+    assert.equal(secondPayload.additionalContext, undefined);
+    assert.deepEqual(secondPayload.labels, []);
+    // The prompt itself must also be untouched (no grounding instruction and
+    // no reference to the previous answer).
+    assert.equal(capturedPrompts[1], 'follow-up prompt');
   });
 
-  test('clearChat removes the latest visible result from future context payloads', async () => {
+  test('plain chat (no /ask) attaches pinned snippets and disables web grounding for that turn', async () => {
     const provider = new ChatViewProvider(
       createContext(),
       { getAccessToken: async () => 'token-123' } as never,
       {} as never
     );
 
-    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('first prompt', []);
-    provider.clearChat();
-    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('after clear', []);
+    await (provider as unknown as { handlePinSnippet(item: unknown): Promise<void> }).handlePinSnippet({
+      source: 'teams',
+      title: 'standup notes',
+      snippet: 'Release is blocked by test failures.',
+      cache: { hit: false }
+    });
 
-    const secondPayload = capturedPayloads[1] as {
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('what is blocking the release?', []);
+
+    assert.equal(capturedPayloads.length, 1);
+    const payload = capturedPayloads[0] as {
       additionalContext?: Array<{ description: string; text: string }>;
+      contextualResources?: { webContext?: { isWebEnabled: boolean } };
       labels: string[];
     };
-    assert.equal(secondPayload.additionalContext, undefined);
-    assert.deepEqual(secondPayload.labels, []);
+    assert.ok(payload.additionalContext?.some(item => item.text.includes('Release is blocked')));
+    assert.ok(payload.labels.some(label => label.startsWith('📌 ')));
+    assert.equal(payload.contextualResources?.webContext?.isWebEnabled, false);
+
+    // The prompt sent to Copilot must carry the grounding instruction ahead
+    // of the user's own request.
+    assert.ok(capturedPrompts[0].startsWith('[ContextRelay grounding]'));
+    assert.ok(capturedPrompts[0].endsWith('what is blocking the release?'));
+  });
+
+  test('plain chat without pins or #file mentions sends the prompt through unchanged', async () => {
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getAccessToken: async () => 'token-123' } as never,
+      {} as never
+    );
+
+    await (provider as unknown as { handlePlainChat(prompt: string, mentionFiles: unknown[]): Promise<void> }).handlePlainChat('hello there', []);
+
+    assert.equal(capturedPayloads.length, 1);
+    const payload = capturedPayloads[0] as {
+      additionalContext?: unknown;
+      contextualResources?: unknown;
+    };
+    assert.equal(payload.additionalContext, undefined);
+    assert.equal(payload.contextualResources, undefined);
+    assert.equal(capturedPrompts[0], 'hello there');
   });
 
   test('ask without pinned snippets surfaces a single guard message and skips Copilot calls', async () => {

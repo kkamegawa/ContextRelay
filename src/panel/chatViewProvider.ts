@@ -16,7 +16,7 @@ import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
 import { type ContextItem, type ContextSource, type ResolvedPreview, getContextItemKey } from '../models/contextItem';
 import { getHelpText, parseCommand } from '../router/commandRouter';
 import { SnippetStore } from '../snippets/snippetStore';
-import { buildChatContextPayload } from './chatContext';
+import { buildChatContextPayload, buildGroundedPrompt } from './chatContext';
 import { isCopilotSupportedFileExtension } from './copilotSupportedExtensions';
 import { buildWorkIqPromptWithFiles, resolveFileMentions, type ResolvedFileMention } from './fileMentions';
 import { buildPreviewWebviewHtml } from './openResult';
@@ -46,7 +46,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = CHAT_VIEW_ID;
 
   private latestSearchSummary?: string;
-  private latestVisibleResult?: string;
   private readonly cache: CacheStore<ContextItem[]>;
   private readonly snippetStore: SnippetStore;
   private readonly docGenerator: DocGenerator;
@@ -136,7 +135,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private resetChatState(): void {
     this.snippetStore.clear();
     this.latestSearchSummary = undefined;
-    this.latestVisibleResult = undefined;
     this.currentConversationId = undefined;
     this.currentWorkIqContextId = undefined;
     this.postMessage({ command: 'clearChat' });
@@ -699,24 +697,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       // Conversation history is preserved by the Copilot Chat API via the
       // conversation id, so we only forward explicit ContextRelay context:
-      // pinned snippets, the latest visible generated result, and the latest
-      // search summary.
+      // pinned snippets and the latest search summary. This applies to both
+      // /ask and plain chat turns alike.
       const contextPayload = buildChatContextPayload({
         snippets,
         searchSummary: this.latestSearchSummary,
-        visibleResult: this.latestVisibleResult,
         localFiles: mentionFiles.map(file => ({
           uri: file.uri,
           label: `Local file: ${file.relativePath}`
         }))
       });
-      const reply = await sendMessage(token, this.currentConversationId, prompt, contextPayload);
+      // additionalContext is only "extra" grounding to Copilot, so when pins
+      // or #file mentions are attached, tell it explicitly to prefer that
+      // context over web/enterprise search results.
+      const groundedPrompt = buildGroundedPrompt(prompt, contextPayload);
+      const reply = await sendMessage(token, this.currentConversationId, groundedPrompt, contextPayload);
       if (!reply.trim()) {
         throw new Error('Microsoft 365 Copilot returned an empty response.');
       }
 
+      // Use the raw prompt (not the grounded one) for output-language
+      // detection so the English grounding instruction doesn't skew it.
       const { content } = detectOutputLanguage(prompt, reply);
-      this.latestVisibleResult = content;
       this.postMessage({
         command: 'assistantMessage',
         kind,

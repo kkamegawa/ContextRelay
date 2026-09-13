@@ -1,5 +1,11 @@
 import { strict as assert } from 'assert';
-import { buildChatContextPayload, MAX_CHAT_CONTEXT_CHARS } from '../../panel/chatContext';
+import {
+  buildChatContextPayload,
+  buildGroundedPrompt,
+  GROUNDING_INSTRUCTION,
+  MAX_CHAT_CONTEXT_CHARS,
+  PINNED_LABEL_PREFIX
+} from '../../panel/chatContext';
 import type { SavedSnippet } from '../../models/contextItem';
 
 function snippet(source: SavedSnippet['item']['source'], name: string, body: string, url?: string): SavedSnippet {
@@ -23,9 +29,10 @@ suite('chatContext', () => {
     assert.equal(payload.additionalContext, undefined);
     assert.equal(payload.contextualResources, undefined);
     assert.deepEqual(payload.labels, []);
+    assert.equal(payload.hasGroundingContext, false);
   });
 
-  test('uses SharePoint and OneDrive snippet URLs as file contextual resources', () => {
+  test('uses SharePoint and OneDrive snippet URLs as file contextual resources and disables web grounding', () => {
     const payload = buildChatContextPayload({
       snippets: [
         snippet('sharepoint', 'spec.docx', 'body', 'https://contoso.sharepoint.com/sites/docs/spec.docx'),
@@ -37,7 +44,12 @@ suite('chatContext', () => {
       { uri: 'https://contoso.sharepoint.com/sites/docs/spec.docx' },
       { uri: 'https://contoso-my.sharepoint.com/personal/docs/plan.docx' }
     ]);
-    assert.deepEqual(payload.labels, ['spec.docx', 'plan.docx']);
+    assert.deepEqual(payload.labels, [
+      `${PINNED_LABEL_PREFIX}spec.docx`,
+      `${PINNED_LABEL_PREFIX}plan.docx`
+    ]);
+    assert.equal(payload.hasGroundingContext, true);
+    assert.equal(payload.contextualResources?.webContext?.isWebEnabled, false);
   });
 
   test('adds local # mention files before snippet URLs and deduplicates by uri', () => {
@@ -58,20 +70,33 @@ suite('chatContext', () => {
     assert.deepEqual(payload.labels, [
       'Local file: spec.docx',
       'Local file: notes.md',
-      'spec.docx'
+      `${PINNED_LABEL_PREFIX}spec.docx`
     ]);
+    assert.equal(payload.hasGroundingContext, true);
   });
 
-  test('uses non-file snippets and visible result as additional context', () => {
+  test('uses non-file snippets as additional context and labels them as pinned', () => {
     const payload = buildChatContextPayload({
-      snippets: [snippet('teams', 'standup', 'Release is blocked by test failures.')],
-      visibleResult: 'Draft answer from the panel'
+      snippets: [snippet('teams', 'standup', 'Release is blocked by test failures.')]
     });
 
-    assert.equal(payload.additionalContext?.length, 2);
+    assert.equal(payload.additionalContext?.length, 1);
     assert.ok(payload.additionalContext?.[0].text.includes('Release is blocked'));
-    assert.ok(payload.additionalContext?.[1].text.includes('Draft answer'));
-    assert.ok(payload.labels.includes('Latest visible ContextRelay result'));
+    assert.deepEqual(payload.labels, [`${PINNED_LABEL_PREFIX}standup`]);
+    assert.equal(payload.hasGroundingContext, true);
+  });
+
+  test('does not enable grounding for a search summary alone', () => {
+    const payload = buildChatContextPayload({
+      snippets: [],
+      searchSummary: 'Found 3 mail results for "budget".'
+    });
+
+    assert.equal(payload.additionalContext?.length, 1);
+    assert.ok(payload.additionalContext?.[0].text.includes('Found 3 mail results'));
+    assert.deepEqual(payload.labels, ['Latest ContextRelay search summary']);
+    assert.equal(payload.hasGroundingContext, false);
+    assert.equal(payload.contextualResources, undefined);
   });
 
   test('caps additional context to the shared budget', () => {
@@ -98,5 +123,21 @@ suite('chatContext', () => {
 
     const original = `Title: huge\nSource: teams\n\n${oversizedBody}`;
     assert.equal(Number(match?.[1]), original.length - suffixIndex);
+  });
+});
+
+suite('buildGroundedPrompt', () => {
+  test('leaves the prompt untouched when there is no grounding context', () => {
+    const prompt = 'What is the capital of France?';
+    assert.equal(buildGroundedPrompt(prompt, { hasGroundingContext: false }), prompt);
+  });
+
+  test('prepends the grounding instruction when pinned/mentioned context is attached', () => {
+    const prompt = 'Summarize the pinned document.';
+    const result = buildGroundedPrompt(prompt, { hasGroundingContext: true });
+
+    assert.ok(result.startsWith(GROUNDING_INSTRUCTION));
+    assert.ok(result.endsWith(prompt));
+    assert.ok(result.includes('[User request]'));
   });
 });
