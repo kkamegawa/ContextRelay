@@ -250,3 +250,9 @@
 - Summary: `/ask` and no-prefix plain chat already shared the same Copilot context-building code, but neither told Copilot to prefer pinned/`#file` context over web and enterprise search. Added an explicit grounding instruction and `contextualResources.webContext.isWebEnabled = false` whenever pinned snippets or `#file` mentions are attached, for both paths. Stopped re-sending the previous Copilot reply as context each turn. Removed the unused `src/panel/askPrompt.ts` prompt builder.
 - Design record: [docs/adr.md](adr.md) — 2026-09-07 entry.
 - Tests: `src/test/suite/chatContext.test.ts`, `src/test/suite/chatViewProvider.test.ts`, `src/test/suite/commandRouter.test.ts`.
+
+### 2026-09-13 — Bump the js-yaml override to 4.3.2
+
+- Issue: [kkamegawa/ContextRelay#236](https://github.com/kkamegawa/ContextRelay/issues/236)
+- Summary: `npm ci` / `npm audit` reported three high-severity findings, all from js-yaml 4.3.1 (GHSA-2883-xcg3-v3hh), reached directly and through `mocha` and `webpack-cli`. Raised `overrides.js-yaml` to 4.3.2 and refreshed `package-lock.json`, which clears all three. Because `precompile` runs `npm run security:check`, this also unblocks `npm run compile`.
+- Tests: `src/test/suite/dependencyVersions.test.ts` (js-yaml override, version floor, and installed-version baselines raised to 4.3.2).
