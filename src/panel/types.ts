@@ -46,6 +46,25 @@ export interface ApplyAssistantResultMessage {
   text: string;
 }
 
+export interface AttachFilesMessage {
+  command: 'attachFiles';
+  /** text/uri-list entries from a drag-and-drop onto the input area. */
+  uris: string[];
+}
+
+export interface AttachFilePickerMessage {
+  command: 'attachFilePicker';
+}
+
+export interface RemoveAttachmentMessage {
+  command: 'removeAttachment';
+  absolutePath: string;
+}
+
+export interface CancelAssistantMessage {
+  command: 'cancelAssistantMessage';
+}
+
 export type WebviewToHostMessage =
   | SubmitQueryMessage
   | WebviewReadyMessage
@@ -53,7 +72,11 @@ export type WebviewToHostMessage =
   | OpenLinkMessage
   | OpenItemMessage
   | CopySnippetMessage
-  | ApplyAssistantResultMessage;
+  | ApplyAssistantResultMessage
+  | AttachFilesMessage
+  | AttachFilePickerMessage
+  | RemoveAttachmentMessage
+  | CancelAssistantMessage;
 
 // --- Messages: Extension host → Webview ---
 
@@ -114,6 +137,45 @@ export interface WorkspaceFilesMessage {
   files: string[];
 }
 
+export interface AttachmentSummary {
+  absolutePath: string;
+  relativePath: string;
+  origin: 'mention' | 'drop' | 'picker' | 'activeEditor';
+}
+
+export interface AttachmentsChangedMessage {
+  command: 'attachmentsChanged';
+  attachments: AttachmentSummary[];
+}
+
+/** Sent once when a streamed Copilot reply starts, before any progress text exists. */
+export interface AssistantMessageStartMessage {
+  command: 'assistantMessageStart';
+  id: string;
+  timestamp: string;
+}
+
+/**
+ * Sent as a streamed reply grows. `text` is the cumulative reply so far
+ * (not a delta) since the Chat API's streamed frames each carry the full
+ * conversation snapshot — renderers should replace, not append.
+ */
+export interface AssistantMessageProgressMessage {
+  command: 'assistantMessageProgress';
+  id: string;
+  text: string;
+}
+
+/** Sent once a streamed reply finishes (or falls back to the synchronous endpoint). */
+export interface AssistantMessageEndMessage {
+  command: 'assistantMessageEnd';
+  id: string;
+  text: string;
+  timestamp: string;
+  kind?: 'info' | 'ask' | 'chat';
+  contextLabels?: string[];
+}
+
 export type HostToWebviewMessage =
   | UserMessageDisplay
   | QueryResultMessage
@@ -123,4 +185,8 @@ export type HostToWebviewMessage =
   | ClearChatMessage
   | AssistantMessage
   | PinnedItemsMessage
-  | WorkspaceFilesMessage;
+  | WorkspaceFilesMessage
+  | AttachmentsChangedMessage
+  | AssistantMessageStartMessage
+  | AssistantMessageProgressMessage
+  | AssistantMessageEndMessage;

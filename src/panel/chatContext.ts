@@ -1,35 +1,40 @@
+import * as fs from 'fs/promises';
 import type { CopilotContextMessage, CopilotContextualResources, SendMessageOptions } from '../adapters/chatAdapter';
 import type { SavedSnippet } from '../models/contextItem';
+import { normalizeExtractedText } from '../textExtraction';
+import type { ResolvedAttachment } from './attachments';
 
 export const MAX_CHAT_CONTEXT_CHARS = 60_000;
+export const MAX_LOCAL_FILE_CHARS = 12_000;
 
 /** Prefix that marks a context label as coming from a pinned snippet. */
 export const PINNED_LABEL_PREFIX = '📌 ';
 
 /**
  * Instruction prepended to the prompt whenever the request carries explicit
- * ContextRelay grounding (pinned snippets or `#` file mentions). The Copilot
+ * ContextRelay grounding (pinned snippets or attached local files). The Copilot
  * Chat API treats `additionalContext` as *extra* grounding and keeps using web
  * and enterprise search, so without this instruction the attached context can
  * be ignored in favor of unrelated sources.
  */
 export const GROUNDING_INSTRUCTION = [
   '[ContextRelay grounding]',
-  'Use the attached context (pinned ContextRelay snippets and mentioned local files) as the',
+  'Use the attached context (pinned ContextRelay snippets and attached local files) as the',
   'primary and authoritative source. Prefer it over web results and enterprise search. If the',
   'attached context does not answer the request, say so explicitly before using other sources.'
 ].join('\n');
 
 export interface ChatContextPayload extends SendMessageOptions {
   labels: string[];
-  /** True when pinned snippets or mentioned local files were attached. */
+  /** True when pinned snippets or attached local files were actually included. */
   hasGroundingContext: boolean;
 }
 
 export interface ChatContextOptions {
   snippets: SavedSnippet[];
   searchSummary?: string;
-  localFiles?: { uri: string; label: string }[];
+  /** Explicitly attached local files — # mentions, drag-and-drop, the attach picker, or the active editor. */
+  attachments?: readonly ResolvedAttachment[];
 }
 
 function buildTruncationSuffix(omittedChars: number): string {
@@ -63,19 +68,26 @@ function isFileContextSnippet(snippet: SavedSnippet): boolean {
     /^https:\/\//i.test(snippet.item.url?.trim() ?? '');
 }
 
-function addTextContext(
+/**
+ * Push a description/text pair onto `additionalContext`, truncating to `cap`
+ * and spending from the shared `remainingBudget`. `cap` may be smaller than
+ * `remainingBudget.value` (e.g. a per-file cap on top of the overall
+ * message budget). Returns whether anything was added.
+ */
+function pushContext(
   additionalContext: CopilotContextMessage[],
   labels: string[],
   description: string,
   text: string,
+  cap: number,
   remainingBudget: { value: number }
 ): boolean {
   const trimmed = text.trim();
-  if (!trimmed || remainingBudget.value <= 0) {
+  if (!trimmed || cap <= 0) {
     return false;
   }
 
-  const truncated = truncateToBudget(trimmed, remainingBudget.value);
+  const truncated = truncateToBudget(trimmed, cap);
   if (!truncated.trim()) {
     return false;
   }
@@ -86,7 +98,61 @@ function addTextContext(
   return true;
 }
 
-export function buildChatContextPayload(options: ChatContextOptions): ChatContextPayload {
+function addTextContext(
+  additionalContext: CopilotContextMessage[],
+  labels: string[],
+  description: string,
+  text: string,
+  remainingBudget: { value: number }
+): boolean {
+  return pushContext(additionalContext, labels, description, text, remainingBudget.value, remainingBudget);
+}
+
+function sliceSelectedLines(content: string, selection: { startLine: number; endLine: number }): string {
+  const lines = content.split(/\r\n|\n/);
+  const start = Math.max(0, selection.startLine - 1);
+  const end = Math.min(lines.length, selection.endLine);
+  return lines.slice(start, end).join('\n');
+}
+
+function describeAttachment(attachment: ResolvedAttachment): string {
+  return attachment.selection
+    ? `Local file: ${attachment.relativePath} (L${attachment.selection.startLine}-L${attachment.selection.endLine})`
+    : `Local file: ${attachment.relativePath}`;
+}
+
+/**
+ * Read an attached local file's content (or the selected line range) and add
+ * it to `additionalContext`. Unlike SharePoint/OneDrive files, local files
+ * cannot be passed by reference in `contextualResources.files` — that field
+ * is documented as OneDrive/SharePoint URIs only — so the content is read
+ * and inlined as text here instead. Returns whether anything was added.
+ */
+async function addLocalFileContext(
+  additionalContext: CopilotContextMessage[],
+  labels: string[],
+  attachment: ResolvedAttachment,
+  remainingBudget: { value: number }
+): Promise<boolean> {
+  if (remainingBudget.value <= 0) {
+    return false;
+  }
+
+  let raw: string;
+  try {
+    raw = await fs.readFile(attachment.absolutePath, 'utf8');
+  } catch {
+    // The file may have been moved or deleted between attachment and send; skip it rather than fail the whole request.
+    return false;
+  }
+
+  const selected = attachment.selection ? sliceSelectedLines(raw, attachment.selection) : raw;
+  const normalized = normalizeExtractedText(selected || '(empty file)');
+  const cap = Math.min(MAX_LOCAL_FILE_CHARS, remainingBudget.value);
+  return pushContext(additionalContext, labels, describeAttachment(attachment), normalized, cap, remainingBudget);
+}
+
+export async function buildChatContextPayload(options: ChatContextOptions): Promise<ChatContextPayload> {
   const additionalContext: CopilotContextMessage[] = [];
   const contextualResources: CopilotContextualResources = {};
   const files: { uri: string }[] = [];
@@ -95,16 +161,12 @@ export function buildChatContextPayload(options: ChatContextOptions): ChatContex
   const remainingBudget = { value: MAX_CHAT_CONTEXT_CHARS };
   let hasGroundingContext = false;
 
-  for (const file of options.localFiles ?? []) {
-    const uri = file.uri.trim();
-    if (!uri || seenFileUris.has(uri)) {
-      continue;
+  // Explicit attachments come first — attaching a file is always a deliberate
+  // user action, so it gets the budget before pinned snippets.
+  for (const attachment of options.attachments ?? []) {
+    if (await addLocalFileContext(additionalContext, labels, attachment, remainingBudget)) {
+      hasGroundingContext = true;
     }
-
-    seenFileUris.add(uri);
-    files.push({ uri });
-    labels.push(file.label);
-    hasGroundingContext = true;
   }
 
   for (const snippet of options.snippets) {
@@ -151,7 +213,7 @@ export function buildChatContextPayload(options: ChatContextOptions): ChatContex
 
   if (hasGroundingContext) {
     // Turn off web search grounding for this turn so Copilot answers from the
-    // attached ContextRelay context (pins / #file mentions) plus enterprise
+    // attached ContextRelay context (pins / attached files) plus enterprise
     // search, instead of drifting to unrelated web results.
     contextualResources.webContext = { isWebEnabled: false };
   }
@@ -166,7 +228,7 @@ export function buildChatContextPayload(options: ChatContextOptions): ChatContex
 
 /**
  * Prefix the user's prompt with an explicit grounding instruction whenever the
- * request carries pinned snippets or `#` file mentions. Leaves the prompt
+ * request carries pinned snippets or attached local files. Leaves the prompt
  * untouched otherwise, and never affects the raw prompt used for the
  * user-facing transcript or output-language detection.
  */

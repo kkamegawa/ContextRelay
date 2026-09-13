@@ -2,7 +2,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
 import { normalizeExtractedText } from '../textExtraction';
+import { type ResolvedAttachment } from './attachments';
 import { isCopilotSupportedFileExtension } from './copilotSupportedExtensions';
+import { resolveWorkspaceFile, toDisplayRelativePath } from './workspacePath';
 
 const FILE_MENTION_PATTERN = /(^|\s)#(?:"([^"]+)"|'([^']+)'|([^\s#]+))/g;
 const ONLY_DIGITS_PATTERN = /^\d+$/;
@@ -17,16 +19,9 @@ export interface FileMentionCandidate {
   removeEnd: number;
 }
 
-export interface ResolvedFileMention {
-  absolutePath: string;
-  workspaceRoot: string;
-  relativePath: string;
-  uri: string;
-}
-
 export interface ResolveFileMentionResult {
   cleanedPrompt: string;
-  files: ResolvedFileMention[];
+  files: ResolvedAttachment[];
   errors: string[];
 }
 
@@ -87,7 +82,7 @@ export async function resolveFileMentions(
   }
 
   const normalizedRoots = await Promise.all(workspaceRoots.map(root => fs.realpath(root)));
-  const files: ResolvedFileMention[] = [];
+  const files: ResolvedAttachment[] = [];
   const errors: string[] = [];
   const seenUris = new Set<string>();
 
@@ -108,7 +103,8 @@ export async function resolveFileMentions(
       absolutePath: match.canonicalPath,
       workspaceRoot: match.workspaceRoot,
       relativePath: toDisplayRelativePath(match.workspaceRoot, match.canonicalPath),
-      uri
+      uri,
+      origin: 'mention'
     });
   }
 
@@ -121,7 +117,7 @@ export async function resolveFileMentions(
 
 export async function buildWorkIqPromptWithFiles(
   prompt: string,
-  files: readonly ResolvedFileMention[]
+  files: readonly ResolvedAttachment[]
 ): Promise<string> {
   if (files.length === 0) {
     return prompt;
@@ -212,43 +208,19 @@ async function resolveCandidatePath(
   workspaceRoots: readonly string[],
   preferredRoot?: string
 ): Promise<FileMatch | string> {
-  const stat = await safeStat(candidatePath);
-  if (!stat || !stat.isFile()) {
-    return `File not found for #${candidatePath}.`;
-  }
-
-  const canonicalPath = await fs.realpath(candidatePath);
-  const workspaceRoot = preferredRoot ?? findContainingWorkspaceRoot(canonicalPath, workspaceRoots);
-  if (!workspaceRoot) {
-    return `File #${candidatePath} is outside the opened workspace.`;
-  }
-
-  if (!isPathWithinRoot(canonicalPath, workspaceRoot)) {
-    return `File #${candidatePath} is outside the opened workspace.`;
+  const resolved = await resolveWorkspaceFile(candidatePath, workspaceRoots, {
+    preferredRoot,
+    label: `#${candidatePath}`
+  });
+  if (typeof resolved === 'string') {
+    return resolved;
   }
 
   return {
     candidatePath,
-    workspaceRoot,
-    canonicalPath
+    workspaceRoot: resolved.workspaceRoot,
+    canonicalPath: resolved.canonicalPath
   };
-}
-
-function findContainingWorkspaceRoot(candidatePath: string, workspaceRoots: readonly string[]): string | undefined {
-  return workspaceRoots.find(root => isPathWithinRoot(candidatePath, root));
-}
-
-function isPathWithinRoot(candidatePath: string, workspaceRoot: string): boolean {
-  const relative = path.relative(workspaceRoot, candidatePath);
-  if (relative === '') {
-    return true;
-  }
-  return !relative.startsWith('..') && !path.isAbsolute(relative);
-}
-
-function toDisplayRelativePath(workspaceRoot: string, absolutePath: string): string {
-  const relative = path.relative(workspaceRoot, absolutePath);
-  return relative.split(path.sep).join('/');
 }
 
 function truncateForBudget(value: string, budget: number): string {
@@ -264,13 +236,5 @@ function truncateForBudget(value: string, budget: number): string {
     return suffix.slice(0, budget);
   }
   return `${value.slice(0, budget - suffix.length)}${suffix}`;
-}
-
-async function safeStat(candidatePath: string): Promise<import('fs').Stats | undefined> {
-  try {
-    return await fs.stat(candidatePath);
-  } catch {
-    return undefined;
-  }
 }
 

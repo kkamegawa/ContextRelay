@@ -250,3 +250,10 @@
 - Summary: `/ask` and no-prefix plain chat already shared the same Copilot context-building code, but neither told Copilot to prefer pinned/`#file` context over web and enterprise search. Added an explicit grounding instruction and `contextualResources.webContext.isWebEnabled = false` whenever pinned snippets or `#file` mentions are attached, for both paths. Stopped re-sending the previous Copilot reply as context each turn. Removed the unused `src/panel/askPrompt.ts` prompt builder.
 - Design record: [docs/adr.md](adr.md) — 2026-09-07 entry.
 - Tests: `src/test/suite/chatContext.test.ts`, `src/test/suite/chatViewProvider.test.ts`, `src/test/suite/commandRouter.test.ts`.
+
+### 2026-09-13 — Inline local file content, attachment UX, and streaming (supersedes PR #209)
+
+- Issue: [kkamegawa/ContextRelay#208](https://github.com/kkamegawa/ContextRelay/issues/208)
+- Summary: Rebuilt the design-independent parts of PR #209 on top of the #232 grounding model. Attached local files are now read and inlined into `additionalContext` instead of being sent as unsupported `file://` URIs. Added drag and drop, the 📎 picker, opt-in active-editor auto-attach, and `chatOverStream` streaming with a safe fallback. Every attachment source grounds the turn and satisfies the `/ask` guard. PR #209's `/ask` redefinition was not adopted.
+- Design record: [docs/adr.md](adr.md) — 2026-09-13 entry.
+- Tests: `src/test/suite/chatContext.test.ts`, `src/test/suite/chatViewProvider.test.ts`, `src/test/suite/attachments.test.ts`, `src/test/suite/sseParser.test.ts`, `src/test/suite/chatAdapter.test.ts`.
