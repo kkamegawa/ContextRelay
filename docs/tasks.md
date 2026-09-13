@@ -257,3 +257,10 @@
 - Summary: Rebuilt the design-independent parts of PR #209 on top of the #232 grounding model. Attached local files are now read and inlined into `additionalContext` instead of being sent as unsupported `file://` URIs. Added drag and drop, the 📎 picker, opt-in active-editor auto-attach, and `chatOverStream` streaming with a safe fallback. Every attachment source grounds the turn and satisfies the `/ask` guard. PR #209's `/ask` redefinition was not adopted.
 - Design record: [docs/adr.md](adr.md) — 2026-09-13 entry.
 - Tests: `src/test/suite/chatContext.test.ts`, `src/test/suite/chatViewProvider.test.ts`, `src/test/suite/attachments.test.ts`, `src/test/suite/sseParser.test.ts`, `src/test/suite/chatAdapter.test.ts`.
+
+### 2026-09-14 — Raise the js-yaml override to 4.3.2 (GHSA-2883-xcg3-v3hh)
+
+- Issue: [kkamegawa/ContextRelay#236](https://github.com/kkamegawa/ContextRelay/issues/236)
+- Summary: `npm audit --audit-level=moderate` reported three high-severity findings, all from js-yaml 4.3.1 (GHSA-2883-xcg3-v3hh), reached directly and through `mocha` and `webpack-cli`. Raised `overrides.js-yaml` to 4.3.2, the newest 24h-eligible 4.x release, and refreshed `package-lock.json`, which clears all three and unblocks `npm run compile` and `npm run package` (both run `npm run security:check` first). Supersedes PR #238, which conflicts with `main`.
+- Design record: [docs/adr.md](adr.md) — 2026-09-14 entry.
+- Tests: `src/test/suite/dependencyVersions.test.ts` (js-yaml override baseline, version floor, and installed-version baseline raised to 4.3.2).
