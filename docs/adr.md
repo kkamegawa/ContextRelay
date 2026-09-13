@@ -37,6 +37,13 @@
 - Reason: The user chose the #232 grounding model as the baseline and asked to keep the parts of #209 that do not change it. Without the inline file fix, `#file` grounding from 2026-09-07 never delivered file content to Copilot.
 - Compatibility: With `contextRelay.chat.attachActiveEditor` enabled, every Copilot message sent while a workspace file is open is grounded on that file; the setting is off by default. Consistent with the 2026-09-07 entry, which this entry extends rather than reverses.
 
+## 2026-09-14 - Raise the js-yaml override to 4.3.2 to clear GHSA-2883-xcg3-v3hh
+
+- Task: Issue #236 (supersedes PR #238, which conflicts with `main` after #237).
+- Decision: Raise `overrides.js-yaml` from 4.3.1 to 4.3.2, refresh `package-lock.json`, and raise the js-yaml override baseline, version floor, and installed-version baseline in `dependencyVersions.test.ts` to 4.3.2.
+- Reason: `npm audit --audit-level=moderate` reports three high-severity findings with a single root cause: js-yaml 4.0.0-4.3.1 is affected by GHSA-2883-xcg3-v3hh (`maxTotalMergeKeys` does not limit CPU use for empty merge sources). `mocha` and `webpack-cli` appear only as transitive paths to js-yaml. Because `precompile` and `prepackage` run `npm run security:check`, `npm run compile` and `npm run package` fail until the finding is cleared. 4.3.2 is the newest js-yaml 4.x release, is past the 24-hour publication policy, is not deprecated, and is the first release outside the affected range.
+- Compatibility: Patch update within the existing 4.x major version, which satisfies both `mocha` (dependency range `^4.1.0`) and `webpack-cli` (optional peer range `^4.0.0 || ^5.0.0`), so no direct dependency changes are required. js-yaml 5.x is not adopted because it is outside the range `mocha` declares. Consistent with the 2026-08-10 and 2026-09-07 (VS Code baseline) entries, which keep security remediations within existing major versions and guard them with version floors.
+
 ## 2026-09-14 - Unit-test the webview DOM classes with happy-dom
 
 - Task: Issue #210 (sub-issues #211-#215).

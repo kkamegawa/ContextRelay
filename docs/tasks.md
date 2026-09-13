@@ -258,9 +258,16 @@
 - Design record: [docs/adr.md](adr.md) — 2026-09-13 entry.
 - Tests: `src/test/suite/chatContext.test.ts`, `src/test/suite/chatViewProvider.test.ts`, `src/test/suite/attachments.test.ts`, `src/test/suite/sseParser.test.ts`, `src/test/suite/chatAdapter.test.ts`.
 
+### 2026-09-14 — Raise the js-yaml override to 4.3.2 (GHSA-2883-xcg3-v3hh)
+
+- Issue: [kkamegawa/ContextRelay#236](https://github.com/kkamegawa/ContextRelay/issues/236)
+- Summary: `npm audit --audit-level=moderate` reported three high-severity findings, all from js-yaml 4.3.1 (GHSA-2883-xcg3-v3hh), reached directly and through `mocha` and `webpack-cli`. Raised `overrides.js-yaml` to 4.3.2, the newest 24h-eligible 4.x release, and refreshed `package-lock.json`, which clears all three and unblocks `npm run compile` and `npm run package` (both run `npm run security:check` first). Supersedes PR #238, which conflicts with `main`.
+- Design record: [docs/adr.md](adr.md) — 2026-09-14 entry.
+- Tests: `src/test/suite/dependencyVersions.test.ts` (js-yaml override baseline, version floor, and installed-version baseline raised to 4.3.2).
+
 ### 2026-09-14 — DOM/webview unit testing infrastructure
 
 - Issue: [kkamegawa/ContextRelay#210](https://github.com/kkamegawa/ContextRelay/issues/210), with sub-issues [#211](https://github.com/kkamegawa/ContextRelay/issues/211), [#212](https://github.com/kkamegawa/ContextRelay/issues/212), [#213](https://github.com/kkamegawa/ContextRelay/issues/213), [#214](https://github.com/kkamegawa/ContextRelay/issues/214), and [#215](https://github.com/kkamegawa/ContextRelay/issues/215)
 - Summary: Added `happy-dom` and a shared DOM test utility that loads the production panel HTML into a locked-down happy-dom window. Added unit tests for `ChatRenderer` (messages, streaming, result cards, pin state, loading, errors, and `clear()`), `HashMenu`, and the `SlashMenu` DOM class. Raised `engines.node` to `>=22.12.0` for `require(esm)`.
-- Design record: [docs/adr.md](adr.md) — 2026-09-14 entry. Plan: [Wiki — Add DOM/Webview Unit Testing Infrastructure](https://github.com/kkamegawa/ContextRelay/wiki/dom-webview-test-infrastructure).
+- Design record: [docs/adr.md](adr.md) — 2026-09-14 entry "Unit-test the webview DOM classes with happy-dom". Plan: [Wiki — Add DOM/Webview Unit Testing Infrastructure](https://github.com/kkamegawa/ContextRelay/wiki/dom-webview-test-infrastructure).
 - Tests: `src/test/suite/domTestUtils.test.ts`, `src/test/suite/chatRenderer.test.ts`, `src/test/suite/hashMenu.test.ts`, `src/test/suite/slashMenu.test.ts`, `src/test/suite/dependencyVersions.test.ts`.
