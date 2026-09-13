@@ -2,7 +2,7 @@
   "compilerOptions": {
     "module": "CommonJS",
     "target": "ES2020",
-    "lib": ["ES2020"],
+    "lib": ["ES2020", "DOM"],
     "outDir": "./out-test",
     "rootDir": ".",
     "strict": true,
@@ -13,5 +13,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", "src/webview/**/*"]
+  "exclude": ["node_modules"]
 }

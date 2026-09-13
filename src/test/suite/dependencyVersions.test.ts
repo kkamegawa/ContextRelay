@@ -390,6 +390,23 @@ suite('Dependency security baselines', () => {
     );
   });
 
+  test('keeps happy-dom on a release with the VM context escape fix', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+    const declaredVersion = packageJson.devDependencies?.['happy-dom'];
+    const installedVersion = packageLockJson.packages?.['node_modules/happy-dom']?.version;
+
+    // GHSA-37j7-fg3j-429f (VM context escape leading to RCE) affects happy-dom before 20.0.0.
+    assert.ok(
+      compareVersions(declaredVersion, '20.0.0') >= 0,
+      `happy-dom must stay on 20.0.0 or newer (found: ${declaredVersion ?? 'missing'})`
+    );
+    assert.ok(
+      compareVersions(installedVersion, '20.0.0') >= 0,
+      `installed happy-dom must stay on 20.0.0 or newer (found: ${installedVersion ?? 'missing'})`
+    );
+  });
+
   test('locks installed glob, diff, fast-uri, and browserslist versions outside known vulnerable ranges', () => {
     const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
 
