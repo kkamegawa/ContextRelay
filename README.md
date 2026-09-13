@@ -51,7 +51,7 @@ Summarize #docs/plan.md
 
 ## Requirements
 
-- Node.js 22 or later for local development and validation from source
+- Node.js 22.12 or later for local development and validation from source
 - [Visual Studio Code](https://code.visualstudio.com/) 1.85 or later
 - A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
 - **For Exchange Mail, Teams, SharePoint, OneDrive, OneNote, Planner, and Microsoft To Do search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
@@ -120,7 +120,7 @@ The following delegated Microsoft Graph permissions are required by feature:
 ### From Source
 
 1. Clone this repository.
-2. Use Node.js 22 or later. If you use `nvm`, run:
+2. Use Node.js 22.12 or later. If you use `nvm`, run:
 
    ```bash
    nvm use

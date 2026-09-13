@@ -43,3 +43,15 @@
 - Decision: Raise `overrides.js-yaml` from 4.3.1 to 4.3.2, refresh `package-lock.json`, and raise the js-yaml override baseline, version floor, and installed-version baseline in `dependencyVersions.test.ts` to 4.3.2.
 - Reason: `npm audit --audit-level=moderate` reports three high-severity findings with a single root cause: js-yaml 4.0.0-4.3.1 is affected by GHSA-2883-xcg3-v3hh (`maxTotalMergeKeys` does not limit CPU use for empty merge sources). `mocha` and `webpack-cli` appear only as transitive paths to js-yaml. Because `precompile` and `prepackage` run `npm run security:check`, `npm run compile` and `npm run package` fail until the finding is cleared. 4.3.2 is the newest js-yaml 4.x release, is past the 24-hour publication policy, is not deprecated, and is the first release outside the affected range.
 - Compatibility: Patch update within the existing 4.x major version, which satisfies both `mocha` (dependency range `^4.1.0`) and `webpack-cli` (optional peer range `^4.0.0 || ^5.0.0`), so no direct dependency changes are required. js-yaml 5.x is not adopted because it is outside the range `mocha` declares. Consistent with the 2026-08-10 and 2026-09-07 (VS Code baseline) entries, which keep security remediations within existing major versions and guard them with version floors.
+
+## 2026-09-14 - Unit-test the webview DOM classes with happy-dom
+
+- Task: Issue #210 (sub-issues #211-#215).
+- Decision:
+  - Use `happy-dom` (`^20.14.5`) as the DOM implementation for unit tests instead of `jsdom`, whose `whatwg-encoding` dependency is blocked by `dependencyVersions.test.ts`. The declared and installed versions are checked against a floor of 20.0.0 (GHSA-37j7-fg3j-429f) rather than an exact baseline.
+  - Raise `engines.node` from `>=22.0.0` to `>=22.12.0`. `happy-dom` ships only as an ES module, and the CommonJS test build loads it through `require(esm)`, which Node.js enables without a flag from 22.12.
+  - Keep a single `tsconfig.test.json`, now with the `DOM` lib and including `src/webview`.
+  - Load the production panel HTML from `ChatViewProvider.getHtmlForWebview()` into a happy-dom window with JavaScript evaluation, script, stylesheet, and frame loading, and navigation disabled. The provider is loaded with a minimal `vscode` stub, and the module cache entries added by that load are removed so `chatViewProvider.test.ts` keeps loading the provider with its own stubs.
+  - Add no DOM API stubs. happy-dom implements `scrollIntoView`, `requestAnimationFrame`, `KeyboardEvent`, and `click()`.
+- Reason: `ChatRenderer`, `HashMenu`, and `SlashMenu` had no automated coverage, so webview regressions such as the `dragleave` bug found on PR #209 could not be covered by a test.
+- Compatibility: Local development and `npm test` need Node.js 22.12 or later. `.nvmrc` (`22`) already resolves to a newer 22.x release, and the extension itself runs on the Node.js bundled with VS Code. No production code changed. Consistent with the 2026-08-10 and 2026-09-07 dependency entries: the floor does not add another exact-match baseline for Dependabot updates to break.
