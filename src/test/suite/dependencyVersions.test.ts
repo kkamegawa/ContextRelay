@@ -317,6 +317,17 @@ suite('Dependency security baselines', () => {
     );
   });
 
+  test('declares Node 22.12+ so the CommonJS tests can require the ESM-only happy-dom', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const nodeEngine = packageJson.engines?.node;
+
+    // require(esm) is available without a flag from Node.js 22.12.
+    assert.ok(
+      compareVersions(nodeEngine, '22.12.0') >= 0,
+      `package.json must require Node.js 22.12 or later to load happy-dom through require(esm) (found: ${nodeEngine ?? 'missing'})`
+    );
+  });
+
   test('keeps @types/vscode aligned with engines.vscode', () => {
     const packageJson = readRepoJson<PackageJson>('package.json');
     const vscodeTypesVersion = packageJson.devDependencies?.['@types/vscode'];
@@ -387,6 +398,23 @@ suite('Dependency security baselines', () => {
     assert.ok(
       compareVersions(nanoidVersion, '3.3.18') >= 0,
       `installed nanoid must stay on 3.3.18 or newer (found: ${nanoidVersion ?? 'missing'})`
+    );
+  });
+
+  test('keeps happy-dom on a release with the VM context escape fix', () => {
+    const packageJson = readRepoJson<PackageJson>('package.json');
+    const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
+    const declaredVersion = packageJson.devDependencies?.['happy-dom'];
+    const installedVersion = packageLockJson.packages?.['node_modules/happy-dom']?.version;
+
+    // GHSA-37j7-fg3j-429f (VM context escape leading to RCE) affects happy-dom before 20.0.0.
+    assert.ok(
+      compareVersions(declaredVersion, '20.0.0') >= 0,
+      `happy-dom must stay on 20.0.0 or newer (found: ${declaredVersion ?? 'missing'})`
+    );
+    assert.ok(
+      compareVersions(installedVersion, '20.0.0') >= 0,
+      `installed happy-dom must stay on 20.0.0 or newer (found: ${installedVersion ?? 'missing'})`
     );
   });
 
