@@ -224,7 +224,7 @@ suite('Dependency security baselines', () => {
       {
         label: '@types/node',
         actual: packageJson.devDependencies?.['@types/node'],
-        expected: '^26.4.1',
+        expected: '^26.6.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -521,7 +521,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @types/node',
         actual: packageLockJson.packages?.['node_modules/@types/node']?.version,
-        expected: '26.4.1',
+        expected: '26.6.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
