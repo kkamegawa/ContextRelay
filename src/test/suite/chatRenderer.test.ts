@@ -50,6 +50,24 @@ suite('ChatRenderer', () => {
     return all('button', root).map(button => button.textContent ?? '');
   }
 
+  interface WelcomeSnapshot {
+    heading: string;
+    paragraphs: string[];
+    fontSizes: string[];
+    codes: string[];
+  }
+
+  function describeWelcome(welcome: HTMLElement): WelcomeSnapshot {
+    const paragraphs = all('p', welcome);
+
+    return {
+      heading: one('h2', welcome).textContent ?? '',
+      paragraphs: paragraphs.map(paragraph => paragraph.textContent ?? ''),
+      fontSizes: paragraphs.map(paragraph => paragraph.style.fontSize),
+      codes: all('code', welcome).map(code => code.textContent ?? '')
+    };
+  }
+
   suite('messages', () => {
     test('renders a user message as text and removes the welcome block', () => {
       assert.ok(dom.document.getElementById('welcome'), 'the panel starts with the welcome block');
@@ -342,6 +360,24 @@ suite('ChatRenderer', () => {
 
       renderer.renderUserMessage('Hello again', TIMESTAMP);
       assert.equal(dom.document.getElementById('welcome'), null);
+    });
+
+    test('clear() rebuilds the welcome block with the text shipped in the panel HTML', () => {
+      const initial = describeWelcome(one('#welcome'));
+
+      renderer.renderUserMessage('Hello', TIMESTAMP);
+      renderer.clear();
+
+      // The initial block is rendered by the extension host and the rebuilt one
+      // by the webview; both read the same shared welcome text.
+      assert.deepEqual(describeWelcome(one('#welcome')), initial);
+    });
+
+    test('the welcome block says pinned context is attached automatically', () => {
+      const hints = describeWelcome(one('#welcome')).paragraphs.join(' ');
+
+      assert.match(hints, /grounding context automatically/);
+      assert.match(hints, /Use \/ask to require that context before sending\./);
     });
   });
 });

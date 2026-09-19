@@ -399,3 +399,16 @@ VS Code 1.85 is chosen to ensure stable support for all required APIs with recen
 7. [Search Teams chat messages](https://learn.microsoft.com/en-us/graph/search-concept-chat-messages)
 8. [VS Code Microsoft auth provider](https://github.com/microsoft/vscode/blob/main/extensions/microsoft-authentication/README.md)
 9. [VS Code Copilot Chat context](https://code.visualstudio.com/docs/copilot/chat/copilot-chat-context)
+
+---
+
+## Appendix C: Documentation set
+
+| Document | Language | Content |
+|---|---|---|
+| `README.md` | English | Features, requirements, permissions, installation, configuration, sign-in troubleshooting, and usage. The English README is the source of truth. |
+| `README_ja.md` | Japanese | Full translation of `README.md`, with the same heading structure, tables, and code blocks, so both can be reviewed side by side. |
+| `SECURITY.md` / `LICENSE` | English only | Never translated. |
+| `docs/*.md` | English, with `_ja` variants where a Japanese audience needs them | Design plan, tasks, test plan, ADR, Work IQ setup, and tenant admin material. |
+
+The panel's own user-facing text (welcome block, slash menu, help text, guard warnings) is English and lives in the source, not in these documents. The welcome block is defined once in `src/chatWelcomeText.ts` and rendered by both the extension host and the webview.

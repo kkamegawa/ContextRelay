@@ -34,6 +34,34 @@ import { normalizeSafeExternalUrl } from './safeExternalUrl';
 import { buildSearchSummary, type SearchSummaryResult } from './searchSummary';
 import { type HostToWebviewMessage, type WebviewToHostMessage } from './types';
 import { CHAT_EDITOR_PANEL_ID, CHAT_VIEW_ID } from './chatViewConstants';
+import {
+  CHAT_WELCOME_COMMANDS_HINT,
+  CHAT_WELCOME_GROUNDING_HINT,
+  CHAT_WELCOME_HEADING,
+  CHAT_WELCOME_HINT_FONT_SIZE,
+  CHAT_WELCOME_INTRO,
+  type WelcomeTextSegment
+} from '../chatWelcomeText';
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Render one welcome paragraph from the shared welcome text. The webview
+ * rebuilds the same paragraphs as DOM nodes in ChatRenderer.clear().
+ */
+function renderWelcomeParagraph(segments: WelcomeTextSegment[], style?: string): string {
+  const inner = segments
+    .map(segment => (segment.code ? `<code>${escapeHtml(segment.text)}</code>` : escapeHtml(segment.text)))
+    .join('');
+  return style ? `<p style="${style}">${inner}</p>` : `<p>${inner}</p>`;
+}
 
 type ChatHostKind = 'sidebar' | 'editor';
 
@@ -1900,10 +1928,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   <div id="app">
     <div id="chatArea" role="log" aria-live="polite" aria-label="Chat messages">
       <div class="welcome" id="welcome">
-        <h2>ContextRelay</h2>
-        <p>Chat with Microsoft 365 Copilot, or search Microsoft 365 context with slash commands.</p>
-        <p style="font-size: 0.8em;">Type <code>/</code> for source search commands. Use <code>#path/to/file</code> (or <code>#"path with spaces"</code>) to attach local workspace files to Copilot and /workiq prompts.</p>
-        <p style="font-size: 0.8em;">Pinned snippets and attached files (<code>#file</code>, 📎, or drag &amp; drop) are sent to Microsoft 365 Copilot as grounding context automatically. Use <code>/ask</code> to require that context before sending.</p>
+        <h2>${escapeHtml(CHAT_WELCOME_HEADING)}</h2>
+        ${renderWelcomeParagraph(CHAT_WELCOME_INTRO)}
+        ${renderWelcomeParagraph(CHAT_WELCOME_COMMANDS_HINT, `font-size: ${CHAT_WELCOME_HINT_FONT_SIZE};`)}
+        ${renderWelcomeParagraph(CHAT_WELCOME_GROUNDING_HINT, `font-size: ${CHAT_WELCOME_HINT_FONT_SIZE};`)}
       </div>
     </div>
 

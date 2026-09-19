@@ -64,6 +64,16 @@ suite('SlashMenu (DOM)', () => {
     assert.ok(rows()[0].querySelector('.slash-desc')?.textContent);
   });
 
+  test('describes /ask as a guard, not as the only way to use pinned context', () => {
+    const askRow = rows()[ALL_COMMANDS.indexOf('/ask')];
+
+    assert.equal(askRow.querySelector('.slash-label')?.textContent, '/ask');
+    assert.equal(
+      askRow.querySelector('.slash-desc')?.textContent,
+      'Ask Microsoft 365 Copilot, but only when pinned snippets or attached files are present'
+    );
+  });
+
   test('filters commands by the typed prefix, ignoring case', () => {
     assert.equal(menu.update('/t'), true);
     assert.deepEqual(commands(), ['/teams', '/task']);
