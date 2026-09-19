@@ -608,7 +608,7 @@ Use the built-in commands to hand off context to GitHub Copilot:
 
 Attach `HANDOFF.md` in Copilot Chat using VS Code's context mechanisms (#-mentions / Add Context).
 
-### `/ask` — Require pinned snippets before asking Microsoft 365 Copilot
+### `/ask` — Require pinned snippets or attached files before asking Microsoft 365 Copilot
 
 Plain chat (see [Chatting and Searching](#chatting-and-searching)) already attaches pinned snippets and attached files automatically, so `/ask` is **optional**. Use `/ask` when you want ContextRelay to refuse to send the message unless that context is present — useful as a guardrail before an unattended or scripted prompt.
 
