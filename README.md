@@ -1,12 +1,14 @@
 # ContextRelay
 
-ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. Plain text starts a Microsoft 365 Copilot chat without automatically attaching ContextRelay search context, while slash commands search Exchange mail, Teams messages, SharePoint sites, OneDrive, OneNote, and Planner tasks. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
+[日本語版 README](README_ja.md)
+
+ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. Plain text starts a Microsoft 365 Copilot chat: ContextRelay does not run a Microsoft 365 search for it, but any pinned snippets and attached files are sent along as grounding context automatically. Slash commands search Exchange mail, Teams messages, SharePoint sites, OneDrive, OneNote, and Planner tasks. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
 
 ---
 
 ## Features
 
-- **Plain Copilot chat** -- Type without a slash command to chat directly with Microsoft 365 Copilot in the panel.
+- **Plain Copilot chat** -- Type without a slash command to chat directly with Microsoft 365 Copilot in the panel. Pinned snippets and attached files are attached as grounding context automatically; `/ask` is the optional guard that refuses to send when none are present.
 - **Local file attachments** -- Attach local workspace files (Copilot-supported extensions only) with `#` mentions, the 📎 button, drag and drop, or the opt-in active editor. File content is sent to plain Copilot chat and `/ask` as grounding context; `#` mentions also work with `/workiq`.
 - **Streaming replies** -- Microsoft 365 Copilot replies render incrementally, with a Stop button to cancel.
 - **Explicit source search** -- Search across connected Microsoft 365 sources with slash commands.

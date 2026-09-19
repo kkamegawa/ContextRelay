@@ -8,6 +8,14 @@
 import { getSourceInlineSvg, getSourceLabel, getSourceTextIcon } from '../sourcePresentation';
 import { canOpenResult } from '../models/contextItem';
 import { formatAssistantMessageAsHtml, hasRichTextFormatting } from './assistantMessageFormatting';
+import {
+  CHAT_WELCOME_COMMANDS_HINT,
+  CHAT_WELCOME_GROUNDING_HINT,
+  CHAT_WELCOME_HEADING,
+  CHAT_WELCOME_HINT_FONT_SIZE,
+  CHAT_WELCOME_INTRO,
+  type WelcomeTextSegment
+} from '../chatWelcomeText';
 
 interface ContextItem {
   source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';
@@ -448,50 +456,37 @@ export class ChatRenderer {
     welcome.className = 'welcome';
     welcome.id = 'welcome';
     const heading = document.createElement('h2');
-    heading.textContent = 'ContextRelay';
+    heading.textContent = CHAT_WELCOME_HEADING;
     welcome.appendChild(heading);
 
-    const intro = document.createElement('p');
-    intro.textContent = 'Chat with Microsoft 365 Copilot, or search Microsoft 365 context with slash commands.';
-    welcome.appendChild(intro);
-
-    const commandsHint = document.createElement('p');
-    commandsHint.style.fontSize = '0.8em';
-    commandsHint.appendChild(document.createTextNode('Type '));
-    const slashCode = document.createElement('code');
-    slashCode.textContent = '/';
-    commandsHint.appendChild(slashCode);
-    commandsHint.appendChild(document.createTextNode(' for available commands, combine source commands like '));
-    const comboCode = document.createElement('code');
-    comboCode.textContent = '/mail /onedrive';
-    commandsHint.appendChild(comboCode);
-    commandsHint.appendChild(document.createTextNode(' for source search. Use '));
-    const hashCode = document.createElement('code');
-    hashCode.textContent = '#file';
-    commandsHint.appendChild(hashCode);
-    commandsHint.appendChild(document.createTextNode(' (or quoted paths like '));
-    const quotedHashCode = document.createElement('code');
-    quotedHashCode.textContent = '#"notes/Release Plan.md"';
-    commandsHint.appendChild(quotedHashCode);
-    commandsHint.appendChild(document.createTextNode(') to attach local workspace files to Copilot and /workiq prompts.'));
-    welcome.appendChild(commandsHint);
-
-    const askHint = document.createElement('p');
-    askHint.style.fontSize = '0.8em';
-    askHint.appendChild(document.createTextNode('Pin snippets and run '));
-    const askCode = document.createElement('code');
-    askCode.textContent = '/ask';
-    askHint.appendChild(askCode);
-    askHint.appendChild(document.createTextNode(' to process pinned snippets or '));
-    const hashMentionCode = document.createElement('code');
-    hashMentionCode.textContent = '#file';
-    askHint.appendChild(hashMentionCode);
-    askHint.appendChild(document.createTextNode(' mentions with Microsoft 365 Copilot.'));
-    welcome.appendChild(askHint);
+    welcome.appendChild(this.buildWelcomeParagraph(CHAT_WELCOME_INTRO));
+    welcome.appendChild(this.buildWelcomeParagraph(CHAT_WELCOME_COMMANDS_HINT, CHAT_WELCOME_HINT_FONT_SIZE));
+    welcome.appendChild(this.buildWelcomeParagraph(CHAT_WELCOME_GROUNDING_HINT, CHAT_WELCOME_HINT_FONT_SIZE));
 
     this.chatArea.appendChild(welcome);
     this.welcomeEl = welcome;
     this.loadingElements.clear();
+  }
+
+  /**
+   * Build one welcome paragraph from the shared welcome text, so the rebuilt
+   * block matches the initial HTML rendered by the extension host.
+   */
+  private buildWelcomeParagraph(segments: WelcomeTextSegment[], fontSize?: string): HTMLElement {
+    const paragraph = document.createElement('p');
+    if (fontSize) {
+      paragraph.style.fontSize = fontSize;
+    }
+    for (const segment of segments) {
+      if (segment.code) {
+        const code = document.createElement('code');
+        code.textContent = segment.text;
+        paragraph.appendChild(code);
+      } else {
+        paragraph.appendChild(document.createTextNode(segment.text));
+      }
+    }
+    return paragraph;
   }
 
   /**
