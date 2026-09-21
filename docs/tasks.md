@@ -282,6 +282,6 @@
 ### 2026-09-21 — Consolidate the Mocha 12 and VS Code type updates
 
 - Issue: [kkamegawa/ContextRelay#253](https://github.com/kkamegawa/ContextRelay/issues/253). Supersedes Dependabot pull requests [#251](https://github.com/kkamegawa/ContextRelay/pull/251) and [#252](https://github.com/kkamegawa/ContextRelay/pull/252).
-- Pull request: Replacement pull request to be linked after creation.
+- Pull request: [kkamegawa/ContextRelay#254](https://github.com/kkamegawa/ContextRelay/pull/254).
 - Summary: Updated Mocha from 11.8.0 to 12.0.2 and `@types/vscode` from 1.136.0 to 1.138.0. Raised `engines.vscode` to `^1.138.0`, kept `engines.node` at `>=22.12.0`, and moved the Mocha-compatible overrides to `serialize-javascript` 7.1.1, `glob` 13.0.6, `diff` 9.0.0, and `js-yaml` 5.4.2. Regenerated `package-lock.json` with npm. No application or CI workflow code changed.
 - Tests: Extended `src/test/suite/dependencyVersions.test.ts` with exact declaration and lockfile baselines, updated safe-version floors, and a regression that constructs and runs Mocha through the compiled CommonJS default import. `npm ci` completed with 0 vulnerabilities and no deprecated-package or dependency-conflict warning; `npm ls` resolved the four Mocha transitive dependencies to the reviewed versions. `npm run compile`, `npm run lint`, `npm test` (403 passing), the compiled `src/test/suite/index.ts` programmatic runner (403 passing), `npm run security:check` (0 vulnerabilities), `npm run package`, and `git diff --check` all passed.
