@@ -2,6 +2,7 @@ import { strict as assert } from 'assert';
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import Mocha from 'mocha';
 
 interface PackageJson {
   dependencies?: Record<string, string>;
@@ -218,7 +219,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'mocha',
         actual: packageJson.devDependencies?.mocha,
-        expected: '11.8.0',
+        expected: '12.0.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -276,6 +277,24 @@ suite('Dependency security baselines', () => {
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
+        label: 'serialize-javascript override',
+        actual: packageJson.overrides?.['serialize-javascript'],
+        expected: '7.1.1',
+        message: 'must stay aligned with the Mocha 12 dependency range'
+      },
+      {
+        label: 'glob override',
+        actual: packageJson.overrides?.glob,
+        expected: '13.0.6',
+        message: 'must stay aligned with the Mocha 12 dependency range'
+      },
+      {
+        label: 'diff override',
+        actual: packageJson.overrides?.diff,
+        expected: '9.0.0',
+        message: 'must stay aligned with the Mocha 12 dependency range'
+      },
+      {
         label: 'brace-expansion override',
         actual: packageJson.overrides?.['brace-expansion'],
         expected: '5.0.9',
@@ -290,8 +309,8 @@ suite('Dependency security baselines', () => {
       {
         label: 'js-yaml override',
         actual: packageJson.overrides?.['js-yaml'],
-        expected: '4.3.2',
-        message: 'must stay on the audited non-vulnerable release'
+        expected: '5.4.2',
+        message: 'must stay aligned with the Mocha 12 dependency range'
       },
       {
         label: 'postcss override',
@@ -335,10 +354,23 @@ suite('Dependency security baselines', () => {
 
     assert.ok(vscodeTypesVersion, '@types/vscode must be declared in devDependencies');
     assert.ok(vscodeEngineVersion, 'engines.vscode must be declared');
+    assert.equal(vscodeTypesVersion, '^1.138.0', '@types/vscode must stay on the reviewed 1.138 baseline');
+    assert.equal(vscodeEngineVersion, '^1.138.0', 'engines.vscode must stay on the reviewed 1.138 baseline');
     assert.ok(
       compareVersions(vscodeEngineVersion, vscodeTypesVersion ?? '') >= 0,
       `@types/vscode (${vscodeTypesVersion ?? 'missing'}) must not exceed engines.vscode (${vscodeEngineVersion ?? 'missing'})`
     );
+  });
+
+  test('constructs and runs Mocha through the compiled CommonJS default import', async () => {
+    const mocha = new Mocha({ ui: 'tdd' });
+    mocha.suite.addTest(new Mocha.Test('runs through the default import', () => undefined));
+
+    const failures = await new Promise<number>(resolve => {
+      mocha.run(resolve);
+    });
+
+    assert.equal(failures, 0, 'the CommonJS test build must be able to construct and run Mocha');
   });
 
   test('pins safe override versions for vulnerable transitive dependencies', () => {
@@ -350,18 +382,18 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['serialize-javascript'], '7.0.4') >= 0,
+      compareVersions(packageJson.overrides?.['serialize-javascript'], '7.1.1') >= 0,
       `serialize-javascript override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['serialize-javascript'] ?? 'missing'})`
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.glob, '12.0.0') >= 0,
+      compareVersions(packageJson.overrides?.glob, '13.0.0') >= 0,
       `glob override must stay on a supported, non-deprecated release (found: ${packageJson.overrides?.glob ?? 'missing'})`
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.diff, '8.0.3') >= 0,
-      `diff override must stay outside the vulnerable range 6.0.0-8.0.2 (found: ${packageJson.overrides?.diff ?? 'missing'})`
+      compareVersions(packageJson.overrides?.diff, '9.0.0') >= 0,
+      `diff override must stay on the Mocha 12 baseline or newer (found: ${packageJson.overrides?.diff ?? 'missing'})`
     );
 
     assert.ok(
@@ -375,7 +407,7 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['js-yaml'], '4.3.2') >= 0,
+      compareVersions(packageJson.overrides?.['js-yaml'], '5.0.0') >= 0,
       `js-yaml override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['js-yaml'] ?? 'missing'})`
     );
 
@@ -418,7 +450,7 @@ suite('Dependency security baselines', () => {
     );
   });
 
-  test('locks installed glob, diff, fast-uri, and browserslist versions outside known vulnerable ranges', () => {
+  test('locks installed Mocha transitive dependencies outside known vulnerable ranges', () => {
     const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
 
     // The glob override applies to mocha's transitive dependency, so the installed
@@ -428,12 +460,14 @@ suite('Dependency security baselines', () => {
       packageLockJson.packages?.['node_modules/glob'];
     const globVersion = globPackage?.version;
     const diffVersion = packageLockJson.packages?.['node_modules/diff']?.version;
+    const serializeJavaScriptVersion = packageLockJson.packages?.['node_modules/serialize-javascript']?.version;
+    const jsYamlVersion = packageLockJson.packages?.['node_modules/js-yaml']?.version;
     const fastUriPackage = packageLockJson.packages?.['node_modules/fast-uri'];
     const fastUriVersion = fastUriPackage?.version;
     const browserslistVersion = packageLockJson.packages?.['node_modules/browserslist']?.version;
 
     assert.ok(
-      compareVersions(globVersion, '12.0.0') >= 0,
+      compareVersions(globVersion, '13.0.0') >= 0,
       `installed glob must stay on a supported, non-deprecated release (found: ${globVersion ?? 'missing'})`
     );
 
@@ -444,9 +478,18 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      Boolean(diffVersion) &&
-        (compareVersions(diffVersion, '6.0.0') < 0 || compareVersions(diffVersion, '8.0.3') >= 0),
-      `installed diff must stay outside the vulnerable range 6.0.0-8.0.2 (found: ${diffVersion ?? 'missing'})`
+      compareVersions(diffVersion, '9.0.0') >= 0,
+      `installed diff must stay on the Mocha 12 baseline or newer (found: ${diffVersion ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(serializeJavaScriptVersion, '7.1.1') >= 0,
+      `installed serialize-javascript must stay on 7.1.1 or newer (found: ${serializeJavaScriptVersion ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(jsYamlVersion, '5.0.0') >= 0,
+      `installed js-yaml must stay on the Mocha 12 baseline or newer (found: ${jsYamlVersion ?? 'missing'})`
     );
 
     assert.ok(
@@ -515,8 +558,14 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed mocha',
         actual: packageLockJson.packages?.['node_modules/mocha']?.version,
-        expected: '11.8.0',
+        expected: '12.0.2',
         message: 'must stay aligned with the consolidated Dependabot update'
+      },
+      {
+        label: 'installed @types/vscode',
+        actual: packageLockJson.packages?.['node_modules/@types/vscode']?.version,
+        expected: '1.138.0',
+        message: 'must stay aligned with the supported VS Code baseline'
       },
       {
         label: 'installed @types/node',
@@ -573,6 +622,26 @@ suite('Dependency security baselines', () => {
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
+        label: 'installed serialize-javascript',
+        actual: packageLockJson.packages?.['node_modules/serialize-javascript']?.version,
+        expected: '7.1.1',
+        message: 'must stay aligned with the Mocha 12 dependency range'
+      },
+      {
+        label: 'installed glob',
+        actual:
+          packageLockJson.packages?.['node_modules/mocha/node_modules/glob']?.version ??
+          packageLockJson.packages?.['node_modules/glob']?.version,
+        expected: '13.0.6',
+        message: 'must stay aligned with the Mocha 12 dependency range'
+      },
+      {
+        label: 'installed diff',
+        actual: packageLockJson.packages?.['node_modules/diff']?.version,
+        expected: '9.0.0',
+        message: 'must stay aligned with the Mocha 12 dependency range'
+      },
+      {
         label: 'installed brace-expansion',
         actual: packageLockJson.packages?.['node_modules/brace-expansion']?.version,
         expected: '5.0.9',
@@ -587,8 +656,8 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed js-yaml',
         actual: packageLockJson.packages?.['node_modules/js-yaml']?.version,
-        expected: '4.3.2',
-        message: 'must stay on the audited non-vulnerable release'
+        expected: '5.4.2',
+        message: 'must stay aligned with the Mocha 12 dependency range'
       },
       {
         label: 'installed postcss',
@@ -634,8 +703,8 @@ suite('Dependency security baselines', () => {
     const legacyGlobPackage = packageEntries['node_modules/glob'];
     if (legacyGlobPackage) {
       assert.ok(
-        compareVersions(legacyGlobPackage.version, '12.0.0') >= 0,
-        `installed glob must be 12.0.0+ (found: ${legacyGlobPackage.version ?? 'missing'})`
+        compareVersions(legacyGlobPackage.version, '13.0.0') >= 0,
+        `installed glob must be 13.0.0+ (found: ${legacyGlobPackage.version ?? 'missing'})`
       );
       assert.equal(
         legacyGlobPackage.deprecated,

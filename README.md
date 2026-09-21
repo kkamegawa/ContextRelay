@@ -52,7 +52,7 @@ Summarize #docs/plan.md
 ## Requirements
 
 - Node.js 22.12 or later for local development and validation from source
-- [Visual Studio Code](https://code.visualstudio.com/) 1.85 or later
+- [Visual Studio Code](https://code.visualstudio.com/) 1.138 or later
 - A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
 - **For Exchange Mail, Teams, SharePoint, OneDrive, OneNote, Planner, and Microsoft To Do search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
 - **For Copilot-grounded chat features**: Microsoft 365 Copilot license might still be required depending on tenant rollout and API availability
