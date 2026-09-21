@@ -10,7 +10,7 @@ Authentication, slash routing, Retrieval API, Chat API (beta), Exchange Mail ada
 
 ## 2. Environment
 
-- VS Code 1.85+ (stable channel)
+- VS Code 1.138+ (stable channel)
 - Work/school account (Microsoft Entra ID)
 - Microsoft 365 Copilot license assigned to the test account (required for Retrieval and Chat APIs)
 - Standard Microsoft 365 license (sufficient for Exchange Mail and Teams adapters)

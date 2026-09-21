@@ -37,7 +37,7 @@ Recommended execution metadata to capture with each run:
 
 ## 1. Environment setup
 
-- VS Code 1.85+
+- VS Code 1.138+
 - Windows or macOS test machine
 - Microsoft 365 work/school account
 - A tenant with:
