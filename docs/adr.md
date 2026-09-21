@@ -76,3 +76,14 @@
   - Restate the grounding behavior in the README intro and in the "Plain Copilot chat" feature bullet, and rewrite the `/ask` entry in the slash menu (`src/webview/slashMenu.ts`) so it reads as a guard.
 - Reason: The behavior change in #233/#237 (plain chat grounds on pinned snippets and attached files automatically, `/ask` became an optional guard) was documented in README, `docs/plan.md`, `docs/test_plan.md` and `docs/e2e_checklist.md`, but the same welcome paragraph existed as two independent implementations and only the extension host copy was updated. Running `/clear` replaced the correct hint with the stale "run `/ask` to process pinned snippets" text, so the panel contradicted its own documentation. A single definition removes the class of bug rather than the instance; `sourcePresentation.ts` already establishes that a `vscode`-free module at `src/` can be shared by the extension host and the webview bundle.
 - Compatibility: Text and documentation only; no behavior, settings, or payloads change. The welcome block users see first is unchanged except for the added "combine source commands" tip. Consistent with the 2026-09-07 and 2026-09-13 grounding entries, which this entry documents rather than revises.
+
+## 2026-09-21 - Adopt Mocha 12 and raise the minimum supported VS Code version
+
+- Task: Issue #253 (supersedes Dependabot pull requests #251 and #252).
+- Decision:
+  - Adopt Mocha 12.0.2 instead of the 12.0.0 proposed by Dependabot because 12.0.2 is the latest stable release that has been public for more than 24 hours and includes subsequent fixes.
+  - Update the Mocha transitive overrides to `serialize-javascript` 7.1.1, `glob` 13.0.6, `diff` 9.0.0, and `js-yaml` 5.4.2. Each version remains within Mocha 12.0.2's declared ranges.
+  - Adopt `@types/vscode` 1.138.0 and raise `engines.vscode` from `^1.136.0` to `^1.138.0` so the compile-time API surface does not exceed the declared runtime floor.
+  - Cover Mocha's compiled CommonJS default import by constructing and running a programmatic Mocha instance in the dependency regression suite, and continue verifying the full `src/test/suite/index.ts` runner separately.
+- Reason: Mocha 12 is a major development-tool update with changes to supported Node.js versions, module loading, CLI parsing, reporters, and legacy entry points. The repository does not use the removed `_mocha` executable or affected legacy CLI/reporter behaviors, and its existing Node.js floor `>=22.12.0` already satisfies Mocha 12.0.2. Exact declaration, lockfile, and floor assertions keep the reviewed graph reproducible.
+- Compatibility: Application behavior is unchanged. The public compatibility change is that the extension now requires VS Code 1.138.0 or later. This updates the 2026-09-07 VS Code baseline. It also supersedes the 2026-09-14 decision to remain on js-yaml 4.x because Mocha 12 now declares `^5.0.0`, allowing the audited 5.4.2 override without exceeding an upstream range.
