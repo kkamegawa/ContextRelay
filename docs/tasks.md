@@ -279,6 +279,13 @@
 - Design record: [docs/adr.md](adr.md) — 2026-09-19 entry.
 - Tests: `src/test/suite/dependencyVersions.test.ts` (baselines raised to `marked` 18.0.13, `@types/node` 26.6.1, and `@typescript-eslint/parser` / `@typescript-eslint/eslint-plugin` 8.70.0). Verified on every branch and on `main` with `npm install && npm run lint && npm run compile && npm test && npm run security:check` — 387 passing, 0 failing.
 
+### 2026-09-19 — Sync the README and the panel welcome text with the `/ask` grounding behavior
+
+- Issue: [kkamegawa/ContextRelay#249](https://github.com/kkamegawa/ContextRelay/issues/249)
+- Summary: Audited README and `docs/` against the behavior changed by [#233](https://github.com/kkamegawa/ContextRelay/pull/233) and [#237](https://github.com/kkamegawa/ContextRelay/pull/237). The usage sections, the command table, `docs/plan.md`, `docs/test_plan.md`, `docs/e2e_checklist.md` and the router help text were already correct; four places were not. The README intro and the "Plain Copilot chat" feature bullet still implied that no context is attached without `/ask`; the welcome block rebuilt by `ChatRenderer.clear()` still told users to run `/ask` to use pinned snippets, contradicting the initial HTML; and the slash menu described `/ask` without its guard. The welcome text now lives once in `src/chatWelcomeText.ts` and is rendered by both the extension host and the webview. Added `README_ja.md`, a full Japanese translation with the same structure, cross-linked from `README.md`.
+- Design record: [docs/adr.md](adr.md) — 2026-09-19 entry "Define the panel welcome text once, and add a Japanese README". Documentation set: [docs/plan.md](plan.md) Appendix C. Plan: [Wiki — Sync the README and the Panel Welcome Text with the `/ask` Grounding Behavior](https://github.com/kkamegawa/ContextRelay/wiki/ask-behavior-doc-sync).
+- Tests: `src/test/suite/chatRenderer.test.ts` — two cases added: the block rebuilt by `clear()` must match the block in the shipped panel HTML (heading, paragraph text, font sizes, inline code), and the welcome text must state that pinned context is attached automatically. Verified with `npm run lint && npm run compile && npm test && npm run security:check` — 389 passing, 0 failing, 0 vulnerabilities.
+
 ### 2026-09-21 — Consolidate the Mocha 12 and VS Code type updates
 
 - Issue: [kkamegawa/ContextRelay#253](https://github.com/kkamegawa/ContextRelay/issues/253). Supersedes Dependabot pull requests [#251](https://github.com/kkamegawa/ContextRelay/pull/251) and [#252](https://github.com/kkamegawa/ContextRelay/pull/252).
