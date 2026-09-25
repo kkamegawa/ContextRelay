@@ -320,7 +320,7 @@
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "^26.6.1",
+    "@types/node": "^26.6.2",
     "@types/sanitize-html": "^2.16.1",
     "@types/vscode": "^1.138.0",
     "@typescript-eslint/eslint-plugin": "^8.70.0",
