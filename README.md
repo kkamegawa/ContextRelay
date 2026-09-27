@@ -6,6 +6,12 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 
 ---
 
+## Screenshot
+
+![ContextRelay panel used with /ask to draft a basic design and a phased task list](media/screenshot-panel.webp)
+
+---
+
 ## Features
 
 - **Plain Copilot chat** -- Type without a slash command to chat directly with Microsoft 365 Copilot in the panel. Pinned snippets and attached files are attached as grounding context automatically; `/ask` is the optional guard that refuses to send when none are present.
