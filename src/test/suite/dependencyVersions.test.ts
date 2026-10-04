@@ -279,7 +279,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'serialize-javascript override',
         actual: packageJson.overrides?.['serialize-javascript'],
-        expected: '7.1.1',
+        expected: '7.1.2',
         message: 'must stay aligned with the Mocha 12 dependency range'
       },
       {
@@ -297,7 +297,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'brace-expansion override',
         actual: packageJson.overrides?.['brace-expansion'],
-        expected: '5.0.9',
+        expected: '5.0.12',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
@@ -382,7 +382,7 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['serialize-javascript'], '7.1.1') >= 0,
+      compareVersions(packageJson.overrides?.['serialize-javascript'], '7.1.2') >= 0,
       `serialize-javascript override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['serialize-javascript'] ?? 'missing'})`
     );
 
@@ -397,7 +397,7 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['brace-expansion'], '5.0.9') >= 0,
+      compareVersions(packageJson.overrides?.['brace-expansion'], '5.0.12') >= 0,
       `brace-expansion override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['brace-expansion'] ?? 'missing'})`
     );
 
@@ -462,6 +462,7 @@ suite('Dependency security baselines', () => {
     const diffVersion = packageLockJson.packages?.['node_modules/diff']?.version;
     const serializeJavaScriptVersion = packageLockJson.packages?.['node_modules/serialize-javascript']?.version;
     const jsYamlVersion = packageLockJson.packages?.['node_modules/js-yaml']?.version;
+    const braceExpansionVersion = packageLockJson.packages?.['node_modules/brace-expansion']?.version;
     const fastUriPackage = packageLockJson.packages?.['node_modules/fast-uri'];
     const fastUriVersion = fastUriPackage?.version;
     const browserslistVersion = packageLockJson.packages?.['node_modules/browserslist']?.version;
@@ -483,8 +484,8 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(serializeJavaScriptVersion, '7.1.1') >= 0,
-      `installed serialize-javascript must stay on 7.1.1 or newer (found: ${serializeJavaScriptVersion ?? 'missing'})`
+      compareVersions(serializeJavaScriptVersion, '7.1.2') >= 0,
+      `installed serialize-javascript must stay on 7.1.2 or newer (found: ${serializeJavaScriptVersion ?? 'missing'})`
     );
 
     assert.ok(
@@ -493,7 +494,12 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(fastUriVersion, '3.1.7') >= 0,
+      compareVersions(braceExpansionVersion, '5.0.12') >= 0,
+      `installed brace-expansion must stay on a non-vulnerable release (found: ${braceExpansionVersion ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(fastUriVersion, '3.1.8') >= 0,
       `installed fast-uri must stay on a non-vulnerable release (found: ${fastUriVersion ?? 'missing'})`
     );
 
@@ -507,6 +513,16 @@ suite('Dependency security baselines', () => {
     assert.ok(
       compareVersions(browserslistVersion, '4.28.7') >= 0,
       `installed browserslist must stay on a non-vulnerable release (found: ${browserslistVersion ?? 'missing'})`
+    );
+  });
+
+  test('keeps the audit wrapper at the moderate threshold', () => {
+    const scriptPath = path.resolve(__dirname, '../../../../scripts/run-audit-safe.cjs');
+    const script = fs.readFileSync(scriptPath, 'utf8');
+
+    assert.ok(
+      script.includes("'audit', '--audit-level=moderate'"),
+      'run-audit-safe.cjs must call npm audit with --audit-level=moderate'
     );
   });
 
@@ -624,7 +640,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed serialize-javascript',
         actual: packageLockJson.packages?.['node_modules/serialize-javascript']?.version,
-        expected: '7.1.1',
+        expected: '7.1.2',
         message: 'must stay aligned with the Mocha 12 dependency range'
       },
       {
@@ -644,7 +660,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed brace-expansion',
         actual: packageLockJson.packages?.['node_modules/brace-expansion']?.version,
-        expected: '5.0.9',
+        expected: '5.0.12',
         message: 'must stay on the audited non-vulnerable release'
       },
       {

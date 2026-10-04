@@ -72,3 +72,35 @@ npm run vsce:package
 共有ロジックは [`scripts/tag-version.cjs`](../scripts/tag-version.cjs) にあり、
 [`src/test/suite/tagVersion.test.ts`](../src/test/suite/tagVersion.test.ts) の
 ユニットテストでカバーされています。
+
+## 依存関係ベースラインのポリシー
+
+- 推移的依存のセキュリティ用 override は `package.json` の `overrides` に置きます。すべての override には、`src/test/suite/dependencyVersions.test.ts` に対応する下限チェックがあります。
+- コンパイルとパッケージ化の前に、`npm run security:check`(`npm audit --audit-level=moderate`)が脆弱性0件であること。閾値は下げません。
+- 固定中の override、または lockfile のみの推移的依存に脆弱性情報が出たら、固定版を上げる(または lockfile を更新する)、対応する下限テストを上げる、以下の検証を全て実行する、の順に対応します。
+
+bash (macOS/Linux):
+
+```bash
+npm install --package-lock-only
+npm update <package> --package-lock-only
+npm ci
+npm run security:check
+npm run compile
+npm run lint
+npm test
+```
+
+PowerShell 7:
+
+```powershell
+npm install --package-lock-only
+npm update <package> --package-lock-only
+npm ci
+npm run security:check
+npm run compile
+npm run lint
+npm test
+```
+
+背景は `docs/audit_remediation_design.md` を参照してください。
