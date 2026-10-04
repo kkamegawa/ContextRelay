@@ -71,3 +71,35 @@ globally newest tag in the repository.
 The shared logic lives in [`scripts/tag-version.cjs`](../scripts/tag-version.cjs)
 and is covered by unit tests in
 [`src/test/suite/tagVersion.test.ts`](../src/test/suite/tagVersion.test.ts).
+
+## Dependency baseline policy
+
+- Security overrides for transitive dependencies live in the `overrides` block of `package.json`. Every override has a matching floor assertion in `src/test/suite/dependencyVersions.test.ts`.
+- `npm run security:check` (`npm audit --audit-level=moderate`) must report 0 vulnerabilities before compile and package. The threshold must not be lowered.
+- When an advisory covers a pinned override or a lockfile-only transitive package, raise the pin (or refresh the lockfile entry), raise the matching floor test, and run the full validation below.
+
+bash (macOS/Linux):
+
+```bash
+npm install --package-lock-only
+npm update <package> --package-lock-only
+npm ci
+npm run security:check
+npm run compile
+npm run lint
+npm test
+```
+
+PowerShell 7:
+
+```powershell
+npm install --package-lock-only
+npm update <package> --package-lock-only
+npm ci
+npm run security:check
+npm run compile
+npm run lint
+npm test
+```
+
+See `docs/audit_remediation_design.md` for the background.
