@@ -219,7 +219,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'mocha',
         actual: packageJson.devDependencies?.mocha,
-        expected: '12.0.2',
+        expected: '12.0.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -237,7 +237,7 @@ suite('Dependency security baselines', () => {
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.70.0',
+        expected: '^8.71.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -303,7 +303,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'shell-quote override',
         actual: packageJson.overrides?.['shell-quote'],
-        expected: '1.10.0',
+        expected: '1.11.0',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
@@ -316,6 +316,12 @@ suite('Dependency security baselines', () => {
         label: 'postcss override',
         actual: packageJson.overrides?.postcss,
         expected: '8.5.26',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'source-map-js override',
+        actual: packageJson.overrides?.['source-map-js'],
+        expected: '1.2.2',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
@@ -402,7 +408,7 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['shell-quote'], '1.10.0') >= 0,
+      compareVersions(packageJson.overrides?.['shell-quote'], '1.11.0') >= 0,
       `shell-quote override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['shell-quote'] ?? 'missing'})`
     );
 
@@ -414,6 +420,11 @@ suite('Dependency security baselines', () => {
     assert.ok(
       compareVersions(packageJson.overrides?.postcss, '8.5.25') >= 0,
       `postcss override must stay on a non-vulnerable release (found: ${packageJson.overrides?.postcss ?? 'missing'})`
+    );
+
+    assert.ok(
+      compareVersions(packageJson.overrides?.['source-map-js'], '1.2.2') >= 0,
+      `source-map-js override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['source-map-js'] ?? 'missing'})`
     );
   });
 
@@ -574,7 +585,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed mocha',
         actual: packageLockJson.packages?.['node_modules/mocha']?.version,
-        expected: '12.0.2',
+        expected: '12.0.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -598,7 +609,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.70.0',
+        expected: '8.71.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -666,7 +677,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed shell-quote',
         actual: packageLockJson.packages?.['node_modules/shell-quote']?.version,
-        expected: '1.10.0',
+        expected: '1.11.0',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
@@ -679,6 +690,12 @@ suite('Dependency security baselines', () => {
         label: 'installed postcss',
         actual: packageLockJson.packages?.['node_modules/postcss']?.version,
         expected: '8.5.26',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'installed source-map-js',
+        actual: packageLockJson.packages?.['node_modules/source-map-js']?.version,
+        expected: '1.2.2',
         message: 'must stay on the audited non-vulnerable release'
       }
     ];
