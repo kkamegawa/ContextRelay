@@ -5,7 +5,8 @@ import {
   createFallbackPreview,
   createMailPreview,
   getMailMessageId,
-  normalizePreviewText
+  normalizePreviewText,
+  sanitizePreviewHtml
 } from '../../panel/itemPreview';
 
 function makeItem(overrides: Partial<ContextItem>): ContextItem {
@@ -121,5 +122,29 @@ suite('Item preview', () => {
     assert.equal(preview.kind, 'html');
     assert.ok(preview.html.includes('<h1>Title</h1>'));
     assert.equal(preview.text, 'Title\n\n• First\n\n• Second');
+  });
+
+  test('strips meta, noscript, svg animation, iframe and srcset markup under the preview allowlist', () => {
+    const cases = [
+      '<meta http-equiv="refresh" content="0;url=javascript:alert(1)">',
+      '<noscript></p><img src=x onerror=alert(1)></noscript>',
+      '<svg:animate attributeName="href" values="javascript:alert(1)"></svg:animate>',
+      '<iframe src="https://example.invalid"><b onclick="alert(1)">fallback</b></iframe>',
+      '<img srcset="javascript:alert(1) 1x">'
+    ];
+
+    for (const input of cases) {
+      const output = sanitizePreviewHtml(`<p>kept</p>${input}`);
+      assert.ok(output.includes('<p>kept</p>'), `safe content must survive: ${input}`);
+      assert.ok(!/<(meta|noscript|svg|iframe|img)|javascript:|onerror|onclick/i.test(output), `unsafe markup must be removed: ${input} -> ${output}`);
+    }
+  });
+
+  test('keeps http links safe and strips javascript links', () => {
+    const output = sanitizePreviewHtml('<a href="https://example.invalid/x" onclick="alert(1)">ok</a><a href="javascript:alert(1)">bad</a>');
+
+    assert.ok(output.includes('href="https://example.invalid/x"'));
+    assert.ok(output.includes('rel="noreferrer noopener"'));
+    assert.ok(!/javascript:|onclick/i.test(output));
   });
 });

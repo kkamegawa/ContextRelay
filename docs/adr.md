@@ -87,3 +87,14 @@
   - Cover Mocha's compiled CommonJS default import by constructing and running a programmatic Mocha instance in the dependency regression suite, and continue verifying the full `src/test/suite/index.ts` runner separately.
 - Reason: Mocha 12 is a major development-tool update with changes to supported Node.js versions, module loading, CLI parsing, reporters, and legacy entry points. The repository does not use the removed `_mocha` executable or affected legacy CLI/reporter behaviors, and its existing Node.js floor `>=22.12.0` already satisfies Mocha 12.0.2. Exact declaration, lockfile, and floor assertions keep the reviewed graph reproducible.
 - Compatibility: Application behavior is unchanged. The public compatibility change is that the extension now requires VS Code 1.138.0 or later. This updates the 2026-09-07 VS Code baseline. It also supersedes the 2026-09-14 decision to remain on js-yaml 4.x because Mocha 12 now declares `^5.0.0`, allowing the audited 5.4.2 override without exceeding an upstream range.
+
+## 2026-10-12 - Consolidate Dependabot updates for @types/vscode 1.140, sanitize-html 2.18 and typescript-eslint 8.71.1
+
+- Task: Issue #277 (supersedes Dependabot pull requests #273, #274 and #275).
+- Decision:
+  - Adopt `@types/vscode` 1.140.0 and raise `engines.vscode` from `^1.138.0` to `^1.140.0` so the compile-time API surface does not exceed the declared runtime floor.
+  - Adopt `sanitize-html` 2.18.0 and raise the dependency regression floor from 2.17.5 to 2.18.0.
+  - Adopt `@typescript-eslint/eslint-plugin` 8.71.1 and align the baseline tests with `@typescript-eslint/parser` 8.71.1, which was merged separately and left the exact-version baseline tests failing on the main branch.
+  - Add behavior tests for `sanitizePreviewHtml` covering the markup classes fixed in sanitize-html 2.18.0.
+- Reason: The 1.138.0 to 1.140.0 type definition difference is limited to documentation comments (the `headers` description of the MCP HTTP server definition), and the repository does not use that API, so no code change is needed. The raised engines floor is the only public compatibility change and follows the rule established on 2026-09-21. The sanitize-html 2.18.0 security fixes concern `meta`, `noscript` in `nonTextTags`, namespace-prefixed SVG animation tags and iframe fallback markup, none of which are allowed by the preview configuration, so they are defense in depth rather than an exposure fix.
+- Compatibility: The extension now requires VS Code 1.140.0 or later. Preview rendering output is unchanged for allowed tags.

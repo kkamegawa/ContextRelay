@@ -377,14 +377,14 @@ A "Load more" button per source section that fetches the next page of results.
 
 ## Appendix A: Minimum VS Code version
 
-**Target**: VS Code 1.138+
+**Target**: VS Code 1.140+
 
 Key API dependencies:
 - `vscode.authentication.getSession` (available since VS Code 1.63)
 - `WebviewViewProvider` (available since VS Code 1.51)
 - Microsoft authentication provider built-in extension (available since VS Code 1.75)
 
-VS Code 1.138 is the declared runtime floor so it remains aligned with the `@types/vscode` 1.138 development baseline.
+VS Code 1.140 is the declared runtime floor so it remains aligned with the `@types/vscode` 1.140 development baseline.
 
 ---
 

@@ -213,7 +213,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'sanitize-html',
         actual: packageJson.dependencies?.['sanitize-html'],
-        expected: '^2.17.7',
+        expected: '^2.18.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -237,13 +237,13 @@ suite('Dependency security baselines', () => {
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.71.0',
+        expected: '^8.71.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/parser',
         actual: packageJson.devDependencies?.['@typescript-eslint/parser'],
-        expected: '8.71.0',
+        expected: '8.71.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -315,7 +315,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'postcss override',
         actual: packageJson.overrides?.postcss,
-        expected: '8.5.26',
+        expected: '8.5.29',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
@@ -360,8 +360,8 @@ suite('Dependency security baselines', () => {
 
     assert.ok(vscodeTypesVersion, '@types/vscode must be declared in devDependencies');
     assert.ok(vscodeEngineVersion, 'engines.vscode must be declared');
-    assert.equal(vscodeTypesVersion, '^1.138.0', '@types/vscode must stay on the reviewed 1.138 baseline');
-    assert.equal(vscodeEngineVersion, '^1.138.0', 'engines.vscode must stay on the reviewed 1.138 baseline');
+    assert.equal(vscodeTypesVersion, '^1.140.0', '@types/vscode must stay on the reviewed 1.140 baseline');
+    assert.equal(vscodeEngineVersion, '^1.140.0', 'engines.vscode must stay on the reviewed 1.140 baseline');
     assert.ok(
       compareVersions(vscodeEngineVersion, vscodeTypesVersion ?? '') >= 0,
       `@types/vscode (${vscodeTypesVersion ?? 'missing'}) must not exceed engines.vscode (${vscodeEngineVersion ?? 'missing'})`
@@ -546,7 +546,7 @@ suite('Dependency security baselines', () => {
       `marked must stay on a vetted baseline or newer (found: ${packageJson.dependencies?.marked ?? 'missing'})`
     );
     assert.ok(
-      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.17.5') >= 0,
+      compareVersions(packageJson.dependencies?.['sanitize-html'], '2.18.0') >= 0,
       `sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageJson.dependencies?.['sanitize-html'] ?? 'missing'})`
     );
 
@@ -561,7 +561,7 @@ suite('Dependency security baselines', () => {
       `installed sanitize-html must not be deprecated (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.deprecated ?? 'not deprecated'})`
     );
     assert.ok(
-      compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.17.5') >= 0,
+      compareVersions(packageLockJson.packages?.['node_modules/sanitize-html']?.version, '2.18.0') >= 0,
       `installed sanitize-html must stay on a non-vulnerable baseline or newer (found: ${packageLockJson.packages?.['node_modules/sanitize-html']?.version ?? 'missing'})`
     );
   });
@@ -579,7 +579,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed sanitize-html',
         actual: packageLockJson.packages?.['node_modules/sanitize-html']?.version,
-        expected: '2.17.7',
+        expected: '2.18.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -591,7 +591,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @types/vscode',
         actual: packageLockJson.packages?.['node_modules/@types/vscode']?.version,
-        expected: '1.138.0',
+        expected: '1.140.0',
         message: 'must stay aligned with the supported VS Code baseline'
       },
       {
@@ -609,13 +609,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.71.0',
+        expected: '8.71.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/parser',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
-        expected: '8.71.0',
+        expected: '8.71.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -689,7 +689,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed postcss',
         actual: packageLockJson.packages?.['node_modules/postcss']?.version,
-        expected: '8.5.26',
+        expected: '8.5.29',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
