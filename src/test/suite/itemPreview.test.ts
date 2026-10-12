@@ -124,7 +124,7 @@ suite('Item preview', () => {
     assert.equal(preview.text, 'Title\n\n• First\n\n• Second');
   });
 
-  test('drops markup that the sanitize-html 2.18 security fixes target', () => {
+  test('strips meta, noscript, svg animation, iframe and srcset markup under the preview allowlist', () => {
     const cases = [
       '<meta http-equiv="refresh" content="0;url=javascript:alert(1)">',
       '<noscript></p><img src=x onerror=alert(1)></noscript>',

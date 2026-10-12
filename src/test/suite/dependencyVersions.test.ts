@@ -315,7 +315,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'postcss override',
         actual: packageJson.overrides?.postcss,
-        expected: '8.5.26',
+        expected: '8.5.29',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
@@ -689,7 +689,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed postcss',
         actual: packageLockJson.packages?.['node_modules/postcss']?.version,
-        expected: '8.5.26',
+        expected: '8.5.29',
         message: 'must stay on the audited non-vulnerable release'
       },
       {
