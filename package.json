@@ -340,7 +340,7 @@
   },
   "dependencies": {
     "jszip": "^3.10.2",
-    "marked": "^18.0.14",
+    "marked": "^18.1.0",
     "sanitize-html": "^2.18.0"
   },
   "allowScripts": {
