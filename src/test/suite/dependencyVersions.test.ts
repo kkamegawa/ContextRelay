@@ -213,7 +213,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'sanitize-html',
         actual: packageJson.dependencies?.['sanitize-html'],
-        expected: '^2.18.0',
+        expected: '^2.18.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -579,7 +579,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed sanitize-html',
         actual: packageLockJson.packages?.['node_modules/sanitize-html']?.version,
-        expected: '2.18.0',
+        expected: '2.18.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
