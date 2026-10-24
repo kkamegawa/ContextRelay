@@ -338,6 +338,10 @@ window.addEventListener('message', (event) => {
       renderer.clear();
       break;
 
+    case 'submissionCancelled':
+      clearPendingSubmission();
+      break;
+
     case 'assistantMessage':
       clearPendingSubmission();
       renderer.renderAssistantMessage(

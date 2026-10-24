@@ -526,12 +526,51 @@ suite('ChatViewProvider', () => {
       { getEmbeddedAccessToken: async () => { tokenCalls += 1; return 'token-embedded'; } } as never,
       {} as never
     );
-    (provider as unknown as { postMessage(message: unknown): void }).postMessage = () => undefined;
+    const messages: Array<{ command: string }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
 
     await provider.submitQuery('/embedded decisions');
 
     assert.equal(tokenCalls, 0);
     assert.equal(embeddedRequests.length, 0);
+    assert.equal(messages[messages.length - 1]?.command, 'submissionCancelled', 'cancelling the picker must re-enable the input');
+  });
+
+  test('clearing the chat supersedes an in-flight /embedded search and releases its loader', async () => {
+    configValues.set('embedded.enabled', true);
+    const source = { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    configValues.set('embedded.sources', [source]);
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => 'token-embedded' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; isLoading?: boolean }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+    let resolveSearch!: (items: unknown[]) => void;
+    embeddedOverride = () => new Promise(resolve => { resolveSearch = resolve; });
+
+    const pending = provider.submitQuery('/embedded access design');
+    while (!resolveSearch) {
+      await Promise.resolve();
+    }
+    provider.clearChat();
+    const clearIndex = messages.findIndex(message => message.command === 'clearChat');
+    resolveSearch([{
+      source: 'sharepoint-embedded',
+      title: 'Stale item',
+      snippet: 'Result from before the clear',
+      cache: { hit: false },
+      raw: { sourceName: source.name, containerTypeId: source.containerTypeId, extracts: ['Result from before the clear'] }
+    }]);
+    await pending;
+
+    assert.ok(clearIndex > 0);
+    assert.deepEqual(messages[clearIndex - 1], { command: 'loading', source: 'sharepoint-embedded', isLoading: false });
+    assert.deepEqual(messages.slice(clearIndex + 1).filter(message =>
+      message.command === 'queryResult' || message.command === 'queryError' || message.command === 'loading'
+    ), []);
+    assert.equal((provider as unknown as { latestSearchSummary?: string }).latestSearchSummary, undefined);
   });
 
   test('/embedded uses the friendly source selected from the configured list', async () => {

@@ -316,3 +316,12 @@
 - Tests added or updated: `authProvider.test.ts`, `chatViewProvider.test.ts` and the new `speMcpLauncher.test.ts`.
 - Local validation passed (run by the user, because the agent's sandbox could not run Node.js): `npm run compile` (including the precompile audit, **0 vulnerabilities**), `npm run lint` (no errors or warnings) and `npm test` (**443 passing, 0 failing**).
 - Not run: live launches of the MCP launcher from Claude Code and Copilot CLI, and the Work IQ verification items WIQ-01 to WIQ-07.
+
+### 2026-10-24 — PR review fixes for SharePoint Embedded UI state
+
+- Pull request: [kkamegawa/ContextRelay#291](https://github.com/kkamegawa/ContextRelay/pull/291) review comments.
+- Clearing the chat now supersedes an in-flight `/embedded` request and releases its loader, so a late response cannot repopulate the cleared transcript or search summary.
+- Cancelling the Embedded source picker sends `submissionCancelled`, which re-enables the panel input.
+- Result cards remember whether an Embedded hit has extracts, so a saved pin without extracts keeps an enabled Unpin button when pin state arrives after the results.
+- Tests added: `chatViewProvider.test.ts` (clear during search, picker cancellation) and `chatRenderer.test.ts` (late pin state for an extract-less hit).
+- Local validation passed (run by the user): `npm test` (**445 passing, 0 failing**).

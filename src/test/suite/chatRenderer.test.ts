@@ -322,6 +322,29 @@ suite('ChatRenderer', () => {
       assert.equal(one('.action-pin', secondCard).getAttribute('aria-pressed'), 'false');
     });
 
+    test('keeps Unpin available for a saved Embedded pin without extracts when pin state arrives later', () => {
+      const item = makeItem({
+        source: 'sharepoint-embedded',
+        title: 'Saved evidence',
+        snippet: '',
+        url: undefined,
+        raw: { sourceName: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', extracts: [] }
+      });
+      renderer.renderQueryResult([item], 'sharepoint-embedded', 'saved', TIMESTAMP);
+      const pinButton = one('.action-pin') as HTMLButtonElement;
+      assert.equal(pinButton.disabled, true);
+      assert.equal(pinButton.title, 'Cannot pin: no retrieval extracts are available as evidence');
+
+      renderer.setPinnedItems([getContextItemKey(item as never)]);
+      assert.equal(pinButton.textContent, 'Unpin');
+      assert.equal(pinButton.disabled, false);
+
+      renderer.setPinnedItems([]);
+      assert.equal(pinButton.textContent, 'Pin');
+      assert.equal(pinButton.disabled, true);
+      assert.equal(pinButton.title, 'Cannot pin: no retrieval extracts are available as evidence');
+    });
+
     test('posts openLink, copySnippet, and pinSnippet from the card buttons', () => {
       const item = makeItem();
       renderer.renderQueryResult([item], 'sharepoint', 'release', TIMESTAMP);

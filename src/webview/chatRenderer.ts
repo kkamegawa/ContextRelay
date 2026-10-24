@@ -77,9 +77,14 @@ export class ChatRenderer {
 
     const pinBtn = card.querySelector<HTMLButtonElement>('.action-pin');
     if (pinBtn) {
+      // A result without evidence can still be unpinned, so only block pinning it.
+      const canPin = card.dataset.pinEvidence !== 'false';
       pinBtn.textContent = isPinned ? 'Unpin' : 'Pin';
-      pinBtn.title = isPinned ? 'Unpin snippet' : 'Pin snippet';
+      pinBtn.title = isPinned
+        ? 'Unpin snippet'
+        : canPin ? 'Pin snippet' : 'Cannot pin: no retrieval extracts are available as evidence';
       pinBtn.setAttribute('aria-pressed', isPinned ? 'true' : 'false');
+      pinBtn.disabled = !isPinned && !canPin;
     }
   }
 
@@ -610,10 +615,7 @@ export class ChatRenderer {
       Array.isArray((item.raw as { extracts?: unknown }).extracts) &&
       ((item.raw as { extracts: unknown[] }).extracts).some(extract => typeof extract === 'string' && extract.trim())
     );
-    pinBtn.disabled = !hasEmbeddedEvidence && !this.pinnedKeys.has(itemKey);
-    if (!hasEmbeddedEvidence) {
-      pinBtn.title = 'Cannot pin: no retrieval extracts are available as evidence';
-    }
+    card.dataset.pinEvidence = String(hasEmbeddedEvidence);
     pinBtn.addEventListener('click', () => {
       this.vscode.postMessage({
         command: 'pinSnippet',

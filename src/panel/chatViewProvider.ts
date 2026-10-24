@@ -220,6 +220,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       message.command === 'pinnedItems' ||
       message.command === 'workspaceFiles' ||
       message.command === 'attachmentsChanged' ||
+      message.command === 'submissionCancelled' ||
       message.command === 'assistantMessageStart' ||
       message.command === 'assistantMessageProgress';
 
@@ -248,6 +249,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.activeStreamController?.abort();
     this.activeStreamController = undefined;
     this.pendingAttachments = [];
+    // Supersede any in-flight /embedded request so it cannot repopulate the cleared
+    // transcript or search summary, and release its loading state now because the
+    // superseded request will no longer clear it.
+    this.embeddedRequestGeneration += 1;
+    if (this.embeddedLoadingRequest !== undefined) {
+      this.postMessage({ command: 'loading', source: 'sharepoint-embedded', isLoading: false });
+      this.embeddedLoadingRequest = undefined;
+    }
     this.postMessage({ command: 'clearChat' });
     this.sendPinnedItems();
     this.sendAttachments();
@@ -963,6 +972,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       if (!selected) {
+        // No loading, result or error message follows, so re-enable the input explicitly.
+        this.postMessage({ command: 'submissionCancelled' });
         return;
       }
       source = selected.source;
