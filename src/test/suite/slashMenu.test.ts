@@ -4,11 +4,12 @@ import { SlashMenu } from '../../webview/slashMenu';
 import { installDom, type DomEnvironment } from './domTestUtils';
 
 suite('SlashMenu', () => {
-  test('includes /workiq in the slash command menu', () => {
+  test('includes /workiq and /embedded in the slash command menu', () => {
     assert.ok(
       SLASH_COMMAND_IDS.includes('/workiq'),
       '/workiq must be available in the slash menu'
     );
+    assert.ok(SLASH_COMMAND_IDS.includes('/embedded'));
   });
 });
 
@@ -18,6 +19,7 @@ suite('SlashMenu (DOM)', () => {
     '/teams',
     '/sharepoint',
     '/onedrive',
+    '/embedded',
     '/onenote',
     '/task',
     '/all',

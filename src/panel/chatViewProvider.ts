@@ -9,9 +9,11 @@ import { searchPlanner } from '../adapters/plannerAdapter';
 import { searchRetrieval } from '../adapters/retrievalAdapter';
 import { searchTeams } from '../adapters/teamsAdapter';
 import { searchTodo } from '../adapters/todoAdapter';
+import { searchEmbedded } from '../adapters/retrievalAdapter';
 import { sendWorkIqMessage } from '../adapters/workIqAdapter';
 import { AuthProvider } from '../auth/authProvider';
 import { CacheStore } from '../cache/cacheStore';
+import { getEnabledEmbeddedSources, type EmbeddedSource } from '../embedded/embeddedSources';
 import { DocGenerator, type HandoffContext } from '../docs/docGenerator';
 import { type ContextItem, type ContextSource, type ResolvedPreview, getContextItemKey } from '../models/contextItem';
 import { getHelpText, parseCommand } from '../router/commandRouter';
@@ -52,6 +54,24 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function hasRetrievalExtracts(item: ContextItem): boolean {
+  if (!item.raw || typeof item.raw !== 'object') {
+    return false;
+  }
+  const extracts = (item.raw as { extracts?: unknown }).extracts;
+  return Array.isArray(extracts) && extracts.some(extract => typeof extract === 'string' && extract.trim().length > 0);
+}
+
+function formatEmbeddedSearchError(message: string): string {
+  if (/\b403\b|forbidden|accessdenied|authorization_requestdenied/i.test(message)) {
+    return `${message} Check that the app has delegated FileStorageContainer.Selected consent, the app is granted access to this container type, and the signed-in user can access its containers. Review the tenant's SharePoint Embedded permissions and billing setup.`;
+  }
+  if (/\b404\b|notfound|resourcenotfound/i.test(message)) {
+    return `${message} Confirm the configured container type ID exists in this tenant, the SharePoint Embedded app/container is provisioned, and the app and signed-in user have access. Review the tenant's SharePoint Embedded setup; this search does not fall back to another source.`;
+  }
+  return message;
+}
+
 /**
  * Render one welcome paragraph from the shared welcome text. The webview
  * rebuilds the same paragraphs as DOM nodes in ChatRenderer.clear().
@@ -68,6 +88,11 @@ type ChatHostKind = 'sidebar' | 'editor';
 interface ChatHostSession {
   webview: vscode.Webview;
   ready: boolean;
+}
+
+interface EmbeddedCacheEntry {
+  items: ContextItem[];
+  expiresAt: number;
 }
 
 /**
@@ -98,6 +123,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private activeStreamController?: AbortController;
   /** Bumped on every chat reset so an in-flight request can tell it was cleared. */
   private chatGeneration = 0;
+  /** Embedded retrieval results must stay process-local and never enter workspace state. */
+  private readonly embeddedCache = new Map<string, EmbeddedCacheEntry>();
+  private embeddedCacheGeneration = 0;
+  private embeddedConfigGeneration = 0;
+  private embeddedRequestGeneration = 0;
+  private embeddedLoadingRequest?: number;
+  private embeddedSessionFingerprint?: string;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -112,6 +144,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     );
     this.snippetStore = new SnippetStore(context);
     this.docGenerator = new DocGenerator();
+
+    this.context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+      if (
+        event.affectsConfiguration('contextRelay.embedded') ||
+        event.affectsConfiguration('contextRelay.maxResults') ||
+        event.affectsConfiguration('contextRelay.cache.ttlSeconds')
+      ) {
+        if (event.affectsConfiguration('contextRelay.embedded')) {
+          this.embeddedConfigGeneration += 1;
+        }
+        this.clearEmbeddedCache();
+      }
+    }));
+
+    // Any Microsoft session event (including Work IQ or the Embedded session being created)
+    // drops cached results, but does not discard an in-flight search: its response was
+    // permission-trimmed for the identity that sent it, and the token fingerprint isolates
+    // later searches by identity.
+    const authChange = this.authProvider.onSessionChange?.(() => this.embeddedCache.clear());
+    if (authChange) {
+      this.context.subscriptions.push(authChange);
+    }
   }
 
   resolveWebviewView(
@@ -201,6 +255,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public clearCache(): void {
     this.cache.clear();
+    this.clearEmbeddedCache();
   }
 
   public clearSnippets(): void {
@@ -381,6 +436,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (this.snippetStore.removeByItemKey(key)) {
       this.sendPinnedItems();
       vscode.window.showInformationMessage(`Snippet "${item.title}" unpinned.`);
+      return;
+    }
+
+    if (item.source === 'sharepoint-embedded' && !hasRetrievalExtracts(item)) {
+      vscode.window.showWarningMessage('ContextRelay: This SharePoint Embedded result has no retrieval extracts, so it cannot be pinned as evidence.');
       return;
     }
 
@@ -715,6 +775,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (parsed.target === 'embedded') {
+      await this.handleEmbeddedSearch(parsed.query);
+      return;
+    }
+
     if (parsed.target === 'chat') {
       const mentionResolution = await this.resolveMentionsForPrompt(trimmed);
       if (!mentionResolution) {
@@ -846,6 +911,221 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       text,
       timestamp: new Date().toISOString()
     });
+  }
+
+  private async handleEmbeddedSearch(query: string): Promise<void> {
+    const requestId = ++this.embeddedRequestGeneration;
+    if (this.embeddedLoadingRequest !== undefined) {
+      this.postMessage({ command: 'loading', source: 'sharepoint-embedded', isLoading: false });
+      this.embeddedLoadingRequest = undefined;
+    }
+
+    if (query.trim().length > 1500) {
+      this.postEmbeddedError('SharePoint Embedded queries must be 1,500 characters or fewer. Shorten the natural-language query and try again.');
+      return;
+    }
+
+    const configGeneration = this.embeddedConfigGeneration;
+    const config = vscode.workspace.getConfiguration('contextRelay');
+    if (!config.get<boolean>('embedded.enabled', false)) {
+      this.postEmbeddedError(
+        'SharePoint Embedded search is disabled. Enable `contextRelay.embedded.enabled` in Settings and configure at least one source.'
+      );
+      return;
+    }
+
+    let sources: EmbeddedSource[];
+    try {
+      sources = getEnabledEmbeddedSources(config.get<unknown>('embedded.sources', []));
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.postEmbeddedError(`${reason} Review contextRelay.embedded.sources in Settings and correct invalid or duplicate entries.`);
+      return;
+    }
+    if (sources.length === 0) {
+      this.postEmbeddedError(
+        'No valid SharePoint Embedded sources are enabled. Add a source with a friendly name and container type ID under `contextRelay.embedded.sources` in Settings.'
+      );
+      return;
+    }
+
+    let source: EmbeddedSource | undefined = sources[0];
+    if (sources.length > 1) {
+      const selected = await vscode.window.showQuickPick(
+        sources.map(candidate => ({
+          label: candidate.name,
+          description: 'SharePoint Embedded · Preview',
+          source: candidate
+        })),
+        { placeHolder: 'Choose a SharePoint Embedded source' }
+      );
+      if (!this.isCurrentEmbeddedRequest(requestId)) {
+        return;
+      }
+      if (!selected) {
+        return;
+      }
+      source = selected.source;
+    }
+
+    if (configGeneration !== this.embeddedConfigGeneration) {
+      this.postEmbeddedError('SharePoint Embedded settings changed while choosing a source. Run `/embedded` again to use the updated configuration.');
+      return;
+    }
+
+    let token: string;
+    try {
+      token = await this.authProvider.getEmbeddedAccessToken();
+    } catch (err) {
+      if (this.isCurrentEmbeddedRequest(requestId)) {
+        this.postEmbeddedError(err instanceof Error ? err.message : 'Authentication required.');
+      }
+      return;
+    }
+
+    if (!this.isCurrentEmbeddedRequest(requestId)) {
+      return;
+    }
+    if (configGeneration !== this.embeddedConfigGeneration) {
+      this.postEmbeddedError('SharePoint Embedded settings changed during sign-in. Run `/embedded` again to use the updated configuration.');
+      return;
+    }
+
+    const refreshedConfig = vscode.workspace.getConfiguration('contextRelay');
+    if (!refreshedConfig.get<boolean>('embedded.enabled', false)) {
+      this.postEmbeddedError('SharePoint Embedded search was disabled while signing in. Enable `contextRelay.embedded.enabled` and run `/embedded` again.');
+      return;
+    }
+    try {
+      const refreshedSources = getEnabledEmbeddedSources(refreshedConfig.get<unknown>('embedded.sources', []));
+      const selectedSource = source;
+      const refreshedSource = refreshedSources.find(candidate =>
+        candidate.containerTypeId === selectedSource?.containerTypeId && candidate.name === selectedSource?.name
+      );
+      if (!refreshedSource) {
+        this.postEmbeddedError('The selected SharePoint Embedded source changed or was disabled. Run `/embedded` again to choose a current source.');
+        return;
+      }
+      source = refreshedSource;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.postEmbeddedError(`${reason} Review contextRelay.embedded.sources in Settings and run /embedded again.`);
+      return;
+    }
+
+    if (!this.isCurrentEmbeddedRequest(requestId)) {
+      return;
+    }
+
+    const fingerprint = crypto.createHash('sha256').update(token).digest('hex');
+    if (this.embeddedSessionFingerprint !== fingerprint) {
+      this.clearEmbeddedCache();
+      this.embeddedSessionFingerprint = fingerprint;
+    }
+    const generation = this.embeddedCacheGeneration;
+    this.embeddedLoadingRequest = requestId;
+    this.postMessage({ command: 'loading', source: 'sharepoint-embedded', isLoading: true });
+
+    try {
+      const configuredMaxResults = config.get<number>('maxResults', 10);
+      const maxResults = Number.isFinite(configuredMaxResults)
+        ? Math.min(Math.max(Math.floor(configuredMaxResults), 1), 25)
+        : 10;
+      const cacheKey = JSON.stringify([fingerprint, source.containerTypeId, source.name, query, maxResults]);
+      const ttlSeconds = config.get<number>('cache.ttlSeconds', 300);
+      const cached = ttlSeconds > 0 ? this.embeddedCache.get(cacheKey) : undefined;
+      let items: ContextItem[];
+      let cacheHit = false;
+      if (cached && cached.expiresAt > Date.now()) {
+        items = cached.items.map(item => ({ ...item, cache: { ...item.cache, hit: true, ttlSeconds } }));
+        cacheHit = true;
+      } else {
+        items = await searchEmbedded(token, query, source);
+        if (generation !== this.embeddedCacheGeneration) {
+          this.postEmbeddedSearchInvalidated(requestId, query);
+          return;
+        }
+        if (ttlSeconds > 0) {
+          this.embeddedCache.set(cacheKey, {
+            items,
+            expiresAt: Date.now() + ttlSeconds * 1000
+          });
+          const maxEntries = Math.max(1, config.get<number>('cache.maxEntries', 200));
+          while (this.embeddedCache.size > maxEntries) {
+            const oldestKey = this.embeddedCache.keys().next().value;
+            if (oldestKey === undefined) {
+              break;
+            }
+            this.embeddedCache.delete(oldestKey);
+          }
+        }
+      }
+
+      if (!this.isCurrentEmbeddedRequest(requestId)) {
+        return;
+      }
+      this.postMessage({
+        command: 'queryResult',
+        items,
+        source: 'sharepoint-embedded',
+        query,
+        timestamp: new Date().toISOString()
+      });
+      this.latestSearchSummary = buildSearchSummary(query, [{
+        source: 'sharepoint-embedded',
+        items,
+        cached: cacheHit
+      }], ['sharepoint-embedded']);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (generation !== this.embeddedCacheGeneration) {
+        this.postEmbeddedSearchInvalidated(requestId, query);
+      } else if (this.isCurrentEmbeddedRequest(requestId)) {
+        this.postEmbeddedError(formatEmbeddedSearchError(message));
+        this.latestSearchSummary = buildSearchSummary(query, [{
+          source: 'sharepoint-embedded',
+          items: [],
+          error: message
+        }], ['sharepoint-embedded']);
+      }
+    } finally {
+      if (this.embeddedLoadingRequest === requestId && this.isCurrentEmbeddedRequest(requestId)) {
+        this.postMessage({ command: 'loading', source: 'sharepoint-embedded', isLoading: false });
+        this.embeddedLoadingRequest = undefined;
+      }
+    }
+  }
+
+  private isCurrentEmbeddedRequest(requestId: number): boolean {
+    return requestId === this.embeddedRequestGeneration;
+  }
+
+  /** Report a search whose response was discarded because settings or sign-in changed mid-flight. */
+  private postEmbeddedSearchInvalidated(requestId: number, query: string): void {
+    if (!this.isCurrentEmbeddedRequest(requestId)) {
+      return;
+    }
+    const message = 'SharePoint Embedded settings or sign-in changed while the search was running, so its results were discarded. Run `/embedded` again.';
+    this.postEmbeddedError(message);
+    this.latestSearchSummary = buildSearchSummary(query, [{
+      source: 'sharepoint-embedded',
+      items: [],
+      error: message
+    }], ['sharepoint-embedded']);
+  }
+
+  private postEmbeddedError(message: string): void {
+    this.postMessage({
+      command: 'queryError',
+      source: 'sharepoint-embedded',
+      message,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  private clearEmbeddedCache(): void {
+    this.embeddedCache.clear();
+    this.embeddedCacheGeneration += 1;
   }
 
   private async handleAskCommand(prompt: string, mentionFiles: readonly ResolvedAttachment[] = []): Promise<void> {
@@ -1216,11 +1496,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return config.get<boolean>('adapters.todo', true);
       case 'connectors':
         return config.get<boolean>('adapters.connectors', false);
+      case 'sharepoint-embedded':
+        return false;
     }
   }
 
   private async handleOpenItem(item: ContextItem): Promise<void> {
     if (!item) {
+      return;
+    }
+
+    if (item.source === 'sharepoint-embedded') {
+      const preview = await resolvePreview(item, async () => this.authProvider.getEmbeddedAccessToken());
+      this.showPreviewPanel(preview);
       return;
     }
 
@@ -1350,6 +1638,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           config.get<boolean>('adapters.connectors', false),
           () => searchRetrieval(token, query, 'externalItem')
         );
+      case 'sharepoint-embedded':
+        throw new Error('Use /embedded to search SharePoint Embedded.');
     }
   }
 
@@ -1609,6 +1899,44 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       color: var(--vscode-badge-foreground);
       text-transform: uppercase;
       font-weight: 600;
+    }
+
+    .source-badge-embedded {
+      text-transform: none;
+      white-space: normal;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      box-sizing: border-box;
+    }
+
+    .source-metadata {
+      font-size: 0.72em;
+      opacity: 0.75;
+      overflow-wrap: anywhere;
+    }
+
+    .embedded-source-metadata {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--cr-spacing-xs);
+      min-width: 0;
+      max-width: 100%;
+      margin-top: 2px;
+    }
+
+    .result-card.embedded-result .title {
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .result-card.embedded-result .result-title-text {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .result-card.embedded-result .pin-indicator {
+      flex: 0 0 auto;
     }
 
     .source-header {

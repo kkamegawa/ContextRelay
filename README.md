@@ -2,7 +2,7 @@
 
 [日本語版 README](README_ja.md)
 
-ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. Plain text starts a Microsoft 365 Copilot chat: ContextRelay does not run a Microsoft 365 search for it, but any pinned snippets and attached files are sent along as grounding context automatically. Slash commands search Exchange mail, Teams messages, SharePoint sites, OneDrive, OneNote, and Planner tasks. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
+ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context directly in a side panel while you design and code. Plain text starts a Microsoft 365 Copilot chat: ContextRelay does not run a Microsoft 365 search for it, but any pinned snippets and attached files are sent along as grounding context automatically. Slash commands search Exchange mail, Teams messages, SharePoint sites, OneDrive, OneNote, and Planner tasks. An explicitly configured, opt-in SharePoint Embedded source can retrieve grounding extracts from an authorized container type. Pin key snippets and generate timestamped handoff documents (PLAN / TASKS / TEST_PLAN / HANDOFF) so GitHub Copilot can pick up the work fast.
 
 ---
 
@@ -26,6 +26,7 @@ ContextRelay is a VS Code extension that surfaces relevant Microsoft 365 context
 | `/teams <query>` | Microsoft Teams messages |
 | `/sharepoint <query>` | SharePoint sites & pages |
 | `/onedrive <query>` | OneDrive files |
+| `/embedded <query>` | Retrieval extracts from a configured SharePoint Embedded source (preview, opt-in) |
 | `/onenote <query>` | OneNote pages |
 | `/task <query>` | Planner and Microsoft To Do tasks |
 | `/all <query>` | All enabled sources |
@@ -64,6 +65,7 @@ Summarize #docs/plan.md
 - A Microsoft 365 work/school account (Microsoft Entra ID). Personal Microsoft accounts are not supported.
 - **For Exchange Mail, Teams, SharePoint, OneDrive, OneNote, Planner, and Microsoft To Do search**: Standard Microsoft 365 license plus the required Microsoft Graph delegated permissions
 - **For Copilot-grounded chat features**: Microsoft 365 Copilot license might still be required depending on tenant rollout and API availability
+- **For SharePoint Embedded Retrieval**: opt-in preview, pay-as-you-go billing for the configured container type, delegated `FileStorageContainer.Selected`, a container-type read grant from its owner to the ContextRelay app, and user access to target containers. One tenant user needs a Microsoft 365 Copilot license to initialize the semantic index; querying users do not each need that license for this source.
 
 ### Required permissions
 
@@ -91,6 +93,7 @@ The following delegated Microsoft Graph permissions are required by feature:
 |---|---|
 | `Files.Read.All` | SharePoint / OneDrive search |
 | `Sites.Read.All` | SharePoint / OneDrive search, Chat |
+| `FileStorageContainer.Selected` (delegated) | SharePoint Embedded retrieval (optional; also requires an owner-issued container-type read grant) |
 | `Mail.Read` | Exchange Mail search, Chat |
 | `Chat.Read` | Teams search, Chat |
 | `ChannelMessage.Read.All` | Teams search, Chat |
@@ -99,6 +102,8 @@ The following delegated Microsoft Graph permissions are required by feature:
 | `People.Read.All` | Chat |
 | `OnlineMeetingTranscript.Read.All` | Chat |
 | `ExternalItem.Read.All` | Connectors search, Chat (optional) |
+
+SharePoint Embedded access has a second permission layer beyond the Graph scope: the owning application must register a delegated content-read grant for the ContextRelay app on the selected container type. A container type ID alone does not grant access, and a third-party app cannot grant itself access to Microsoft's Loop-owned container types. See [SharePoint Embedded setup](docs/spe-embedded.md) before enabling this source.
 
 > **Important**:
 >
@@ -111,9 +116,9 @@ The following delegated Microsoft Graph permissions are required by feature:
 
 | Permission | Resource endpoint | Used by |
 |---|---|---|
-| `WorkIQAgent.Ask` | `api://workiq.svc.cloud.microsoft` | `/workiq` command — Work IQ API (optional, requires Microsoft 365 Copilot license) |
+| `WorkIQAgent.Ask` | `api://workiq.svc.cloud.microsoft` | `/workiq` command — Work IQ A2A API (optional; requires Work IQ tenant enablement and Copilot Credits spending-policy coverage) |
 
-> **Important**: This permission requires **tenant admin consent** and is only useful for users with a **Microsoft 365 Copilot license**. See [docs/work_iq.md](docs/work_iq.md) for setup instructions.
+> **Important**: This permission requires **tenant admin consent**. Work IQ API usage is billed through Copilot Credits and users must be covered by a Work IQ API spending policy. See [docs/work_iq.md](docs/work_iq.md) for setup instructions.
 
 ---
 
@@ -315,6 +320,7 @@ Recommended minimum sets:
 | Planner search | `User.Read`, `Tasks.Read` |
 | Chat tab enabled | `User.Read`, `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All` |
 | Connectors enabled | `User.Read`, `ExternalItem.Read.All` |
+| SharePoint Embedded retrieval | `User.Read`, `FileStorageContainer.Selected` (delegated) plus the container-type owner's app grant |
 
 > `User.Read` is always recommended because the built-in Microsoft auth provider relies on a Graph user-profile baseline and ContextRelay always requests it.
 
@@ -649,7 +655,7 @@ Use `/workiq` to send natural language queries to the [Work IQ Gateway](https://
 
 3. Consecutive `/workiq` queries maintain conversation context, so follow-up questions ("Tell me more about the 2 PM call") work naturally.
 
-> **Prerequisites**: The `/workiq` command requires a Microsoft 365 Copilot license and the `WorkIQAgent.Ask` delegated permission on your Entra app registration. See [docs/work_iq.md](docs/work_iq.md) for setup instructions.
+> **Prerequisites**: The `/workiq` command requires the Work IQ service principal in your tenant, Work IQ tenant enablement, a Work IQ API spending policy that covers the user, and the `WorkIQAgent.Ask` delegated permission on your Entra app registration. See [docs/work_iq.md](docs/work_iq.md) for setup instructions.
 
 > **Note**: When `/workiq` is specified, all other slash commands in the input are ignored and treated as part of the query text.
 

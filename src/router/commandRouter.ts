@@ -6,6 +6,7 @@ export type RouteTarget =
   | 'teams'
   | 'sharepoint'
   | 'onedrive'
+  | 'embedded'
   | 'onenote'
   | 'planner'
   | 'task'
@@ -42,7 +43,8 @@ const SEARCH_COMMAND_METADATA: Record<SearchCommandName, { target: RouteTarget; 
 const OPERATION_COMMANDS: Record<string, RouteTarget> = {
   ask: 'ask',
   clear: 'clear',
-  workiq: 'workiq'
+  workiq: 'workiq',
+  embedded: 'embedded'
 };
 
 function hasOwnKey<T extends object>(record: T, key: PropertyKey): key is keyof T {
@@ -73,7 +75,7 @@ export function parseCommand(input: string): ParsedCommand {
   if (hasOwnKey(OPERATION_COMMANDS, firstCommand)) {
     const rawQuery = commandMatch?.[2] ?? '';
     const target = OPERATION_COMMANDS[firstCommand];
-    const query = target === 'ask' || target === 'workiq' ? rawQuery.trim() : '';
+    const query = target === 'ask' || target === 'workiq' || target === 'embedded' ? rawQuery.trim() : '';
     const isEmpty = target === 'clear' ? false : query.length === 0;
 
     return {
@@ -189,7 +191,8 @@ export function getHelpText(command: string | readonly SearchCommandName[]): str
     all: 'Example: /all architecture decisions\nExample: /mail /onedrive architecture decisions\nPlain text without a slash command starts or continues a Microsoft 365 Copilot chat. Pinned snippets and attached files (`#file`, 📎, or drag & drop), if any, are attached as context automatically.',
     ask: 'Example: /ask 日本語に翻訳してmarkdownにして\nExample: /ask #README.md Summarize this file as a bullet list\nPinned snippets or attached files (`#file`, 📎, or drag & drop) are used as context and the Microsoft 365 Copilot response is shown in the panel. Plain chat attaches the same context automatically, so /ask is only needed to require that context be present before sending.',
     clear: 'Example: /clear\nClears the current chat transcript and discards all pinned snippets.',
-    workiq: 'Example: /workiq Summarize my recent emails from Alice\nExample: /workiq What meetings do I have today?\nSends a natural language query to the Work IQ Gateway (A2A protocol). Requires Microsoft 365 Copilot license.'
+    workiq: 'Example: /workiq Summarize my recent emails from Alice\nExample: /workiq What meetings do I have today?\nSends a natural language query to the Work IQ Gateway (A2A protocol). Requires Work IQ to be enabled for the tenant, admin consent for WorkIQAgent.Ask, and a spending policy that covers the user.',
+    embedded: 'Example: /embedded What decisions were made about authentication?\nSearches explicitly configured SharePoint Embedded sources by friendly name. Multiple configured sources prompt you to choose one.'
   };
   return examples[commandName] ?? 'Type a query to search Microsoft 365 content.';
 }

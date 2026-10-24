@@ -1,5 +1,6 @@
 export type ContextSource =
   | 'sharepoint'
+  | 'sharepoint-embedded'
   | 'onedrive'
   | 'mail'
   | 'teams'
@@ -45,7 +46,7 @@ export interface SavedSnippet {
   savedAt: string;
 }
 
-const INTERNAL_PREVIEW_SOURCES = new Set<ContextSource>(['planner', 'todo']);
+const INTERNAL_PREVIEW_SOURCES = new Set<ContextSource>(['planner', 'todo', 'sharepoint-embedded']);
 
 export function canOpenResult(item: Pick<ContextItem, 'source' | 'url'>): boolean {
   return Boolean(item.url?.trim()) || INTERNAL_PREVIEW_SOURCES.has(item.source);
@@ -60,7 +61,7 @@ export function getPreviewText(preview: Pick<ResolvedPreview, 'content'>): strin
  * agree on whether two items are "the same" for pin toggling.
  */
 export function getContextItemKey(
-  item: Pick<ContextItem, 'source' | 'title' | 'url' | 'timestamp' | 'snippet'>
+  item: Pick<ContextItem, 'source' | 'title' | 'url' | 'timestamp' | 'snippet' | 'raw'>
 ): string {
   const discriminator =
     item.url?.trim() ||
@@ -68,5 +69,11 @@ export function getContextItemKey(
     item.snippet.trim() ||
     '';
 
-  return `${item.source}::${discriminator}::${item.title}`;
+  const embeddedContainer = item.source === 'sharepoint-embedded' && item.raw && typeof item.raw === 'object'
+    ? String((item.raw as { containerTypeId?: unknown }).containerTypeId ?? '')
+    : '';
+
+  return item.source === 'sharepoint-embedded'
+    ? `${item.source}::${embeddedContainer}::${discriminator}::${item.title}`
+    : `${item.source}::${discriminator}::${item.title}`;
 }

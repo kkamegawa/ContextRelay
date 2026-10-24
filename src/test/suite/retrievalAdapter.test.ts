@@ -3,6 +3,7 @@ import Module from 'module';
 import { buildSearchSnippet, escapeODataString, formatLocationSnippet, isOneDriveUrl, stripSearchMarkup } from '../../adapters/retrievalSearchUtils';
 
 type SearchRetrievalFn = typeof import('../../adapters/retrievalAdapter').searchRetrieval;
+type SearchEmbeddedFn = typeof import('../../adapters/retrievalAdapter').searchEmbedded;
 type ModuleLoader = typeof Module & {
   _load: (request: string, parent: object | null | undefined, isMain: boolean) => unknown;
 };
@@ -10,6 +11,7 @@ type ModuleLoader = typeof Module & {
 const moduleLoader = Module as unknown as ModuleLoader;
 const originalLoad = moduleLoader._load;
 let searchRetrieval: SearchRetrievalFn;
+let searchEmbedded: SearchEmbeddedFn;
 
 suite('Retrieval adapter', () => {
   suiteSetup(async () => {
@@ -28,7 +30,7 @@ suite('Retrieval adapter', () => {
     };
 
     try {
-      ({ searchRetrieval } = await import('../../adapters/retrievalAdapter'));
+      ({ searchRetrieval, searchEmbedded } = await import('../../adapters/retrievalAdapter'));
     } finally {
       moduleLoader._load = originalLoad;
     }
@@ -178,6 +180,85 @@ suite('Retrieval adapter', () => {
 
       const body = JSON.parse(capturedInit?.body as string);
       assert.equal(body.queryString.length, 1500);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('SharePoint Embedded retrieval sends container configuration and preserves extracts and scores', async () => {
+    const originalFetch = globalThis.fetch;
+    let capturedUrl: string | undefined;
+    let capturedInit: RequestInit | undefined;
+
+    globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
+      capturedUrl = typeof input === 'string' ? input : input.toString();
+      capturedInit = init;
+      return new Response(JSON.stringify({
+        retrievalHits: [{
+          webUrl: 'https://example.com/loop/page',
+          sensitivityLabel: { id: 'label-id' },
+          resourceType: 'file',
+          resourceMetadata: { title: 'Architecture notes' },
+          extracts: [
+            { text: 'First grounded paragraph', relevanceScore: 0.93 },
+            { text: 'Second grounded paragraph', relevanceScore: 0.81 }
+          ]
+        }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    try {
+      const items = await searchEmbedded('token', '  authentication design  ', {
+        name: 'Project knowledge',
+        containerTypeId: '11111111-2222-4333-8444-555555555555',
+        enabled: true
+      });
+
+      assert.equal(capturedUrl, 'https://graph.microsoft.com/v1.0/copilot/retrieval');
+      assert.equal(capturedInit?.method, 'POST');
+      const body = JSON.parse(capturedInit?.body as string);
+      assert.equal(body.queryString, 'authentication design');
+      assert.equal(body.dataSource, 'sharePointEmbedded');
+      assert.deepEqual(body.dataSourceConfiguration, {
+        sharePointEmbedded: { containerTypeId: '11111111-2222-4333-8444-555555555555' }
+      });
+      assert.ok(body.maximumNumberOfResults >= 1 && body.maximumNumberOfResults <= 25);
+      assert.equal(items.length, 1);
+      assert.equal(items[0].source, 'sharepoint-embedded');
+      assert.equal(items[0].title, 'Architecture notes');
+      assert.equal(items[0].snippet, 'First grounded paragraph Second grounded paragraph');
+      assert.deepEqual(items[0].raw, {
+        sourceName: 'Project knowledge',
+        containerTypeId: '11111111-2222-4333-8444-555555555555',
+        extracts: ['First grounded paragraph', 'Second grounded paragraph'],
+        resourceType: 'file',
+        extractRelevanceScores: [0.93, 0.81],
+        sensitivityLabel: { id: 'label-id' }
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('SharePoint Embedded retrieval rejects empty and overlong queries before calling Graph', async () => {
+    const originalFetch = globalThis.fetch;
+    let fetchCount = 0;
+    globalThis.fetch = (async (): Promise<Response> => {
+      fetchCount++;
+      return new Response(JSON.stringify({ retrievalHits: [] }), { status: 200 });
+    }) as typeof fetch;
+
+    try {
+      const source = {
+        name: 'Project knowledge',
+        containerTypeId: '11111111-2222-4333-8444-555555555555',
+        enabled: true
+      };
+      await assert.rejects(searchEmbedded('token', ' \n ', source), /must not be empty/);
+      await assert.rejects(searchEmbedded('token', 'a'.repeat(1501), source), /1500 characters or fewer/);
+      await assert.rejects(searchEmbedded('token', 'query', { ...source, enabled: false }), /source is disabled/);
+      await assert.rejects(searchEmbedded('token', 'query', { ...source, name: '  ' }), /source name is required/);
+      assert.equal(fetchCount, 0);
     } finally {
       globalThis.fetch = originalFetch;
     }

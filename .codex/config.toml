@@ -1,0 +1,6 @@
+[mcp_servers.spe]
+command = "npx"
+args = ["--yes", "@microsoft/spe-mcp@0.2.0-alpha.4", "start", "--read-only", "--tools", "readOnly"]
+
+[mcp_servers.spe.env]
+SPE_DATA_DIR = "~/.spe-mcp/contextrelay-codex"

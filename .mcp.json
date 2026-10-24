@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "spe": {
+      "command": "node",
+      "args": [
+        "scripts/spe-mcp.cjs"
+      ]
+    }
+  }
+}

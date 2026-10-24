@@ -84,6 +84,28 @@ suite('chatContext', () => {
     assert.equal(payload.contextualResources?.webContext?.isWebEnabled, false);
   });
 
+  test('uses Embedded excerpts as additionalContext and never treats the URL as a file resource', async () => {
+    const payload = await buildChatContextPayload({
+      snippets: [{
+        id: 'embedded-1',
+        name: 'Authentication decision',
+        savedAt: '2026-10-24T00:00:00.000Z',
+        item: {
+          source: 'sharepoint-embedded',
+          title: 'Authentication decision',
+          snippet: 'First evidence extract.\n\nSecond evidence extract.',
+          url: 'https://example.invalid/embedded-item',
+          cache: { hit: false },
+          raw: { sourceName: 'Project Knowledge' }
+        }
+      }]
+    });
+
+    assert.equal(payload.contextualResources?.files, undefined);
+    assert.ok(payload.additionalContext?.[0].text.includes('SharePoint Embedded · Preview (Project Knowledge)'));
+    assert.ok(payload.additionalContext?.[0].text.includes('First evidence extract.\n\nSecond evidence extract.'));
+  });
+
   test('reads attached local file content into additionalContext instead of contextualResources.files', async () => {
     const filePath = path.join(root, 'notes.md');
     fs.writeFileSync(filePath, 'ship checklist', 'utf8');

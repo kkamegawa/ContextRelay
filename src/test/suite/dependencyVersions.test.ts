@@ -279,7 +279,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'serialize-javascript override',
         actual: packageJson.overrides?.['serialize-javascript'],
-        expected: '7.1.2',
+        expected: '7.1.3',
         message: 'must stay aligned with the Mocha 12 dependency range'
       },
       {
@@ -388,7 +388,7 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(packageJson.overrides?.['serialize-javascript'], '7.1.2') >= 0,
+      compareVersions(packageJson.overrides?.['serialize-javascript'], '7.1.3') >= 0,
       `serialize-javascript override must stay on a non-vulnerable release (found: ${packageJson.overrides?.['serialize-javascript'] ?? 'missing'})`
     );
 
@@ -444,20 +444,20 @@ suite('Dependency security baselines', () => {
     );
   });
 
-  test('keeps happy-dom on a release with the VM context escape fix', () => {
+  test('keeps happy-dom beyond both VM context escape vulnerabilities', () => {
     const packageJson = readRepoJson<PackageJson>('package.json');
     const packageLockJson = readRepoJson<PackageLockJson>('package-lock.json');
     const declaredVersion = packageJson.devDependencies?.['happy-dom'];
     const installedVersion = packageLockJson.packages?.['node_modules/happy-dom']?.version;
 
-    // GHSA-37j7-fg3j-429f (VM context escape leading to RCE) affects happy-dom before 20.0.0.
+    // GHSA-834v-8h66-3h79 bypasses the original VM context escape fix through 21.0.3.
     assert.ok(
-      compareVersions(declaredVersion, '20.0.0') >= 0,
-      `happy-dom must stay on 20.0.0 or newer (found: ${declaredVersion ?? 'missing'})`
+      compareVersions(declaredVersion, '21.0.4') >= 0,
+      `happy-dom must stay on 21.0.4 or newer (found: ${declaredVersion ?? 'missing'})`
     );
     assert.ok(
-      compareVersions(installedVersion, '20.0.0') >= 0,
-      `installed happy-dom must stay on 20.0.0 or newer (found: ${installedVersion ?? 'missing'})`
+      compareVersions(installedVersion, '21.0.4') >= 0,
+      `installed happy-dom must stay on 21.0.4 or newer (found: ${installedVersion ?? 'missing'})`
     );
   });
 
@@ -495,8 +495,8 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(serializeJavaScriptVersion, '7.1.2') >= 0,
-      `installed serialize-javascript must stay on 7.1.2 or newer (found: ${serializeJavaScriptVersion ?? 'missing'})`
+      compareVersions(serializeJavaScriptVersion, '7.1.3') >= 0,
+      `installed serialize-javascript must stay on 7.1.3 or newer (found: ${serializeJavaScriptVersion ?? 'missing'})`
     );
 
     assert.ok(
@@ -510,7 +510,7 @@ suite('Dependency security baselines', () => {
     );
 
     assert.ok(
-      compareVersions(fastUriVersion, '3.1.8') >= 0,
+      compareVersions(fastUriVersion, '3.1.9') >= 0,
       `installed fast-uri must stay on a non-vulnerable release (found: ${fastUriVersion ?? 'missing'})`
     );
 
@@ -651,7 +651,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed serialize-javascript',
         actual: packageLockJson.packages?.['node_modules/serialize-javascript']?.version,
-        expected: '7.1.2',
+        expected: '7.1.3',
         message: 'must stay aligned with the Mocha 12 dependency range'
       },
       {

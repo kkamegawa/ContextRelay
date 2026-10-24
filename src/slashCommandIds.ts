@@ -8,6 +8,8 @@ export const SLASH_COMMAND_IDS: readonly string[] = [
   '/teams',
   '/sharepoint',
   '/onedrive',
+  '/embedded',
+  '/embedded',
   '/onenote',
   '/task',
   '/all',
