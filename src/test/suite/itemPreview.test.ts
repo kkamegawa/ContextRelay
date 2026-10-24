@@ -41,6 +41,20 @@ suite('Item preview', () => {
     assert.equal(getPreviewText(preview), 'First paragraph\n\nSecond paragraph');
   });
 
+  test('previews every Embedded extract and identifies the friendly source as preview data', () => {
+    const preview = createFallbackPreview(makeItem({
+      source: 'sharepoint-embedded',
+      snippet: '',
+      raw: {
+        sourceName: 'Project Knowledge',
+        extracts: ['Authentication uses managed identity.', 'Token refresh is handled by the client.']
+      }
+    }));
+
+    assert.equal(preview.subtitle, 'Project Knowledge · SharePoint Embedded · Preview');
+    assert.equal(getPreviewText(preview), 'Authentication uses managed identity.\n\nToken refresh is handled by the client.');
+  });
+
   test('creates full mail preview from fetched body', () => {
     const item = makeItem({
       source: 'mail',

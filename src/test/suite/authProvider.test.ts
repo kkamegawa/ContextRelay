@@ -11,6 +11,8 @@ const originalLoad = moduleLoader._load;
 let AuthProvider: AuthProviderClass;
 
 const configValues = new Map<string, unknown>();
+const sessionRequests: string[][] = [];
+let getSessionImpl: (scopes: string[]) => Promise<unknown> = async () => undefined;
 
 suite('AuthProvider', () => {
   suiteSetup(async () => {
@@ -24,7 +26,10 @@ suite('AuthProvider', () => {
             })
           },
           authentication: {
-            getSession: async () => undefined,
+            getSession: async (_providerId: string, scopes: string[]) => {
+              sessionRequests.push(scopes);
+              return getSessionImpl(scopes);
+            },
             onDidChangeSessions: () => ({ dispose: () => undefined })
           }
         };
@@ -42,6 +47,8 @@ suite('AuthProvider', () => {
 
   setup(() => {
     configValues.clear();
+    sessionRequests.length = 0;
+    getSessionImpl = async () => undefined;
     configValues.set('auth.tenantId', 'organizations');
     configValues.set('enableChatPreview', false);
     configValues.set('adapters.mail', false);
@@ -50,6 +57,8 @@ suite('AuthProvider', () => {
     configValues.set('adapters.onedrive', false);
     configValues.set('adapters.todo', false);
     configValues.set('adapters.connectors', false);
+    configValues.set('embedded.enabled', false);
+    configValues.set('embedded.sources', []);
   });
 
   test('includes Notes.Read and Tasks.Read when OneNote and Planner are enabled', () => {
@@ -84,5 +93,53 @@ suite('AuthProvider', () => {
 
     assert.equal(scopes.includes('https://graph.microsoft.com/Notes.Read'), false);
     assert.equal(scopes.includes('https://graph.microsoft.com/Tasks.Read'), false);
+  });
+
+  test('keeps FileStorageContainer.Selected out of the shared session even when Embedded is enabled', () => {
+    configValues.set('adapters.mail', true);
+    configValues.set('embedded.sources', [{
+      name: 'Project knowledge',
+      containerTypeId: '11111111-2222-4333-8444-555555555555',
+      enabled: true
+    }]);
+    configValues.set('embedded.enabled', true);
+
+    const scopes = new AuthProvider({} as never).getRequiredScopes();
+    assert.ok(scopes.includes('https://graph.microsoft.com/Mail.Read'));
+    assert.equal(scopes.includes('https://graph.microsoft.com/FileStorageContainer.Selected'), false);
+  });
+
+  test('requests a dedicated Embedded session with only the Embedded Graph scope', async () => {
+    configValues.set('auth.clientId', 'client-123');
+    configValues.set('adapters.mail', true);
+    getSessionImpl = async () => ({ accessToken: 'embedded-token' });
+
+    const token = await new AuthProvider({} as never).getEmbeddedAccessToken();
+
+    assert.equal(token, 'embedded-token');
+    assert.deepEqual(sessionRequests, [[
+      'offline_access',
+      'openid',
+      'profile',
+      'https://graph.microsoft.com/User.Read',
+      'https://graph.microsoft.com/FileStorageContainer.Selected',
+      'VSCODE_CLIENT_ID:client-123',
+      'VSCODE_TENANT:organizations'
+    ]]);
+  });
+
+  test('reports missing Embedded consent without affecting the shared session', async () => {
+    configValues.set('auth.clientId', 'client-123');
+    configValues.set('adapters.mail', true);
+    getSessionImpl = async scopes => {
+      if (scopes.includes('https://graph.microsoft.com/FileStorageContainer.Selected')) {
+        throw new Error('AADSTS65001: The user or administrator has not consented.');
+      }
+      return { accessToken: 'shared-token' };
+    };
+    const provider = new AuthProvider({} as never);
+
+    await assert.rejects(provider.getEmbeddedAccessToken(), /FileStorageContainer\.Selected/);
+    assert.equal(await provider.getAccessToken(), 'shared-token');
   });
 });

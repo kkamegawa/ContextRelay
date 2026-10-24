@@ -23,6 +23,15 @@ function appendUpdate(filePath: string, content: string): void {
   fs.appendFileSync(filePath, `${prefix}${content.trimEnd()}\n`, 'utf8');
 }
 
+function getSnippetSource(item: SavedSnippet['item']): string {
+  if (item.source !== 'sharepoint-embedded') {
+    return item.source;
+  }
+  const raw = item.raw && typeof item.raw === 'object' ? item.raw as { sourceName?: unknown } : undefined;
+  const sourceName = typeof raw?.sourceName === 'string' ? raw.sourceName.trim() : '';
+  return `SharePoint Embedded · Preview${sourceName ? ` (${sourceName})` : ''}`;
+}
+
 export class DocGenerator {
   private getOutputDir(): string {
     const config = vscode.workspace.getConfiguration('contextRelay');
@@ -36,7 +45,7 @@ export class DocGenerator {
     const ts = utcTimestamp();
     const snippetList = context.snippets.length > 0
       ? context.snippets.map(s =>
-          `- **${s.name}** (${s.item.source}) — ${s.item.snippet.slice(0, 120)}...`
+          `- **${s.name}** (${getSnippetSource(s.item)}) — ${s.item.snippet.slice(0, 120)}...`
         ).join('\n')
       : '_No snippets saved._';
 
@@ -86,7 +95,7 @@ export class DocGenerator {
     const snippetList = context.snippets.length > 0
       ? context.snippets.map(s => [
           `### ${s.name}`,
-          `- **Source**: ${s.item.source}`,
+          `- **Source**: ${getSnippetSource(s.item)}`,
           `- **Saved**: ${s.savedAt}`,
           s.item.url ? `- **Link**: ${s.item.url}` : '',
           '',

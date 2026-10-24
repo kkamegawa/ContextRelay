@@ -98,3 +98,11 @@
   - Add behavior tests for `sanitizePreviewHtml` covering the markup classes fixed in sanitize-html 2.18.0.
 - Reason: The 1.138.0 to 1.140.0 type definition difference is limited to documentation comments (the `headers` description of the MCP HTTP server definition), and the repository does not use that API, so no code change is needed. The raised engines floor is the only public compatibility change and follows the rule established on 2026-09-21. The sanitize-html 2.18.0 security fixes concern `meta`, `noscript` in `nonTextTags`, namespace-prefixed SVG animation tags and iframe fallback markup, none of which are allowed by the preview configuration, so they are defense in depth rather than an exposure fix.
 - Compatibility: The extension now requires VS Code 1.140.0 or later. Preview rendering output is unchanged for allowed tags.
+
+## 2026-10-24 - Add explicit SharePoint Embedded retrieval and restore the security baseline
+
+- Task: [Issue #287](https://github.com/kkamegawa/ContextRelay/issues/287), with sub-issues #288, #289 and #290.
+- Decision: Adopt [ADR 0001](adr/0001-sharepoint-embedded-retrieval.md) for named-source direct retrieval and read-only developer MCP. Existing SharePoint/OneDrive Graph Search remains unchanged.
+- Build prerequisite: Raise happy-dom to 21.0.4, serialize-javascript to 7.1.3 and fast-uri to 3.1.9 because the mandatory audit blocked the feature build. All three releases were public for more than 24 hours when selected. Update the version-floor regressions; no new runtime dependency is introduced. happy-dom is a development-only major upgrade, validated by the full DOM/test suite.
+- Reason: The approved feature keeps product interaction inside ContextRelay and makes owner-controlled access explicit; dependency updates satisfy the repository's zero-vulnerability build rule.
+- Approval: User approval in this conversation on 2026-10-24; dependency repair is the required build validation prerequisite.

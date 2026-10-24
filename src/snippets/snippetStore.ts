@@ -20,9 +20,10 @@ export class SnippetStore {
   save(item: ContextItem, name?: string): SavedSnippet {
     const snippets = this.getAll();
     const id = `snippet-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const storedRaw = getEmbeddedIdentity(item);
     const snippet: SavedSnippet = {
       id,
-      item: { ...item, raw: undefined },
+      item: { ...item, raw: storedRaw },
       name: name ?? item.title,
       savedAt: new Date().toISOString()
     };
@@ -53,4 +54,19 @@ export class SnippetStore {
   clear(): void {
     this.context.workspaceState.update(WORKSPACE_STATE_KEY, []);
   }
+}
+
+function getEmbeddedIdentity(item: ContextItem): { sourceName?: string; containerTypeId?: string } | undefined {
+  if (item.source !== 'sharepoint-embedded' || !item.raw || typeof item.raw !== 'object') {
+    return undefined;
+  }
+
+  const raw = item.raw as { sourceName?: unknown; containerTypeId?: unknown };
+  const sourceName = typeof raw.sourceName === 'string' ? raw.sourceName : undefined;
+  const containerTypeId = typeof raw.containerTypeId === 'string' ? raw.containerTypeId : undefined;
+  if (sourceName === undefined && containerTypeId === undefined) {
+    return undefined;
+  }
+
+  return { sourceName, containerTypeId };
 }

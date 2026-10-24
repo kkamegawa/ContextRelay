@@ -25,6 +25,12 @@ let replies: string[] = [];
 let workIqReplies: Array<{ text: string; contextId?: string }> = [];
 let workspaceFolders: Array<{ uri: { fsPath: string } }> | undefined;
 let quickPickSelection: string[] | undefined;
+let embeddedQuickPickSelection: { label: string; source: { name: string; containerTypeId: string; enabled: boolean } } | undefined;
+const embeddedRequests: Array<{ token: string; query: string; source: { name: string; containerTypeId: string; enabled: boolean } }> = [];
+let embeddedReplies: Array<unknown[]> = [];
+let embeddedQuickPickOverride: (() => Promise<typeof embeddedQuickPickSelection>) | undefined;
+let embeddedOverride: ((token: string, query: string, source: { name: string; containerTypeId: string; enabled: boolean }) => Promise<unknown[]>) | undefined;
+let configurationChangeHandler: ((event: { affectsConfiguration(section: string): boolean }) => void) | undefined;
 let sendOverride: ((onProgress?: (fullTextSoFar: string) => void, signal?: AbortSignal) => Promise<string>) | undefined;
 
 class InMemoryMemento implements vscode.Memento {
@@ -78,7 +84,11 @@ function createVscodeStub(): typeof vscode {
       getConfiguration: () => ({
         get: <T>(key: string, defaultValue: T): T =>
           (configValues.has(key) ? configValues.get(key) : defaultValue) as T
-      })
+      }),
+      onDidChangeConfiguration: (handler: typeof configurationChangeHandler) => {
+        configurationChangeHandler = handler;
+        return { dispose: () => undefined };
+      }
     },
     window: {
       showWarningMessage: async (message: string) => {
@@ -93,7 +103,12 @@ function createVscodeStub(): typeof vscode {
         infoMessages.push(message);
         return undefined;
       },
-      showQuickPick: async () => quickPickSelection
+      showQuickPick: async (items?: Array<{ label: string; source?: unknown }>) => {
+        if (items?.some(item => item.source)) {
+          return embeddedQuickPickOverride ? embeddedQuickPickOverride() : embeddedQuickPickSelection;
+        }
+        return quickPickSelection;
+      }
     },
     env: {
       openExternal: async () => true,
@@ -172,7 +187,16 @@ suite('ChatViewProvider', () => {
       }
 
       if (request === '../adapters/retrievalAdapter') {
-        return { searchRetrieval: async () => [] };
+        return {
+          searchRetrieval: async () => [],
+          searchEmbedded: async (token: string, query: string, source: { name: string; containerTypeId: string; enabled: boolean }) => {
+            embeddedRequests.push({ token, query, source });
+            if (embeddedOverride) {
+              return embeddedOverride(token, query, source);
+            }
+            return embeddedReplies.shift() ?? [];
+          }
+        };
       }
 
       if (request === '../adapters/teamsAdapter') {
@@ -232,6 +256,12 @@ suite('ChatViewProvider', () => {
     ];
     workspaceFolders = undefined;
     quickPickSelection = undefined;
+    embeddedQuickPickSelection = undefined;
+    embeddedRequests.length = 0;
+    embeddedReplies = [];
+    embeddedQuickPickOverride = undefined;
+    embeddedOverride = undefined;
+    configurationChangeHandler = undefined;
     sendOverride = undefined;
   });
 
@@ -413,6 +443,414 @@ suite('ChatViewProvider', () => {
     assert.equal(messages[1].text, 'Asking Work IQ...');
     assert.equal(messages[2].text, 'Work IQ first answer');
     assert.equal(messages[3].isLoading, false);
+  });
+
+  test('/embedded requires explicit enablement and never searches from /all', async () => {
+    let tokenCalls = 0;
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => { tokenCalls += 1; return 'token-embedded'; } } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; message?: string }> = [];
+    (provider as unknown as { postMessage(message: { command: string; message?: string }): void }).postMessage = message => messages.push(message);
+
+    await provider.submitQuery('/embedded auth decision');
+    assert.equal(tokenCalls, 0);
+    await provider.submitQuery('/all architecture decision');
+
+    assert.equal(embeddedRequests.length, 0);
+    assert.ok(messages.some(message => message.command === 'queryError' && message.message?.includes('contextRelay.embedded.enabled')));
+  });
+
+  test('/embedded rejects queries over 1,500 trimmed characters before picking or authenticating', async () => {
+    let tokenCalls = 0;
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => { tokenCalls += 1; return 'token-embedded'; } } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; message?: string }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+
+    await provider.submitQuery(`/embedded  ${'a'.repeat(1501)}  `);
+
+    assert.equal(tokenCalls, 0);
+    assert.equal(embeddedRequests.length, 0);
+    assert.ok(messages.some(message => message.command === 'queryError' && message.message?.includes('1,500 characters')));
+  });
+
+  test('/embedded searches one configured friendly source directly and uses all extracts', async () => {
+    configValues.set('embedded.enabled', true);
+    configValues.set('embedded.sources', [
+      { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true }
+    ]);
+    const source = { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    embeddedReplies.push([{
+      source: 'sharepoint-embedded',
+      title: 'Authentication decision',
+      snippet: 'First extract\n\nSecond extract',
+      url: 'https://example.invalid/content',
+      cache: { hit: false },
+      raw: { sourceName: source.name, containerTypeId: source.containerTypeId, extracts: ['First extract', 'Second extract'] }
+    }]);
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => 'token-embedded' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; items?: Array<{ snippet: string; raw?: unknown }>; source?: string }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+
+    await provider.submitQuery('/embedded What did we decide about authentication?');
+
+    assert.deepEqual(embeddedRequests, [{
+      token: 'token-embedded',
+      query: 'What did we decide about authentication?',
+      source
+    }]);
+    const result = messages.find(message => message.command === 'queryResult');
+    assert.equal(result?.source, 'sharepoint-embedded');
+    assert.equal(result?.items?.[0].snippet, 'First extract\n\nSecond extract');
+  });
+
+  test('/embedded prompts for a friendly source and cancel avoids authentication and search', async () => {
+    configValues.set('embedded.enabled', true);
+    const first = { name: 'Team Notes', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    const second = { name: 'Project Archive', containerTypeId: 'abcdefab-1234-1234-1234-123456789abc', enabled: true };
+    configValues.set('embedded.sources', [first, second]);
+    let tokenCalls = 0;
+    embeddedQuickPickSelection = undefined;
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => { tokenCalls += 1; return 'token-embedded'; } } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+
+    await provider.submitQuery('/embedded decisions');
+
+    assert.equal(tokenCalls, 0);
+    assert.equal(embeddedRequests.length, 0);
+    assert.equal(messages[messages.length - 1]?.command, 'submissionCancelled', 'cancelling the picker must re-enable the input');
+  });
+
+  test('clearing the chat supersedes an in-flight /embedded search and releases its loader', async () => {
+    configValues.set('embedded.enabled', true);
+    const source = { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    configValues.set('embedded.sources', [source]);
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => 'token-embedded' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; isLoading?: boolean }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+    let resolveSearch!: (items: unknown[]) => void;
+    embeddedOverride = () => new Promise(resolve => { resolveSearch = resolve; });
+
+    const pending = provider.submitQuery('/embedded access design');
+    while (!resolveSearch) {
+      await Promise.resolve();
+    }
+    provider.clearChat();
+    const clearIndex = messages.findIndex(message => message.command === 'clearChat');
+    resolveSearch([{
+      source: 'sharepoint-embedded',
+      title: 'Stale item',
+      snippet: 'Result from before the clear',
+      cache: { hit: false },
+      raw: { sourceName: source.name, containerTypeId: source.containerTypeId, extracts: ['Result from before the clear'] }
+    }]);
+    await pending;
+
+    assert.ok(clearIndex > 0);
+    assert.deepEqual(messages[clearIndex - 1], { command: 'loading', source: 'sharepoint-embedded', isLoading: false });
+    assert.deepEqual(messages.slice(clearIndex + 1).filter(message =>
+      message.command === 'queryResult' || message.command === 'queryError' || message.command === 'loading'
+    ), []);
+    assert.equal((provider as unknown as { latestSearchSummary?: string }).latestSearchSummary, undefined);
+  });
+
+  test('/embedded uses the friendly source selected from the configured list', async () => {
+    configValues.set('embedded.enabled', true);
+    const first = { name: 'Team Notes', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    const second = { name: 'Project Archive', containerTypeId: 'abcdefab-1234-1234-1234-123456789abc', enabled: true };
+    configValues.set('embedded.sources', [first, second]);
+    embeddedQuickPickSelection = { label: second.name, source: second };
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => 'token-embedded' } as never,
+      {} as never
+    );
+    (provider as unknown as { postMessage(message: unknown): void }).postMessage = () => undefined;
+
+    await provider.submitQuery('/embedded archive notes');
+
+    assert.deepEqual(embeddedRequests, [{ token: 'token-embedded', query: 'archive notes', source: second }]);
+  });
+
+  test('/embedded turns permission and missing-container errors into actionable guidance without fallback', async () => {
+    configValues.set('embedded.enabled', true);
+    configValues.set('embedded.sources', [
+      { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true }
+    ]);
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => 'token-embedded' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; message?: string; source?: string }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+    embeddedOverride = async () => { throw new Error('403 Forbidden'); };
+
+    await provider.submitQuery('/embedded architecture');
+    const forbiddenErrors = messages.filter(message => message.command === 'queryError');
+    const forbidden = forbiddenErrors[forbiddenErrors.length - 1]?.message ?? '';
+    assert.ok(forbidden.includes('FileStorageContainer.Selected'));
+    assert.ok(forbidden.includes('signed-in user'));
+
+    embeddedOverride = async () => { throw new Error('404 Not Found'); };
+    await provider.submitQuery('/embedded architecture');
+    const missingErrors = messages.filter(message => message.command === 'queryError');
+    const missing = missingErrors[missingErrors.length - 1]?.message ?? '';
+    assert.ok(missing.includes('container type ID'));
+    assert.ok(missing.includes('does not fall back'));
+    assert.equal(messages.some(message => message.command === 'queryResult' && message.source !== 'sharepoint-embedded'), false);
+  });
+
+  test('/embedded cancels a selection when source settings change while Quick Pick is open', async () => {
+    configValues.set('embedded.enabled', true);
+    const oldSource = { name: 'Old Source', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    const newSource = { name: 'New Source', containerTypeId: 'abcdefab-1234-1234-1234-123456789abc', enabled: true };
+    configValues.set('embedded.sources', [oldSource, { ...newSource, containerTypeId: 'fedcba98-1234-1234-1234-123456789abc' }]);
+    let resolvePick!: (value: typeof embeddedQuickPickSelection) => void;
+    embeddedQuickPickOverride = () => new Promise(resolve => { resolvePick = resolve; });
+    let tokenCalls = 0;
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => { tokenCalls += 1; return 'token-embedded'; } } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; message?: string }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+
+    const pending = provider.submitQuery('/embedded notes');
+    while (!resolvePick) {
+      await Promise.resolve();
+    }
+    configValues.set('embedded.sources', [newSource]);
+    configurationChangeHandler?.({ affectsConfiguration: section => section === 'contextRelay.embedded' });
+    resolvePick({ label: oldSource.name, source: oldSource });
+    await pending;
+
+    assert.equal(tokenCalls, 0);
+    assert.equal(embeddedRequests.length, 0);
+    assert.ok(messages.some(message => message.command === 'queryError' && message.message?.includes('settings changed')));
+  });
+
+  test('/embedded rechecks settings after a deferred authentication call', async () => {
+    configValues.set('embedded.enabled', true);
+    configValues.set('embedded.sources', [
+      { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true }
+    ]);
+    let resolveToken!: (value: string) => void;
+    let tokenCalls = 0;
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => { tokenCalls += 1; return new Promise(resolve => { resolveToken = resolve; }); } } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; message?: string }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+
+    const pending = provider.submitQuery('/embedded authentication');
+    while (!resolveToken) {
+      await Promise.resolve();
+    }
+    configValues.set('embedded.enabled', false);
+    configurationChangeHandler?.({ affectsConfiguration: section => section === 'contextRelay.embedded' });
+    resolveToken('token-embedded');
+    await pending;
+
+    assert.equal(tokenCalls, 1);
+    assert.equal(embeddedRequests.length, 0);
+    assert.ok(messages.some(message => message.command === 'queryError' && message.message?.includes('settings changed during sign-in')));
+  });
+
+  test('/embedded tolerates the initial auth session event, then discards an in-flight search after config changes and says so', async () => {
+    configValues.set('embedded.enabled', true);
+    const source = { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    configValues.set('embedded.sources', [source]);
+    let resolveToken!: (value: string) => void;
+    let sessionChanged: (() => void) | undefined;
+    const provider = new ChatViewProvider(
+      createContext(),
+      {
+        getEmbeddedAccessToken: async () => new Promise(resolve => { resolveToken = resolve; }),
+        onSessionChange: (handler: () => void) => { sessionChanged = handler; return { dispose: () => undefined }; }
+      } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; message?: string; isLoading?: boolean }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+    let resolveSearch!: (items: unknown[]) => void;
+    embeddedOverride = () => new Promise(resolve => { resolveSearch = resolve; });
+
+    const pending = provider.submitQuery('/embedded access design');
+    while (!resolveToken) {
+      await Promise.resolve();
+    }
+    sessionChanged?.();
+    resolveToken('token-embedded');
+    while (!resolveSearch) {
+      await Promise.resolve();
+    }
+    configurationChangeHandler?.({ affectsConfiguration: section => section === 'contextRelay.embedded' });
+    resolveSearch([{
+      source: 'sharepoint-embedded',
+      title: 'Stale item',
+      snippet: 'Old configuration result',
+      cache: { hit: false },
+      raw: { sourceName: source.name, containerTypeId: source.containerTypeId, extracts: ['Old configuration result'] }
+    }]);
+    await pending;
+
+    assert.equal(messages.some(message => message.command === 'queryResult'), false);
+    assert.ok(messages.some(message => message.command === 'queryError' && message.message?.includes('results were discarded')));
+    assert.ok((provider as unknown as { latestSearchSummary?: string }).latestSearchSummary?.includes('results were discarded'));
+    assert.equal(messages[messages.length - 1].command, 'loading');
+    assert.equal(messages[messages.length - 1].isLoading, false);
+  });
+
+  test('/embedded still shows an in-flight result when another Microsoft session changes, but drops cached results', async () => {
+    configValues.set('embedded.enabled', true);
+    const source = { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    configValues.set('embedded.sources', [source]);
+    let sessionChanged: (() => void) | undefined;
+    const provider = new ChatViewProvider(
+      createContext(),
+      {
+        getEmbeddedAccessToken: async () => 'token-embedded',
+        onSessionChange: (handler: () => void) => { sessionChanged = handler; return { dispose: () => undefined }; }
+      } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; message?: string }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+    await provider.submitQuery('/embedded cached design');
+    assert.equal(embeddedRequests.length, 1);
+
+    let resolveSearch!: (items: unknown[]) => void;
+    embeddedOverride = () => new Promise(resolve => { resolveSearch = resolve; });
+    const pending = provider.submitQuery('/embedded access design');
+    while (!resolveSearch) {
+      await Promise.resolve();
+    }
+    // For example, /workiq creating its session while the Embedded search is running.
+    sessionChanged?.();
+    resolveSearch([{
+      source: 'sharepoint-embedded',
+      title: 'Access design',
+      snippet: 'Current answer',
+      cache: { hit: false },
+      raw: { sourceName: source.name, containerTypeId: source.containerTypeId, extracts: ['Current answer'] }
+    }]);
+    await pending;
+
+    assert.equal(messages.some(message => message.command === 'queryError'), false);
+    assert.equal(messages.filter(message => message.command === 'queryResult').length, 2);
+
+    embeddedOverride = undefined;
+    await provider.submitQuery('/embedded cached design');
+    assert.equal(embeddedRequests.length, 3, 'the session change must drop the earlier cached result');
+  });
+
+  test('only the newest overlapping Embedded search can render results, summaries, errors, or loading completion', async () => {
+    configValues.set('embedded.enabled', true);
+    configValues.set('embedded.sources', [
+      { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true }
+    ]);
+    const provider = new ChatViewProvider(
+      createContext(),
+      { getEmbeddedAccessToken: async () => 'token-embedded' } as never,
+      {} as never
+    );
+    const messages: Array<{ command: string; [key: string]: unknown }> = [];
+    (provider as unknown as { postMessage(message: typeof messages[number]): void }).postMessage = message => messages.push(message);
+    const pendingSearches: Array<{ query: string; resolve(items: unknown[]): void }> = [];
+    embeddedOverride = (_token, query) => new Promise(resolve => {
+      pendingSearches.push({ query, resolve });
+    });
+
+    const alpha = provider.submitQuery('/embedded alpha');
+    while (pendingSearches.length < 1) {
+      await Promise.resolve();
+    }
+    const beta = provider.submitQuery('/embedded beta');
+    while (pendingSearches.length < 2) {
+      await Promise.resolve();
+    }
+
+    pendingSearches[1].resolve([{
+      source: 'sharepoint-embedded',
+      title: 'Beta evidence',
+      snippet: 'Newest answer',
+      cache: { hit: false },
+      raw: { sourceName: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', extracts: ['Newest answer'] }
+    }]);
+    await beta;
+    pendingSearches[0].resolve([{
+      source: 'sharepoint-embedded',
+      title: 'Alpha evidence',
+      snippet: 'Older answer',
+      cache: { hit: false },
+      raw: { sourceName: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', extracts: ['Older answer'] }
+    }]);
+    await alpha;
+
+    const renderedQueries = messages
+      .filter(message => message.command === 'queryResult')
+      .map(message => message.query);
+    assert.deepEqual(renderedQueries, ['beta']);
+    assert.ok((provider as unknown as { latestSearchSummary?: string }).latestSearchSummary?.includes('Beta evidence'));
+    const loadingCompletions = messages.filter(message =>
+      message.command === 'loading' && message.isLoading === false
+    );
+    assert.equal(loadingCompletions.length, 2, 'superseding the first request clears its loader; its late completion must not clear the second loader');
+  });
+
+  test('Embedded result cache is memory-only, scoped by session, source, query and maxResults, and cleared on config change', async () => {
+    configValues.set('embedded.enabled', true);
+    const source = { name: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', enabled: true };
+    configValues.set('embedded.sources', [source]);
+    configValues.set('maxResults', 5);
+    const context = createContext();
+    let sessionChanged: (() => void) | undefined;
+    const auth = {
+      getEmbeddedAccessToken: async () => 'token-embedded',
+      onSessionChange: (handler: () => void) => { sessionChanged = handler; return { dispose: () => undefined }; }
+    };
+    const provider = new ChatViewProvider(context, auth as never, {} as never);
+    (provider as unknown as { postMessage(message: unknown): void }).postMessage = () => undefined;
+
+    await provider.submitQuery('/embedded architecture');
+    await provider.submitQuery('/embedded architecture');
+    assert.equal(embeddedRequests.length, 1);
+
+    configValues.set('maxResults', 6);
+    await provider.submitQuery('/embedded architecture');
+    assert.equal(embeddedRequests.length, 2);
+
+    configurationChangeHandler?.({ affectsConfiguration: section => section === 'contextRelay.maxResults' });
+    await provider.submitQuery('/embedded architecture');
+    assert.equal(embeddedRequests.length, 3);
+
+    sessionChanged?.();
+    await provider.submitQuery('/embedded architecture');
+    assert.equal(embeddedRequests.length, 4);
+    assert.deepEqual((context.workspaceState as unknown as InMemoryMemento).keys(), []);
   });
 
   test('/workiq reuses contextId for follow-up queries and clearChat resets it', async () => {

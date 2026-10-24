@@ -10,7 +10,7 @@ interface SlashMenuItem {
   label: string;
   description: string;
   icon: string;
-  sourceIcon?: 'mail' | 'teams' | 'sharepoint' | 'onedrive' | 'onenote' | 'planner' | 'todo' | 'all';
+  sourceIcon?: 'mail' | 'teams' | 'sharepoint' | 'sharepoint-embedded' | 'onedrive' | 'onenote' | 'planner' | 'todo' | 'all';
 }
 
 const SLASH_ITEMS: SlashMenuItem[] = [
@@ -18,6 +18,7 @@ const SLASH_ITEMS: SlashMenuItem[] = [
   { command: '/teams', label: '/teams', description: 'Search Teams messages', icon: getSourceTextIcon('teams'), sourceIcon: 'teams' },
   { command: '/sharepoint', label: '/sharepoint', description: 'Search SharePoint', icon: getSourceTextIcon('sharepoint'), sourceIcon: 'sharepoint' },
   { command: '/onedrive', label: '/onedrive', description: 'Search OneDrive', icon: getSourceTextIcon('onedrive'), sourceIcon: 'onedrive' },
+  { command: '/embedded', label: '/embedded', description: 'Search a configured SharePoint Embedded source · Preview', icon: getSourceTextIcon('sharepoint-embedded'), sourceIcon: 'sharepoint-embedded' },
   { command: '/onenote', label: '/onenote', description: 'Search OneNote pages', icon: getSourceTextIcon('onenote'), sourceIcon: 'onenote' },
   { command: '/task', label: '/task', description: 'Search Planner and Microsoft To Do tasks', icon: getSourceTextIcon('todo'), sourceIcon: 'todo' },
   { command: '/all', label: '/all', description: 'Search all sources explicitly', icon: getSourceTextIcon('all'), sourceIcon: 'all' },

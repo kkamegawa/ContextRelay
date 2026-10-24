@@ -37,8 +37,9 @@ ContextRelay is a VS Code extension that uses the signed-in organizational accou
 |---|---|
 | `/mail <query>` | Exchange Mail adapter |
 | `/teams <query>` | Teams adapter (chat + channel messages) |
-| `/sharepoint <query>` | Retrieval adapter (SharePoint) |
-| `/onedrive <query>` | Retrieval adapter (OneDrive for Business) |
+| `/sharepoint <query>` | Microsoft Graph Search adapter (SharePoint) |
+| `/onedrive <query>` | Microsoft Graph Search adapter (OneDrive for Business) |
+| `/embedded <query>` | Opt-in Copilot Retrieval adapter for one configured SharePoint Embedded container type |
 | `/all <query>` | Fan-out to all enabled adapters |
 | `/ask <prompt>` | Microsoft 365 Copilot Chat API; **requires** at least one pinned snippet or attached file (`#file`, 📎, drag and drop, or the opt-in active editor), otherwise aborts with a warning |
 | `<prompt>` (no prefix) | Microsoft 365 Copilot Chat API; same context handling as `/ask` but does **not** require pinned snippets or attached files |
@@ -51,9 +52,9 @@ ContextRelay is a VS Code extension that uses the signed-in organizational accou
 
 ### 4.3 Result rendering
 
-- Results are rendered as **source sections** (Mail / Teams / SharePoint / OneDrive / Connectors), not a single mixed list.
+- Results are rendered as **source sections** (Mail / Teams / SharePoint / OneDrive / SharePoint Embedded / Connectors), not a single mixed list.
 - In `/all` or no-prefix mode, cached results are included in the merge (see Section 9 — Cache policy).
-- `/ask` and no-prefix chat share one code path: whenever pinned snippets or attached files are present, they are attached as Copilot `additionalContext` (local file content is read and inlined, capped at 12,000 characters per file) or `contextualResources.files` (pinned SharePoint/OneDrive `https://` files), the prompt is prefixed with an explicit grounding instruction, and `contextualResources.webContext.isWebEnabled` is set to `false` for that turn so Copilot prefers the attached context over web search. The only behavioral difference is that `/ask` refuses to send the message when neither pinned snippets nor attached files are present; no-prefix chat sends the message ungrounded instead.
+- `/ask` and no-prefix chat share one code path: whenever pinned snippets or attached files are present, they are attached as Copilot `additionalContext` (local file content is read and inlined, capped at 12,000 characters per file) or `contextualResources.files` (pinned SharePoint/OneDrive `https://` files), the prompt is prefixed with an explicit grounding instruction, and `contextualResources.webContext.isWebEnabled` is set to `false` for that turn so Copilot prefers the attached context over web search. SharePoint Embedded retrieval extracts are pinned and passed as text in `additionalContext`; their `webUrl` is an opaque source link and is not treated as a fetchable `contextualResources.files` attachment. The only behavioral difference is that `/ask` refuses to send the message when neither pinned snippets nor attached files are present; no-prefix chat sends the message ungrounded instead.
 - Local files can be attached with `#` mentions, the 📎 picker (also the **ContextRelay: Attach File to Chat** command), drag and drop onto the input, or the opt-in active editor (`contextRelay.chat.attachActiveEditor`, default `false`). All sources resolve to one `ResolvedAttachment` type with shared workspace-path validation, are de-duplicated by path, and are limited as a whole by `contextRelay.chat.maxAttachedFiles` (default `5`); `#` mentions come first, then 📎/drag-and-drop files, then the active editor, and files left out are reported. Each file is re-validated when it is read (real path and file identity through an open handle, so a path swapped for a symlink is not read) and only a bounded amount is read. Attachments are consumed once the message is submitted; files attached while a reply is in flight stay pending for the next message. The `/ask` guard is evaluated on the built payload, so an attachment that can no longer be read does not satisfy it. Local files are never sent as `file://` URIs, because `contextualResources.files` accepts OneDrive/SharePoint URIs only.
 - Replies use the `chatOverStream` endpoint when `contextRelay.chat.streamResponses` is `true` (default) and render incrementally with a Stop button. The synchronous endpoint is used once as a fallback only when the service reports the streamed endpoint as unavailable (HTTP 404, 405, or 501). Network errors, other HTTP errors, failures after the stream was accepted, and cancellation are reported without resending, so a turn is never duplicated. A stream that fails after partial output is closed with the partial reply before the error is shown, and clearing the chat while a reply is in flight cancels it without adding anything to the cleared transcript.
 
@@ -63,15 +64,31 @@ ContextRelay is a VS Code extension that uses the signed-in organizational accou
 
 ### 5.1 Microsoft 365 Copilot Retrieval API (v1.0)
 
-Used when the target source is SharePoint, OneDrive, or Connectors. Returns permission-trimmed text extracts.
+Used for Copilot Connectors and the opt-in SharePoint Embedded source. Existing SharePoint and OneDrive commands use Microsoft Graph Search; they are separate adapters and are not Retrieval API calls. Retrieval returns permission-trimmed text extracts.
 
 - **Endpoint**: `POST https://graph.microsoft.com/v1.0/copilot/retrieval`
-- **dataSource values**: `sharePoint`, `oneDriveBusiness`, `externalItem`
+- **dataSource values used by ContextRelay**: `externalItem` for Connectors and `sharePointEmbedded` for the configured Embedded source.
 - **Delegated permissions** (least privileged):
-  - `Files.Read.All` + `Sites.Read.All` — for SharePoint/OneDrive
   - `ExternalItem.Read.All` — for connectors (optional)
-- **Requires**: Microsoft 365 Copilot license assigned to the user.
+- **SharePoint Embedded**: delegated `FileStorageContainer.Selected`, plus an owning-app container-type registration grant for the ContextRelay app with the required content-read permission. Effective access is bounded by both the app grant and the signed-in user's membership/permissions on each container.
+- **Entitlement**: Connectors require the applicable Copilot license or supported consumption offer. SharePoint Embedded uses the container-type pay-as-you-go configuration described in §5.1.1.
 - [Retrieval API overview](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/api/ai-services/retrieval/overview) | [API reference](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/api/ai-services/retrieval/copilotroot-retrieval)
+
+### 5.1.1 SharePoint Embedded source
+
+`/embedded <query>` accepts a natural-language query. `containerTypeId` is configuration, not part of the user's query. When there is one enabled source, ContextRelay uses it directly; when there are several, the user chooses a friendly source name in a Quick Pick. The API request uses `dataSource: "sharePointEmbedded"` and the selected source's `containerTypeId`. Retrieval is limited to containers of that type that the signed-in user can access.
+
+The setting `contextRelay.embedded.enabled` is opt-in and defaults to `false`. Enabled sources are configured as `{ name, containerTypeId, enabled }` entries under `contextRelay.embedded.sources`. A container type ID is an opaque identifier and belongs in settings, not in chat text or slash-command queries.
+
+The container-type owner must register the ContextRelay application's delegated content-read grant for the target container type. Graph's delegated `FileStorageContainer.Selected` permission is also required; it is requested in the dedicated Embedded session described in §7.5.
+
+If the selected source, its settings, or the result-limit or cache settings change while a search is in flight, the response is discarded and the panel reports that the search must be run again. A discarded search never ends without a visible result or message. A Microsoft sign-in event, such as the Work IQ or Embedded session being created, clears cached Embedded results but does not discard a search in flight, because that response was permission-trimmed for the identity that sent it. Cache keys include a fingerprint of the Embedded token, so later searches never reuse results across identities. Clearing the chat supersedes a search in flight, so its response never repopulates the cleared transcript or search summary. Cancelling the source picker re-enables the input without showing an error. Container-type registration is controlled by the owning application; adding a container type ID to ContextRelay settings cannot grant access to a container type owned by Microsoft Loop or another application. Therefore this feature targets explicitly authorized SharePoint Embedded container types and does not promise tenant-wide or cross-owner Loop workspace search. Users still need access to the individual containers.
+
+The `sharePointEmbedded` Retrieval API data source is in preview and uses pay-as-you-go billing configured for the container type. At least one user in the tenant must have a Microsoft 365 Copilot license to initialize the semantic index; each querying user does not need an individual Copilot license for this data source. See [SharePoint Embedded setup](spe-embedded.md) before enabling it.
+
+### 5.1.2 SharePoint and OneDrive search
+
+The existing `/sharepoint` and `/onedrive` commands use the Microsoft Graph Search API (`POST /v1.0/search/query`) with the `driveItem` entity type and their respective source query scopes. They require delegated `Files.Read.All` and `Sites.Read.All` and use the standard Microsoft 365 Graph entitlement. Do not describe these calls as Copilot Retrieval. The Copilot Retrieval API can provide extracts from SharePoint and OneDrive, but that is not the current behavior for these commands.
 
 ### 5.2 Microsoft 365 Copilot Chat API (beta)
 
@@ -122,8 +139,9 @@ The Copilot Retrieval API does not cover Teams messages directly, so this adapte
 
 | Adapter | Permissions required | License required |
 |---|---|---|
-| Retrieval (SharePoint/OneDrive) | `Files.Read.All`, `Sites.Read.All` | Microsoft 365 Copilot |
-| Retrieval (Connectors) | `ExternalItem.Read.All` | Microsoft 365 Copilot |
+| Graph Search (SharePoint/OneDrive) | `Files.Read.All`, `Sites.Read.All` | Microsoft 365 standard service entitlement |
+| Retrieval (Connectors) | `ExternalItem.Read.All` | Microsoft 365 Copilot or supported consumption offer |
+| Retrieval (SharePoint Embedded) | `FileStorageContainer.Selected` (delegated) and owner-issued container-type app grant | Container-type pay-as-you-go; one tenant user needs Copilot for index initialization |
 | Chat (beta) | `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All`, `ExternalItem.Read.All` | Microsoft 365 Copilot |
 | Exchange Mail | `Mail.Read` | Microsoft 365 (standard) |
 | Teams | `Chat.Read`, `ChannelMessage.Read.All` | Microsoft 365 (standard) |
@@ -174,8 +192,9 @@ Parses the input text, extracts the optional slash prefix, and dispatches to the
 
 - `/mail` → Exchange Mail adapter
 - `/teams` → Teams adapter
-- `/sharepoint` → Retrieval adapter (sharePoint)
-- `/onedrive` → Retrieval adapter (oneDriveBusiness)
+- `/sharepoint` → Microsoft Graph Search adapter (SharePoint)
+- `/onedrive` → Microsoft Graph Search adapter (OneDrive for Business)
+- `/embedded` → opt-in Retrieval adapter (sharePointEmbedded); resolves configured source before calling Graph
 - `/all` or no prefix → all enabled adapters in parallel
 
 ### 7.5 Authentication
@@ -198,7 +217,9 @@ const session = await vscode.authentication.getSession(
 - A Microsoft Entra app registration is required for the Graph scopes used by this extension.
 - `contextRelay.auth.clientId` is required; `contextRelay.auth.tenantId` is optional and defaults to `organizations`.
 - The built-in VS Code provider still owns the auth UX, token cache, and refresh behavior.
-- The extension requests the union of scopes needed for enabled adapters.
+- The extension requests the union of scopes needed for enabled adapters in one shared Microsoft Graph session.
+- SharePoint Embedded is excluded from that union. `/embedded` acquires a dedicated session with `User.Read` and `FileStorageContainer.Selected` (plus the same client and tenant overrides) only when it runs. Missing Embedded consent therefore fails `/embedded` alone and never blocks Mail, Teams, SharePoint, OneDrive, OneNote, tasks, Connectors or Chat.
+- Work IQ also uses its own session because it targets a different resource.
 - Root cause of `AADSTS65002`: VS Code's default first-party client ID is not preauthorized for this extension's Graph scopes.
 - [VS Code Microsoft auth provider issue #115626](https://github.com/microsoft/vscode/issues/115626) | [Scopes and permissions](https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc)
 
@@ -209,7 +230,7 @@ const session = await vscode.authentication.getSession(
 All adapters return a common `ContextItem` shape for consistent rendering and merging:
 
 ```ts
-type ContextSource = 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'connectors';
+type ContextSource = 'sharepoint' | 'onedrive' | 'sharepoint-embedded' | 'mail' | 'teams' | 'connectors';
 
 interface ContextItem {
   source: ContextSource;
@@ -298,6 +319,8 @@ All settings use the `contextRelay.*` namespace.
 | `contextRelay.adapters.sharepoint` | boolean | true | Enable SharePoint adapter |
 | `contextRelay.adapters.onedrive` | boolean | true | Enable OneDrive adapter |
 | `contextRelay.adapters.connectors` | boolean | false | Enable Copilot connectors adapter |
+| `contextRelay.embedded.enabled` | boolean | false | Enable the preview SharePoint Embedded Retrieval source |
+| `contextRelay.embedded.sources` | array | `[]` | Named sources with `name`, `containerTypeId`, and `enabled` fields |
 
 ---
 
@@ -326,9 +349,9 @@ All settings use the `contextRelay.*` namespace.
 - If one adapter fails and others succeed, render successful results and show an error banner for the failed adapter(s) (e.g., "Mail search failed: 403 Forbidden — Mail.Read permission required").
 - Do not block the entire query for a single adapter failure.
 
-### 12.4 Copilot license not available
+### 12.4 Copilot license or retrieval entitlement not available
 
-- Retrieval and Chat adapters require a Microsoft 365 Copilot license. If the API returns a license error (403), show a clear message: "Microsoft 365 Copilot license is required for SharePoint/OneDrive search and Chat features."
+- Connector Retrieval and Chat require the applicable Copilot entitlement. SharePoint Embedded Retrieval uses its container-type pay-as-you-go configuration and requires at least one tenant Copilot user for semantic-index initialization; each query user need not have an individual Copilot license. If an API returns an entitlement error (403), show a source-specific message.
 - Exchange Mail and Teams adapters work without a Copilot license using standard Microsoft Graph.
 - The extension should gracefully degrade: if Copilot APIs are unavailable, only Mail and Teams adapters are offered.
 
@@ -367,11 +390,12 @@ A "Load more" button per source section that fetches the next page of results.
 | Milestone | Scope |
 |---|---|
 | M0 | Scaffolding + authentication + WebviewView panel |
-| M1 | Retrieval adapter (SharePoint/OneDrive) + snippet pinning |
+| M1 | Graph Search adapters (SharePoint/OneDrive), Connectors Retrieval, and snippet pinning |
 | M2 | Slash router + Exchange Mail adapter + Teams adapter |
 | M3 | Chat tab (beta) + conversation UI |
 | M4 | Doc generation (timestamped append) + handoff bundle + Copilot helpers |
 | M5 | Cache (LRU + stale-while-revalidate) + error hardening + throttle/backoff |
+| M6 | Opt-in SharePoint Embedded Retrieval for explicitly authorized container types |
 
 ---
 
@@ -410,5 +434,13 @@ VS Code 1.140 is the declared runtime floor so it remains aligned with the `@typ
 | `README_ja.md` | Japanese | Full translation of `README.md`, with the same heading structure, tables, and code blocks, so both can be reviewed side by side. |
 | `SECURITY.md` / `LICENSE` | English only | Never translated. |
 | `docs/*.md` | English, with `_ja` variants where a Japanese audience needs them | Design plan, tasks, test plan, ADR, Work IQ setup, and tenant admin material. |
+| `docs/spe-embedded.md` / `docs/spe-embedded_ja.md` | English / Japanese | SharePoint Embedded Retrieval setup, access layers, billing, and development MCP configuration. |
+
+## Change history
+
+| Date | Change |
+|---|---|
+| 2026-10-24 | User-approved design and implementation scope: add opt-in SharePoint Embedded Retrieval by friendly named source, document its owning-app permission and billing prerequisites, configure read-only SPE MCP for supported development clients, and assess Work IQ REST while excluding Work IQ MCP. |
+| 2026-10-24 | User-approved review fixes: Embedded uses a dedicated sign-in session, in-flight searches invalidated by setting changes report a message, sign-in events clear cached results without discarding in-flight searches, and each SPE MCP client keeps its own state directory. See [ADR 0001](adr/0001-sharepoint-embedded-retrieval.md). |
 
 The panel's own user-facing text (welcome block, slash menu, help text, guard warnings) is English and lives in the source, not in these documents. The welcome block is defined once in `src/chatWelcomeText.ts` and rendered by both the extension host and the webview.

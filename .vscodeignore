@@ -34,3 +34,14 @@ out/**
 
 # If packaging with --no-dependencies, keep node_modules out of VSIX
 node_modules/**
+# Development MCP configuration and helpers
+.mcp.json
+.codex/**
+scripts/*spe-mcp*
+scripts/*embedded*
+
+# Local agent package manager metadata
+apm_modules/**
+apm.yml
+apm.lock.yaml
+.claude/**

@@ -6,7 +6,7 @@
  */
 
 import { getSourceInlineSvg, getSourceLabel, getSourceTextIcon } from '../sourcePresentation';
-import { canOpenResult } from '../models/contextItem';
+import { canOpenResult, getContextItemKey } from '../models/contextItem';
 import { formatAssistantMessageAsHtml, hasRichTextFormatting } from './assistantMessageFormatting';
 import {
   CHAT_WELCOME_COMMANDS_HINT,
@@ -18,7 +18,7 @@ import {
 } from '../chatWelcomeText';
 
 interface ContextItem {
-  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';
+  source: 'sharepoint' | 'sharepoint-embedded' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';
   title: string;
   snippet: string;
   url?: string;
@@ -48,18 +48,8 @@ export class ChatRenderer {
     this.vscode = vscode;
   }
 
-  /**
-   * Build the same stable item key the extension host uses.
-   * Must stay in sync with getContextItemKey() in src/models/contextItem.ts.
-   */
   private getItemKey(item: ContextItem): string {
-    const discriminator =
-      item.url?.trim() ||
-      item.timestamp?.trim() ||
-      item.snippet.trim() ||
-      '';
-
-    return `${item.source}::${discriminator}::${item.title}`;
+    return getContextItemKey(item);
   }
 
   /**
@@ -87,9 +77,14 @@ export class ChatRenderer {
 
     const pinBtn = card.querySelector<HTMLButtonElement>('.action-pin');
     if (pinBtn) {
+      // A result without evidence can still be unpinned, so only block pinning it.
+      const canPin = card.dataset.pinEvidence !== 'false';
       pinBtn.textContent = isPinned ? 'Unpin' : 'Pin';
-      pinBtn.title = isPinned ? 'Unpin snippet' : 'Pin snippet';
+      pinBtn.title = isPinned
+        ? 'Unpin snippet'
+        : canPin ? 'Pin snippet' : 'Cannot pin: no retrieval extracts are available as evidence';
       pinBtn.setAttribute('aria-pressed', isPinned ? 'true' : 'false');
+      pinBtn.disabled = !isPinned && !canPin;
     }
   }
 
@@ -495,6 +490,9 @@ export class ChatRenderer {
   private buildResultCard(item: ContextItem): HTMLElement {
     const card = document.createElement('div');
     card.className = 'result-card';
+    if (item.source === 'sharepoint-embedded') {
+      card.classList.add('embedded-result');
+    }
 
     // Store data safely via dataset (auto-escapes)
     if (item.url) { card.dataset.url = item.url; }
@@ -506,11 +504,15 @@ export class ChatRenderer {
     const titleDiv = document.createElement('div');
     titleDiv.className = 'title';
 
+    const embeddedSourceName = item.source === 'sharepoint-embedded' && item.raw && typeof item.raw === 'object'
+      ? (item.raw as { sourceName?: unknown }).sourceName
+      : undefined;
     const sourceLabel = getSourceLabel(item.source);
 
     titleDiv.appendChild(this.createSourceIcon(item.source, '📎'));
 
     const titleText = document.createElement('span');
+    titleText.className = 'result-title-text';
     titleText.textContent = item.title;
     titleDiv.appendChild(titleText);
 
@@ -527,7 +529,9 @@ export class ChatRenderer {
     const badge = document.createElement('span');
     badge.className = 'source-badge';
     badge.textContent = sourceLabel;
-    titleDiv.appendChild(badge);
+    if (item.source !== 'sharepoint-embedded') {
+      titleDiv.appendChild(badge);
+    }
 
     if (item.cache.hit) {
       const cacheBadge = document.createElement('span');
@@ -539,6 +543,20 @@ export class ChatRenderer {
 
     card.appendChild(titleDiv);
 
+    if (item.source === 'sharepoint-embedded') {
+      const sourceMetadata = document.createElement('div');
+      sourceMetadata.className = 'embedded-source-metadata';
+      badge.classList.add('source-badge-embedded');
+      sourceMetadata.appendChild(badge);
+      if (typeof embeddedSourceName === 'string' && embeddedSourceName.trim()) {
+        const sourceName = document.createElement('span');
+        sourceName.className = 'source-metadata';
+        sourceName.textContent = `Source: ${embeddedSourceName.trim()}`;
+        sourceMetadata.appendChild(sourceName);
+      }
+      card.appendChild(sourceMetadata);
+    }
+
     // Snippet
     const snippetDiv = document.createElement('div');
     snippetDiv.className = 'snippet';
@@ -549,11 +567,24 @@ export class ChatRenderer {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'actions';
 
-    if (canOpenResult(item)) {
+    if (item.source === 'sharepoint-embedded') {
+      const previewBtn = document.createElement('button');
+      previewBtn.className = 'action-preview';
+      previewBtn.title = 'Preview retrieved text';
+      previewBtn.textContent = 'Preview';
+      previewBtn.addEventListener('click', () => {
+        this.vscode.postMessage({ command: 'openItem', item });
+      });
+      actionsDiv.appendChild(previewBtn);
+    }
+
+    if (canOpenResult(item) && (item.source !== 'sharepoint-embedded' || item.url)) {
       const openBtn = document.createElement('button');
       openBtn.className = 'action-open';
-      openBtn.title = item.url ? 'Open in browser' : 'Open preview';
-      openBtn.textContent = 'Open';
+      openBtn.title = item.source === 'sharepoint-embedded'
+        ? 'Open source in browser'
+        : item.url ? 'Open in browser' : 'Open preview';
+      openBtn.textContent = item.source === 'sharepoint-embedded' ? 'Open source' : 'Open';
       openBtn.addEventListener('click', () => {
         if (item.url) {
           this.vscode.postMessage({ command: 'openLink', url: item.url });
@@ -579,6 +610,12 @@ export class ChatRenderer {
     pinBtn.title = 'Pin snippet';
     pinBtn.textContent = 'Pin';
     pinBtn.setAttribute('aria-pressed', 'false');
+    const hasEmbeddedEvidence = item.source !== 'sharepoint-embedded' || Boolean(
+      item.raw && typeof item.raw === 'object' &&
+      Array.isArray((item.raw as { extracts?: unknown }).extracts) &&
+      ((item.raw as { extracts: unknown[] }).extracts).some(extract => typeof extract === 'string' && extract.trim())
+    );
+    card.dataset.pinEvidence = String(hasEmbeddedEvidence);
     pinBtn.addEventListener('click', () => {
       this.vscode.postMessage({
         command: 'pinSnippet',

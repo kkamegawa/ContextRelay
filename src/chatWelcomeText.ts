@@ -37,7 +37,9 @@ export const CHAT_WELCOME_COMMANDS_HINT: WelcomeTextSegment[] = [
   { text: '#path/to/file', code: true },
   { text: ' (or ' },
   { text: '#"path with spaces"', code: true },
-  { text: ') to attach local workspace files to Copilot and /workiq prompts.' }
+  { text: ') to attach local workspace files to Copilot and /workiq prompts. Use ' },
+  { text: '/embedded', code: true },
+  { text: ' to search configured SharePoint Embedded sources (Preview).' }
 ];
 
 /**

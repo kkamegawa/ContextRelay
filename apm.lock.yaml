@@ -1,0 +1,11 @@
+lockfile_version: '1'
+apm_version: 0.35.0
+dependencies:
+- repo_url: tfsugjp/skills
+  name: 229747fe42f0c6ea
+  host: github.com
+  resolved_commit: 1c7aba1a5348261536cc92c1d7d7ff4ffd43b095
+  version: 0.1.0
+  package_type: apm_package
+  content_hash: sha256:2628493c24c9280ca18b709427162026c593b25c282ceb880f6ba89b868a45f7
+deployments: []

@@ -36,3 +36,6 @@ Thumbs.db
 *.swo
 
 .validation-logs/
+
+# APM dependencies
+apm_modules/

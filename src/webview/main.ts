@@ -270,7 +270,7 @@ interface HostMessage {
 }
 
 interface ContextItem {
-  source: 'sharepoint' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';
+  source: 'sharepoint' | 'sharepoint-embedded' | 'onedrive' | 'mail' | 'teams' | 'onenote' | 'planner' | 'todo' | 'connectors';
   title: string;
   snippet: string;
   url?: string;
@@ -336,6 +336,10 @@ window.addEventListener('message', (event) => {
     case 'clearChat':
       clearPendingSubmission();
       renderer.clear();
+      break;
+
+    case 'submissionCancelled':
+      clearPendingSubmission();
       break;
 
     case 'assistantMessage':

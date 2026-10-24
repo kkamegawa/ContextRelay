@@ -285,3 +285,7 @@ Authentication, slash routing, Retrieval API, Chat API (beta), Exchange Mail ada
 **T-NF-03 Telemetry setting**
 - Setup: Set `telemetry.telemetryLevel` to `off`
 - Expected: No telemetry data is sent.
+
+## SharePoint Embedded
+
+See [Embedded scenarios and observed local results](test/spe-embedded.md) and the [Japanese translation](test/spe-embedded_ja.md). Live tenant and Loop validation is tracked separately from fixture success.

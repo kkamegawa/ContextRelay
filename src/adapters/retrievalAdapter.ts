@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { ContextItem } from '../models/contextItem';
+import { ContextItem, ContextSource } from '../models/contextItem';
+import { EmbeddedSource, isValidContainerTypeId } from '../embedded/embeddedSources';
 import { graphFetchWithRetry, handleGraphResponse, GRAPH_BASE } from './graphClient';
 import {
   buildSearchSnippet,
@@ -10,6 +11,7 @@ import {
 
 interface RetrievalExtract {
   text?: string;
+  relevanceScore?: number;
 }
 
 interface RetrievalResourceMetadata {
@@ -66,6 +68,59 @@ interface SearchResponse {
 }
 
 export type RetrievalDataSource = 'sharePoint' | 'oneDriveBusiness' | 'externalItem';
+
+const EMBEDDED_QUERY_MAX_LENGTH = 1500;
+
+export async function searchEmbedded(
+  token: string,
+  query: string,
+  source: EmbeddedSource | string
+): Promise<ContextItem[]> {
+  const queryString = query.trim();
+  if (!queryString) {
+    throw new Error('SharePoint Embedded search query must not be empty.');
+  }
+  if (queryString.length > EMBEDDED_QUERY_MAX_LENGTH) {
+    throw new Error(`SharePoint Embedded search query must be ${EMBEDDED_QUERY_MAX_LENGTH} characters or fewer.`);
+  }
+
+  const containerTypeId = typeof source === 'string' ? source.trim() : source.containerTypeId.trim();
+  const sourceName = typeof source === 'string' ? containerTypeId : source.name.trim();
+  if (!containerTypeId) {
+    throw new Error('SharePoint Embedded container type ID is required.');
+  }
+  if (!sourceName) {
+    throw new Error('SharePoint Embedded source name is required.');
+  }
+  if (!isValidContainerTypeId(containerTypeId)) {
+    throw new Error('SharePoint Embedded container type ID must be a GUID.');
+  }
+  if (typeof source !== 'string' && source.enabled !== true) {
+    throw new Error('SharePoint Embedded source is disabled.');
+  }
+
+  const config = vscode.workspace.getConfiguration('contextRelay');
+  const configuredMaxResults = config.get<number>('maxResults', 10);
+  const maximumNumberOfResults = Number.isFinite(configuredMaxResults)
+    ? Math.min(Math.max(Math.floor(configuredMaxResults), 1), 25)
+    : 10;
+  const request: CopilotRetrievalRequest = {
+    queryString,
+    dataSource: 'sharePointEmbedded',
+    dataSourceConfiguration: {
+      sharePointEmbedded: { containerTypeId }
+    },
+    resourceMetadata: ['title'],
+    maximumNumberOfResults
+  };
+
+  return searchCopilotRetrieval(token, request, {
+    source: 'sharepoint-embedded',
+    sourceName,
+    containerTypeId,
+    preserveEmbeddedMetadata: true
+  });
+}
 
 export async function searchRetrieval(
   token: string,
@@ -169,40 +224,78 @@ async function searchExternalItems(token: string, query: string): Promise<Contex
   // single natural-language sentence. Trim excessively long input rather than letting the
   // service reject the request with HTTP 400.
   const queryString = query.length > 1500 ? query.slice(0, 1500) : query;
-  const url = `${GRAPH_BASE}/v1.0/copilot/retrieval`;
   // Request body shape per Microsoft Graph retrieval API:
   //   queryString (top-level string), dataSource, resourceMetadata, maximumNumberOfResults.
   // The previous shape ({ query: { queryString }, size }) triggered a Graph API 400
   // "BadRequest" response.
-  const body = JSON.stringify({
+  const request: CopilotRetrievalRequest = {
     queryString,
     dataSource: 'externalItem',
     resourceMetadata: ['title'],
     maximumNumberOfResults: Math.min(Math.max(maxResults, 1), 25)
-  });
+  };
 
-  const response = await graphFetchWithRetry(url, token, { method: 'POST', body });
+  return searchCopilotRetrieval(token, request, { source: 'connectors' });
+}
+
+interface CopilotRetrievalRequest {
+  queryString: string;
+  dataSource: 'externalItem' | 'sharePointEmbedded';
+  dataSourceConfiguration?: {
+    sharePointEmbedded: { containerTypeId: string };
+  };
+  resourceMetadata: string[];
+  maximumNumberOfResults: number;
+}
+
+interface RetrievalMappingOptions {
+  source: ContextSource;
+  sourceName?: string;
+  containerTypeId?: string;
+  preserveEmbeddedMetadata?: boolean;
+}
+
+async function searchCopilotRetrieval(
+  token: string,
+  request: CopilotRetrievalRequest,
+  mapping: RetrievalMappingOptions
+): Promise<ContextItem[]> {
+  const url = `${GRAPH_BASE}/v1.0/copilot/retrieval`;
+  const response = await graphFetchWithRetry(url, token, {
+    method: 'POST',
+    body: JSON.stringify(request)
+  });
   const data = await handleGraphResponse(response) as RetrievalResponse;
 
-  return (data?.retrievalHits ?? []).map(hit => {
-    const extracts = hit.extracts?.map(e => e.text ?? '').filter(Boolean) ?? [];
-    const title =
-      (typeof hit.resourceMetadata?.title === 'string' && hit.resourceMetadata.title) ||
-      (typeof hit.resourceMetadata?.name === 'string' && hit.resourceMetadata.name) ||
-      getTitleFromUrl(hit.webUrl ?? '') ||
-      'Untitled';
+  return (data?.retrievalHits ?? []).map(hit => mapRetrievalHit(hit, mapping));
+}
 
-    return {
-      source: 'connectors',
-      title,
-      snippet: extracts.join(' '),
-      url: hit.webUrl,
-      cache: { hit: false },
-      raw: {
-        extracts,
-        resourceType: hit.resourceType
-      }
-    };
-  });
+function mapRetrievalHit(hit: RetrievalHit, mapping: RetrievalMappingOptions): ContextItem {
+  const extracts = hit.extracts?.map(extract => extract.text ?? '').filter(Boolean) ?? [];
+  const title =
+    (typeof hit.resourceMetadata?.title === 'string' && hit.resourceMetadata.title) ||
+    (typeof hit.resourceMetadata?.name === 'string' && hit.resourceMetadata.name) ||
+    getTitleFromUrl(hit.webUrl ?? '') ||
+    'Untitled';
+  const raw: Record<string, unknown> = {
+    extracts,
+    resourceType: hit.resourceType
+  };
+
+  if (mapping.preserveEmbeddedMetadata) {
+    raw.sourceName = mapping.sourceName;
+    raw.containerTypeId = mapping.containerTypeId;
+    raw.extractRelevanceScores = hit.extracts?.map(extract => extract.relevanceScore);
+    raw.sensitivityLabel = hit.sensitivityLabel;
+  }
+
+  return {
+    source: mapping.source,
+    title,
+    snippet: extracts.join(' '),
+    url: hit.webUrl,
+    cache: { hit: false },
+    raw
+  };
 }
 

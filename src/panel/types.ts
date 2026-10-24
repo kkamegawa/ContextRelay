@@ -119,6 +119,11 @@ export interface ClearChatMessage {
   command: 'clearChat';
 }
 
+/** Ends a submission that produced no other message, such as a cancelled source picker. */
+export interface SubmissionCancelledMessage {
+  command: 'submissionCancelled';
+}
+
 export interface AssistantMessage {
   command: 'assistantMessage';
   text: string;
@@ -183,6 +188,7 @@ export type HostToWebviewMessage =
   | LoadingMessage
   | SlashHelpMessage
   | ClearChatMessage
+  | SubmissionCancelledMessage
   | AssistantMessage
   | PinnedItemsMessage
   | WorkspaceFilesMessage
