@@ -114,6 +114,14 @@ function describeAttachment(attachment: ResolvedAttachment): string {
     : `Local file: ${attachment.relativePath}`;
 }
 
+function getEmbeddedSourceName(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+  const name = (raw as { sourceName?: unknown }).sourceName;
+  return typeof name === 'string' && name.trim() ? name.trim() : undefined;
+}
+
 /**
  * Read an attached local file's content (or the selected line range) and add
  * it to `additionalContext`. Unlike SharePoint/OneDrive files, local files
@@ -184,7 +192,9 @@ export async function buildChatContextPayload(options: ChatContextOptions): Prom
 
     const header = [
       `Title: ${snippet.name || snippet.item.title}`,
-      `Source: ${snippet.item.source}${snippet.item.url ? ` (${snippet.item.url})` : ''}`
+      `Source: ${snippet.item.source === 'sharepoint-embedded'
+        ? `SharePoint Embedded · Preview${getEmbeddedSourceName(snippet.item.raw) ? ` (${getEmbeddedSourceName(snippet.item.raw)})` : ''}`
+        : snippet.item.source}${snippet.item.url ? ` (${snippet.item.url})` : ''}`
     ].join('\n');
     const added = addTextContext(
       additionalContext,

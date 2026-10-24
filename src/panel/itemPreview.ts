@@ -1,5 +1,6 @@
 import sanitizeHtml from 'sanitize-html';
 import { ContextItem, PreviewContent, ResolvedPreview } from '../models/contextItem';
+import { getSourceLabel } from '../sourcePresentation';
 import { decodeHtmlEntitiesOnce } from '../textExtraction';
 
 interface MailItemRaw {
@@ -35,6 +36,7 @@ interface TodoItemRaw {
 
 interface RetrievalItemRaw {
   extracts?: string[];
+  sourceName?: string;
 }
 
 interface MailBodyResponse {
@@ -132,10 +134,14 @@ export function createFallbackPreview(item: ContextItem): ResolvedPreview {
     }
     case 'sharepoint':
     case 'onedrive':
+    case 'sharepoint-embedded':
     case 'connectors':
       return {
         source: item.source,
         title: item.title,
+        subtitle: item.source === 'sharepoint-embedded'
+          ? [asRetrievalItemRaw(item.raw)?.sourceName, getSourceLabel(item.source)].filter(Boolean).join(' · ')
+          : undefined,
         content: createTextPreviewContent(body),
         timestamp: item.timestamp,
         relevance: item.relevance,
@@ -234,7 +240,7 @@ export function renderTextPreviewHtml(value: string): string {
 }
 
 function getFallbackBody(item: ContextItem): string {
-  if (item.source === 'sharepoint' || item.source === 'onedrive' || item.source === 'connectors') {
+  if (item.source === 'sharepoint' || item.source === 'onedrive' || item.source === 'sharepoint-embedded' || item.source === 'connectors') {
     const extracts = asRetrievalItemRaw(item.raw)?.extracts ?? [];
     const joinedExtracts = extracts
       .map(extract => normalizePreviewText(extract))

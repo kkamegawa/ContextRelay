@@ -7,6 +7,7 @@ const RETRIEVAL_SCOPES = ['Files.Read.All', 'Sites.Read.All'];
 const ONENOTE_SCOPES = ['Notes.Read'];
 const PLANNER_SCOPES = ['Tasks.Read'];
 const CONNECTORS_SCOPES = ['ExternalItem.Read.All'];
+const EMBEDDED_SCOPES = ['FileStorageContainer.Selected'];
 const CHAT_SCOPES = [
   'Sites.Read.All',
   'Mail.Read',
@@ -20,6 +21,7 @@ const CHAT_SCOPES = [
 export class AuthProvider {
   private session: vscode.AuthenticationSession | undefined;
   private workIqSession: vscode.AuthenticationSession | undefined;
+  private embeddedSession: vscode.AuthenticationSession | undefined;
 
   constructor(_context: vscode.ExtensionContext) {}
 
@@ -103,6 +105,60 @@ export class AuthProvider {
     return session.accessToken;
   }
 
+  /**
+   * SharePoint Embedded uses its own session so that missing
+   * FileStorageContainer.Selected consent fails /embedded alone instead of
+   * blocking the shared session used by every other adapter.
+   */
+  getEmbeddedScopes(): string[] {
+    const config = vscode.workspace.getConfiguration('contextRelay');
+    return buildProviderScopes(EMBEDDED_SCOPES, {
+      clientId: config.get<string>('auth.clientId')?.trim(),
+      tenantId: config.get<string>('auth.tenantId', 'organizations')?.trim()
+    });
+  }
+
+  async getEmbeddedSession(silent = false): Promise<vscode.AuthenticationSession | undefined> {
+    const config = vscode.workspace.getConfiguration('contextRelay');
+    const clientId = config.get<string>('auth.clientId')?.trim();
+    if (!clientId) {
+      if (silent) {
+        return undefined;
+      }
+      throw new Error(getBuiltInAuthConfigurationMessage());
+    }
+
+    try {
+      this.embeddedSession = await vscode.authentication.getSession('microsoft', this.getEmbeddedScopes(), {
+        createIfNone: !silent,
+        silent
+      });
+      return this.embeddedSession;
+    } catch (err) {
+      this.embeddedSession = undefined;
+
+      if (!silent) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('AADSTS65001') || message.includes('AADSTS650053')) {
+          throw new Error(
+            'Consent for FileStorageContainer.Selected has not been granted. ' +
+            'Add the delegated Microsoft Graph permission to your app registration and grant consent before using /embedded.'
+          );
+        }
+      }
+
+      return undefined;
+    }
+  }
+
+  async getEmbeddedAccessToken(): Promise<string> {
+    const session = await this.getEmbeddedSession();
+    if (!session) {
+      throw new Error('Not authenticated for SharePoint Embedded. Please sign in to use the /embedded command.');
+    }
+    return session.accessToken;
+  }
+
   async getWorkIqSession(silent = false): Promise<vscode.AuthenticationSession | undefined> {
     const config = vscode.workspace.getConfiguration('contextRelay');
     const clientId = config.get<string>('auth.clientId')?.trim();
@@ -157,6 +213,7 @@ export class AuthProvider {
   clearSession(): void {
     this.session = undefined;
     this.workIqSession = undefined;
+    this.embeddedSession = undefined;
   }
 
   onSessionChange(handler: () => void): vscode.Disposable {
@@ -176,5 +233,6 @@ export {
   ONENOTE_SCOPES,
   PLANNER_SCOPES,
   CONNECTORS_SCOPES,
+  EMBEDDED_SCOPES,
   CHAT_SCOPES
 };

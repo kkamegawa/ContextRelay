@@ -38,6 +38,22 @@ suite('CommandRouter', () => {
     assert.equal(result.query, 'architecture diagram');
   });
 
+  test('/embedded routes only to its dedicated operation target', () => {
+    const result = parseCommand('/embedded What did we decide about authentication?');
+    assert.equal(result.target, 'embedded');
+    assert.equal(result.query, 'What did we decide about authentication?');
+    assert.equal(result.searchScope, 'operation');
+    assert.deepEqual(result.targetSources, []);
+    assert.deepEqual(result.sourceCommands, []);
+  });
+
+  test('empty /embedded opens command help', () => {
+    const result = parseCommand('/embedded');
+    assert.equal(result.target, 'embedded');
+    assert.equal(result.isEmpty, true);
+    assert.ok(getHelpText('embedded').includes('friendly'));
+  });
+
   test('/onenote command routes to onenote', () => {
     const result = parseCommand('/onenote architecture decision log');
     assert.equal(result.target, 'onenote');
@@ -274,5 +290,7 @@ suite('CommandRouter', () => {
     const text = getHelpText('workiq');
     assert.ok(text.toLowerCase().includes('work iq'));
     assert.ok(text.includes('Example'));
+    assert.ok(text.includes('spending policy'));
+    assert.ok(!text.includes('Microsoft 365 Copilot license'));
   });
 });

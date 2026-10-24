@@ -83,6 +83,73 @@ suite('SnippetStore', () => {
     ]);
   });
 
+  test('Embedded items from different container types have distinct stable keys', () => {
+    const first = createItem({
+      source: 'sharepoint-embedded',
+      title: 'Loop page',
+      url: 'https://example.com/page',
+      raw: { containerTypeId: '11111111-2222-4333-8444-555555555555' }
+    });
+    const second = createItem({
+      source: 'sharepoint-embedded',
+      title: 'Loop page',
+      url: 'https://example.com/page',
+      raw: { containerTypeId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }
+    });
+
+    assert.notEqual(getContextItemKey(first), getContextItemKey(second));
+  });
+
+  test('saves only Embedded identity metadata and preserves per-container pin and unpin identity', () => {
+    const context = createContext();
+    const store = new SnippetStore(context);
+    const first = createItem({
+      source: 'sharepoint-embedded',
+      title: 'Loop page',
+      snippet: 'Saved grounded text',
+      url: 'https://example.com/page',
+      raw: {
+        sourceName: 'Project knowledge',
+        containerTypeId: '11111111-2222-4333-8444-555555555555',
+        extracts: ['Sensitive raw extract'],
+        extractRelevanceScores: [0.93],
+        sensitivityLabel: { name: 'Confidential' }
+      }
+    });
+    const second = createItem({
+      ...first,
+      raw: {
+        sourceName: 'Team workspace',
+        containerTypeId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        extracts: ['Another extract']
+      }
+    });
+
+    store.save(first);
+    const savedSecond = store.save(second);
+    const restored = new SnippetStore(context).getAll();
+
+    assert.deepEqual(restored[0].item.raw, {
+      sourceName: 'Project knowledge',
+      containerTypeId: '11111111-2222-4333-8444-555555555555'
+    });
+    assert.deepEqual(restored[1].item.raw, {
+      sourceName: 'Team workspace',
+      containerTypeId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+    });
+    assert.notEqual(getContextItemKey(restored[0].item), getContextItemKey(restored[1].item));
+    assert.deepEqual(store.getPinnedKeys(), [
+      getContextItemKey(first),
+      getContextItemKey(second)
+    ]);
+
+    assert.equal(store.removeByItemKey(getContextItemKey(first)), true);
+    assert.deepEqual(store.getPinnedKeys(), [getContextItemKey(second)]);
+    store.remove(savedSecond.id);
+    assert.deepEqual(store.getPinnedKeys(), []);
+    assert.equal(store.getAll().some(item => item.id === savedSecond.id), false);
+  });
+
   test('removeByItemKey removes all duplicates for the same item key', () => {
     const store = new SnippetStore(createContext());
     const duplicate = createItem({ timestamp: '2026-04-18T01:00:00.000Z', snippet: 'same item' });

@@ -2,7 +2,7 @@
 
 [English README](README.md)
 
-ContextRelay は、設計やコーディングをしながらサイドパネルで Microsoft 365 の関連コンテキストを参照できる VS Code 拡張機能です。スラッシュコマンドなしのテキストを入力すると Microsoft 365 Copilot とのチャットが始まります。このとき ContextRelay は Microsoft 365 検索を自動実行しませんが、ピン留めしたスニペットと添付ファイルがあれば、グラウンディングコンテキストとして自動的に送信します。スラッシュコマンドを使うと、Exchange メール、Teams メッセージ、SharePoint サイト、OneDrive、OneNote、Planner タスクを検索できます。重要なスニペットをピン留めし、タイムスタンプ付きの引き継ぎドキュメント（PLAN / TASKS / TEST_PLAN / HANDOFF）を生成すれば、GitHub Copilot がすぐに作業を引き継げます。
+ContextRelay は、設計やコーディングをしながらサイドパネルで Microsoft 365 の関連コンテキストを参照できる VS Code 拡張機能です。スラッシュコマンドなしのテキストを入力すると Microsoft 365 Copilot とのチャットが始まります。このとき ContextRelay は Microsoft 365 検索を自動実行しませんが、ピン留めしたスニペットと添付ファイルがあれば、グラウンディングコンテキストとして自動的に送信します。スラッシュコマンドを使うと、Exchange メール、Teams メッセージ、SharePoint サイト、OneDrive、OneNote、Planner タスクを検索できます。明示的に設定したオプトインの SharePoint Embedded ソースからは、許可されたコンテナータイプの根拠テキストを取得できます。重要なスニペットをピン留めし、タイムスタンプ付きの引き継ぎドキュメント（PLAN / TASKS / TEST_PLAN / HANDOFF）を生成すれば、GitHub Copilot がすぐに作業を引き継げます。
 
 ---
 
@@ -26,6 +26,7 @@ ContextRelay は、設計やコーディングをしながらサイドパネル�
 | `/teams <query>` | Microsoft Teams のメッセージ |
 | `/sharepoint <query>` | SharePoint のサイトとページ |
 | `/onedrive <query>` | OneDrive のファイル |
+| `/embedded <query>` | 設定した SharePoint Embedded ソースからの根拠テキスト（プレビュー、オプトイン） |
 | `/onenote <query>` | OneNote のページ |
 | `/task <query>` | Planner と Microsoft To Do のタスク |
 | `/all <query>` | 有効なすべてのソース |
@@ -64,6 +65,7 @@ Summarize #docs/plan.md
 - Microsoft 365 の職場または学校アカウント（Microsoft Entra ID）。個人用 Microsoft アカウントはサポートしません。
 - **Exchange メール、Teams、SharePoint、OneDrive、OneNote、Planner、Microsoft To Do の検索**: 標準の Microsoft 365 ライセンスと、必要な Microsoft Graph 委任アクセス許可
 - **Copilot グラウンディングを使うチャット機能**: テナントへの展開状況と API の提供状況によっては、Microsoft 365 Copilot ライセンスが必要になる場合があります
+- **SharePoint Embedded Retrieval**: オプトインのプレビュー機能です。対象コンテナータイプへの従量課金、委任された `FileStorageContainer.Selected`、コンテナータイプ所有者から ContextRelay アプリへの読み取り権限、対象コンテナーへのユーザーアクセスが必要です。セマンティックインデックス初期化のためテナントに Copilot ライセンスユーザーが1人必要ですが、検索するユーザー全員に個別ライセンスが必要なわけではありません。
 
 ### 必要なアクセス許可
 
@@ -91,6 +93,7 @@ ContextRelay は現在、これらを設定値から自動的に注入します�
 |---|---|
 | `Files.Read.All` | SharePoint / OneDrive 検索 |
 | `Sites.Read.All` | SharePoint / OneDrive 検索、チャット |
+| `FileStorageContainer.Selected`（委任） | SharePoint Embedded Retrieval（任意。コンテナータイプ所有者による読み取り権限登録も必要） |
 | `Mail.Read` | Exchange メール検索、チャット |
 | `Chat.Read` | Teams 検索、チャット |
 | `ChannelMessage.Read.All` | Teams 検索、チャット |
@@ -99,6 +102,8 @@ ContextRelay は現在、これらを設定値から自動的に注入します�
 | `People.Read.All` | チャット |
 | `OnlineMeetingTranscript.Read.All` | チャット |
 | `ExternalItem.Read.All` | コネクタ検索、チャット（任意） |
+
+SharePoint Embedded には Graph スコープとは別に権限層があります。コンテナータイプ所有者が、そのタイプに対する委任されたコンテンツ読み取り権限を ContextRelay アプリへ登録します。ID を設定するだけでは権限は付与されず、サードパーティアプリが Microsoft Loop 所有のコンテナータイプへ自分で権限を付与することはできません。有効化する前に [SharePoint Embedded の設定](docs/spe-embedded_ja.md)を確認してください。
 
 > **重要**:
 >
@@ -111,9 +116,9 @@ ContextRelay は現在、これらを設定値から自動的に注入します�
 
 | アクセス許可 | リソースエンドポイント | 利用する機能 |
 |---|---|---|
-| `WorkIQAgent.Ask` | `api://workiq.svc.cloud.microsoft` | `/workiq` コマンド — Work IQ API（任意、Microsoft 365 Copilot ライセンスが必要） |
+| `WorkIQAgent.Ask` | `api://workiq.svc.cloud.microsoft` | `/workiq` コマンド — Work IQ A2A API（任意。Work IQ テナント有効化と Copilot Credits の利用ポリシー対象が必要） |
 
-> **重要**: このアクセス許可には **テナント管理者の同意** が必要で、**Microsoft 365 Copilot ライセンス** を持つユーザーのみが利用できます。設定手順は [docs/work_iq_ja.md](docs/work_iq_ja.md) を参照してください。
+> **重要**: このアクセス許可には **テナント管理者の同意** が必要です。Work IQ API は Copilot Credits で従量課金され、ユーザーを Work IQ API の利用ポリシーに含める必要があります。設定手順と REST API の評価は [docs/work_iq_ja.md](docs/work_iq_ja.md) を参照してください。
 
 ---
 
@@ -315,6 +320,7 @@ npm run security:check
 | Planner 検索 | `User.Read`, `Tasks.Read` |
 | Chat タブ有効時 | `User.Read`, `Sites.Read.All`, `Mail.Read`, `People.Read.All`, `OnlineMeetingTranscript.Read.All`, `Chat.Read`, `ChannelMessage.Read.All` |
 | コネクタ有効時 | `User.Read`, `ExternalItem.Read.All` |
+| SharePoint Embedded Retrieval | `User.Read`, `FileStorageContainer.Selected`（委任）、コンテナータイプ所有者によるアプリ権限登録 |
 
 > 組み込みの Microsoft 認証プロバイダーは Graph のユーザープロファイルを前提としており、ContextRelay も常に要求するため、`User.Read` は常に推奨されます。
 
@@ -647,7 +653,7 @@ Copilot Chat では、VS Code のコンテキスト機構（#-mentions / Add Con
 
 3. 連続した `/workiq` クエリは会話コンテキストを維持するため、追加の質問（「14 時の打ち合わせについてもっと教えて」など）も自然に動作します。
 
-> **前提条件**: `/workiq` コマンドには Microsoft 365 Copilot ライセンスと、Entra アプリ登録での `WorkIQAgent.Ask` 委任アクセス許可が必要です。設定手順は [docs/work_iq_ja.md](docs/work_iq_ja.md) を参照してください。
+> **前提条件**: `/workiq` コマンドにはテナントの Work IQ サービスプリンシパル、Work IQ のテナント有効化、ユーザーを含む Work IQ API の利用ポリシー、Entra アプリ登録での `WorkIQAgent.Ask` 委任アクセス許可が必要です。設定手順は [docs/work_iq_ja.md](docs/work_iq_ja.md) を参照してください。
 
 > **注**: `/workiq` を指定した場合、入力内の他のスラッシュコマンドはすべて無視され、クエリ本文の一部として扱われます。
 

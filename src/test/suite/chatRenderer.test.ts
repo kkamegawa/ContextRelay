@@ -247,6 +247,104 @@ suite('ChatRenderer', () => {
       );
     });
 
+    test('shows Embedded preview source and only enables evidence pinning when extracts exist', () => {
+      renderer.renderQueryResult([
+        makeItem({
+          source: 'sharepoint-embedded',
+          title: 'Authentication decision',
+          snippet: 'Evidence paragraph',
+          url: undefined,
+          raw: {
+            sourceName: 'Project Knowledge',
+            containerTypeId: '12345678-1234-1234-1234-123456789abc',
+            extracts: ['Evidence paragraph']
+          }
+        }),
+        makeItem({
+          source: 'sharepoint-embedded',
+          title: 'Empty retrieval result',
+          snippet: '',
+          url: undefined,
+          raw: { sourceName: 'Project Knowledge', extracts: [] }
+        })
+      ], 'sharepoint-embedded', 'authentication', TIMESTAMP);
+
+      const [withEvidence, withoutEvidence] = all('.result-card');
+      assert.ok(withEvidence.classList.contains('embedded-result'));
+      assert.equal(withEvidence.querySelector('.title .source-badge'), null);
+      const sourceMetadata = one('.embedded-source-metadata', withEvidence);
+      assert.equal(one('.source-badge-embedded', sourceMetadata).textContent, 'SharePoint Embedded · Preview');
+      assert.equal(one('.source-metadata', sourceMetadata).textContent, 'Source: Project Knowledge');
+      assert.ok(one('.action-preview', withEvidence));
+      assert.equal((one('.action-pin', withEvidence) as HTMLButtonElement).disabled, false);
+      assert.equal((one('.action-pin', withoutEvidence) as HTMLButtonElement).disabled, true);
+    });
+
+    test('previews Embedded extracts internally even when a source URL is available', () => {
+      const item = makeItem({
+        source: 'sharepoint-embedded',
+        title: 'Authentication decision',
+        snippet: 'Retrieved evidence',
+        raw: {
+          sourceName: 'Project Knowledge',
+          containerTypeId: '12345678-1234-1234-1234-123456789abc',
+          extracts: ['Retrieved evidence']
+        }
+      });
+      renderer.renderQueryResult([item], 'sharepoint-embedded', 'authentication', TIMESTAMP);
+
+      one('.action-preview').click();
+      assert.deepEqual(vscodeApi.messages[vscodeApi.messages.length - 1], { command: 'openItem', item });
+
+      one('.action-open').click();
+      assert.deepEqual(vscodeApi.messages[vscodeApi.messages.length - 1], { command: 'openLink', url: ITEM_URL });
+    });
+
+    test('matches Embedded pin state with the host key and keeps containers distinct', () => {
+      const makeEmbedded = (containerTypeId: string): ResultItem => makeItem({
+        source: 'sharepoint-embedded',
+        title: 'Shared title',
+        snippet: 'Shared evidence',
+        url: undefined,
+        raw: { sourceName: 'Project Knowledge', containerTypeId, extracts: ['Shared evidence'] }
+      });
+      const first = makeEmbedded('12345678-1234-1234-1234-123456789abc');
+      const second = makeEmbedded('abcdefab-1234-1234-1234-123456789abc');
+      assert.notEqual(getContextItemKey(first as never), getContextItemKey(second as never));
+
+      renderer.renderQueryResult([first, second], 'sharepoint-embedded', 'shared', TIMESTAMP);
+      renderer.setPinnedItems([getContextItemKey(first as never)]);
+
+      const [firstCard, secondCard] = all('.result-card');
+      assert.equal(one('.action-pin', firstCard).textContent, 'Unpin');
+      assert.equal(one('.action-pin', firstCard).getAttribute('aria-pressed'), 'true');
+      assert.equal(one('.action-pin', secondCard).textContent, 'Pin');
+      assert.equal(one('.action-pin', secondCard).getAttribute('aria-pressed'), 'false');
+    });
+
+    test('keeps Unpin available for a saved Embedded pin without extracts when pin state arrives later', () => {
+      const item = makeItem({
+        source: 'sharepoint-embedded',
+        title: 'Saved evidence',
+        snippet: '',
+        url: undefined,
+        raw: { sourceName: 'Project Knowledge', containerTypeId: '12345678-1234-1234-1234-123456789abc', extracts: [] }
+      });
+      renderer.renderQueryResult([item], 'sharepoint-embedded', 'saved', TIMESTAMP);
+      const pinButton = one('.action-pin') as HTMLButtonElement;
+      assert.equal(pinButton.disabled, true);
+      assert.equal(pinButton.title, 'Cannot pin: no retrieval extracts are available as evidence');
+
+      renderer.setPinnedItems([getContextItemKey(item as never)]);
+      assert.equal(pinButton.textContent, 'Unpin');
+      assert.equal(pinButton.disabled, false);
+
+      renderer.setPinnedItems([]);
+      assert.equal(pinButton.textContent, 'Pin');
+      assert.equal(pinButton.disabled, true);
+      assert.equal(pinButton.title, 'Cannot pin: no retrieval extracts are available as evidence');
+    });
+
     test('posts openLink, copySnippet, and pinSnippet from the card buttons', () => {
       const item = makeItem();
       renderer.renderQueryResult([item], 'sharepoint', 'release', TIMESTAMP);
