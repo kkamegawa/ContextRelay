@@ -255,7 +255,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'eslint',
         actual: packageJson.devDependencies?.eslint,
-        expected: '^10.12.0',
+        expected: '^10.13.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -627,7 +627,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed eslint',
         actual: packageLockJson.packages?.['node_modules/eslint']?.version,
-        expected: '10.12.0',
+        expected: '10.13.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
