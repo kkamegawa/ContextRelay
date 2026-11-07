@@ -207,7 +207,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'marked',
         actual: packageJson.dependencies?.marked,
-        expected: '^18.1.0',
+        expected: '^18.1.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -573,7 +573,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed marked',
         actual: packageLockJson.packages?.['node_modules/marked']?.version,
-        expected: '18.1.0',
+        expected: '18.1.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
