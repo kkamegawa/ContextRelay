@@ -243,7 +243,7 @@ suite('Dependency security baselines', () => {
       {
         label: '@typescript-eslint/parser',
         actual: packageJson.devDependencies?.['@typescript-eslint/parser'],
-        expected: '8.71.2',
+        expected: '8.72.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -621,7 +621,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @typescript-eslint/parser',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
-        expected: '8.71.2',
+        expected: '8.72.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
