@@ -285,8 +285,14 @@ suite('Dependency security baselines', () => {
       {
         label: 'glob override',
         actual: packageJson.overrides?.glob,
-        expected: '13.0.6',
-        message: 'must stay aligned with the Mocha 12 dependency range'
+        expected: '14.0.4',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'minimatch override',
+        actual: packageJson.overrides?.minimatch,
+        expected: '11.0.5',
+        message: 'must stay on the audited non-vulnerable release'
       },
       {
         label: 'diff override',
@@ -659,8 +665,14 @@ suite('Dependency security baselines', () => {
         actual:
           packageLockJson.packages?.['node_modules/mocha/node_modules/glob']?.version ??
           packageLockJson.packages?.['node_modules/glob']?.version,
-        expected: '13.0.6',
-        message: 'must stay aligned with the Mocha 12 dependency range'
+        expected: '14.0.4',
+        message: 'must stay on the audited non-vulnerable release'
+      },
+      {
+        label: 'installed minimatch',
+        actual: packageLockJson.packages?.['node_modules/minimatch']?.version,
+        expected: '11.0.5',
+        message: 'must stay on the audited non-vulnerable release'
       },
       {
         label: 'installed diff',
