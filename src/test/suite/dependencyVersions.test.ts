@@ -237,7 +237,7 @@ suite('Dependency security baselines', () => {
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.71.2',
+        expected: '^8.72.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -615,7 +615,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.71.2',
+        expected: '8.72.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
