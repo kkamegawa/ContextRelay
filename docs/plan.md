@@ -408,7 +408,7 @@ Key API dependencies:
 - `WebviewViewProvider` (available since VS Code 1.51)
 - Microsoft authentication provider built-in extension (available since VS Code 1.75)
 
-VS Code 1.140 is the declared runtime floor so it remains aligned with the `@types/vscode` 1.140 development baseline.
+VS Code 1.140 is the declared runtime floor. The `@types/vscode` development baseline may be newer; extension code must continue using APIs available at the runtime floor.
 
 ---
 
@@ -440,6 +440,7 @@ VS Code 1.140 is the declared runtime floor so it remains aligned with the `@typ
 
 | Date | Change |
 |---|---|
+| 2026-11-14 | Corrected the runtime-floor note after Dependabot PR #303 updated @types/vscode to 1.144.0: runtime support remains VS Code 1.140, and development typings are tracked independently. |
 | 2026-10-24 | User-approved design and implementation scope: add opt-in SharePoint Embedded Retrieval by friendly named source, document its owning-app permission and billing prerequisites, configure read-only SPE MCP for supported development clients, and assess Work IQ REST while excluding Work IQ MCP. |
 | 2026-10-24 | User-approved review fixes: Embedded uses a dedicated sign-in session, in-flight searches invalidated by setting changes report a message, sign-in events clear cached results without discarding in-flight searches, and each SPE MCP client keeps its own state directory. See [ADR 0001](adr/0001-sharepoint-embedded-retrieval.md). |
 

@@ -207,7 +207,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'marked',
         actual: packageJson.dependencies?.marked,
-        expected: '^18.1.2',
+        expected: '^18.1.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -231,7 +231,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'concurrently',
         actual: packageJson.devDependencies?.concurrently,
-        expected: '^10.0.6',
+        expected: '^10.0.7',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -255,7 +255,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'eslint',
         actual: packageJson.devDependencies?.eslint,
-        expected: '^10.13.0',
+        expected: '^10.14.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -267,7 +267,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'webpack-cli',
         actual: packageJson.devDependencies?.['webpack-cli'],
-        expected: '^7.2.3',
+        expected: '^7.3.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -359,19 +359,15 @@ suite('Dependency security baselines', () => {
     );
   });
 
-  test('keeps @types/vscode aligned with engines.vscode', () => {
+  test('tracks VS Code runtime floor separately from development typings', () => {
     const packageJson = readRepoJson<PackageJson>('package.json');
     const vscodeTypesVersion = packageJson.devDependencies?.['@types/vscode'];
     const vscodeEngineVersion = packageJson.engines?.vscode;
 
     assert.ok(vscodeTypesVersion, '@types/vscode must be declared in devDependencies');
     assert.ok(vscodeEngineVersion, 'engines.vscode must be declared');
-    assert.equal(vscodeTypesVersion, '^1.140.0', '@types/vscode must stay on the reviewed 1.140 baseline');
-    assert.equal(vscodeEngineVersion, '^1.140.0', 'engines.vscode must stay on the reviewed 1.140 baseline');
-    assert.ok(
-      compareVersions(vscodeEngineVersion, vscodeTypesVersion ?? '') >= 0,
-      `@types/vscode (${vscodeTypesVersion ?? 'missing'}) must not exceed engines.vscode (${vscodeEngineVersion ?? 'missing'})`
-    );
+    assert.equal(vscodeTypesVersion, '^1.144.0', '@types/vscode must stay on the reviewed 1.144 development baseline');
+    assert.equal(vscodeEngineVersion, '^1.140.0', 'engines.vscode must keep the supported 1.140 runtime floor');
   });
 
   test('constructs and runs Mocha through the compiled CommonJS default import', async () => {
@@ -579,7 +575,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed marked',
         actual: packageLockJson.packages?.['node_modules/marked']?.version,
-        expected: '18.1.2',
+        expected: '18.1.3',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -597,8 +593,8 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @types/vscode',
         actual: packageLockJson.packages?.['node_modules/@types/vscode']?.version,
-        expected: '1.140.0',
-        message: 'must stay aligned with the supported VS Code baseline'
+        expected: '1.144.0',
+        message: 'must stay aligned with the reviewed development baseline'
       },
       {
         label: 'installed @types/node',
@@ -609,7 +605,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed concurrently',
         actual: packageLockJson.packages?.['node_modules/concurrently']?.version,
-        expected: '10.0.6',
+        expected: '10.0.7',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -633,7 +629,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed eslint',
         actual: packageLockJson.packages?.['node_modules/eslint']?.version,
-        expected: '10.13.0',
+        expected: '10.14.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -645,7 +641,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed webpack-cli',
         actual: packageLockJson.packages?.['node_modules/webpack-cli']?.version,
-        expected: '7.2.3',
+        expected: '7.3.1',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
