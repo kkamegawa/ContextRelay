@@ -207,13 +207,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'marked',
         actual: packageJson.dependencies?.marked,
-        expected: '^18.1.3',
+        expected: '^18.2.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'sanitize-html',
         actual: packageJson.dependencies?.['sanitize-html'],
-        expected: '^2.18.1',
+        expected: '^2.18.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -237,13 +237,13 @@ suite('Dependency security baselines', () => {
       {
         label: '@typescript-eslint/eslint-plugin',
         actual: packageJson.devDependencies?.['@typescript-eslint/eslint-plugin'],
-        expected: '^8.72.1',
+        expected: '8.72.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: '@typescript-eslint/parser',
         actual: packageJson.devDependencies?.['@typescript-eslint/parser'],
-        expected: '8.72.1',
+        expected: '8.72.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -255,7 +255,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'eslint',
         actual: packageJson.devDependencies?.eslint,
-        expected: '^10.14.0',
+        expected: '^10.15.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -366,7 +366,7 @@ suite('Dependency security baselines', () => {
 
     assert.ok(vscodeTypesVersion, '@types/vscode must be declared in devDependencies');
     assert.ok(vscodeEngineVersion, 'engines.vscode must be declared');
-    assert.equal(vscodeTypesVersion, '^1.144.0', '@types/vscode must stay on the reviewed 1.144 development baseline');
+    assert.equal(vscodeTypesVersion, '^1.146.0', '@types/vscode must stay on the reviewed 1.146 development baseline');
     assert.equal(vscodeEngineVersion, '^1.140.0', 'engines.vscode must keep the supported 1.140 runtime floor');
   });
 
@@ -575,13 +575,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed marked',
         actual: packageLockJson.packages?.['node_modules/marked']?.version,
-        expected: '18.1.3',
+        expected: '18.2.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed sanitize-html',
         actual: packageLockJson.packages?.['node_modules/sanitize-html']?.version,
-        expected: '2.18.1',
+        expected: '2.18.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -593,7 +593,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @types/vscode',
         actual: packageLockJson.packages?.['node_modules/@types/vscode']?.version,
-        expected: '1.144.0',
+        expected: '1.146.0',
         message: 'must stay aligned with the reviewed development baseline'
       },
       {
@@ -611,13 +611,13 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed @typescript-eslint/eslint-plugin',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/eslint-plugin']?.version,
-        expected: '8.72.1',
+        expected: '8.72.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
         label: 'installed @typescript-eslint/parser',
         actual: packageLockJson.packages?.['node_modules/@typescript-eslint/parser']?.version,
-        expected: '8.72.1',
+        expected: '8.72.2',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
@@ -629,7 +629,7 @@ suite('Dependency security baselines', () => {
       {
         label: 'installed eslint',
         actual: packageLockJson.packages?.['node_modules/eslint']?.version,
-        expected: '10.14.0',
+        expected: '10.15.0',
         message: 'must stay aligned with the consolidated Dependabot update'
       },
       {
