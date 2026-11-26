@@ -378,7 +378,7 @@
   },
   "dependencies": {
     "jszip": "^3.10.2",
-    "marked": "^18.2.0",
+    "marked": "^18.2.1",
     "sanitize-html": "^2.18.2"
   },
   "allowScripts": {
